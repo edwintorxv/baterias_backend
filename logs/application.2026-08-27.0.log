@@ -1,0 +1,46 @@
+2026-08-27 12:00:19,382 INFO  com.riesgopsicosocial.RiesgoPsicosocialApiApplication - Starting RiesgoPsicosocialApiApplication using Java 17.0.16 with PID 19520 (C:\Users\gachae\Documents\Personal\Backend\riesgo-psicosocial-api\target\classes started by gachae in C:\Users\gachae\Documents\Personal\Backend\riesgo-psicosocial-api)
+2026-08-27 12:00:19,393 INFO  com.riesgopsicosocial.RiesgoPsicosocialApiApplication - The following 1 profile is active: "dev"
+2026-08-27 12:00:19,476 INFO  org.springframework.boot.devtools.env.DevToolsPropertyDefaultsPostProcessor - Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-08-27 12:00:19,476 INFO  org.springframework.boot.devtools.env.DevToolsPropertyDefaultsPostProcessor - For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-08-27 12:00:21,037 INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-08-27 12:00:21,219 INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 165 ms. Found 23 JPA repository interfaces.
+2026-08-27 12:00:22,318 INFO  org.springframework.boot.web.embedded.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-08-27 12:00:22,344 INFO  org.apache.catalina.core.StandardService - Starting service [Tomcat]
+2026-08-27 12:00:22,344 INFO  org.apache.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-08-27 12:00:22,453 INFO  org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/api] - Initializing Spring embedded WebApplicationContext
+2026-08-27 12:00:22,453 INFO  org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 2977 ms
+2026-08-27 12:00:22,960 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-08-27 12:00:23,342 INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@147f544f
+2026-08-27 12:00:23,344 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-08-27 12:00:23,391 INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://localhost:5432/bateria_psicosocial (PostgreSQL 16.12)
+2026-08-27 12:00:23,499 INFO  org.flywaydb.core.internal.command.DbValidate - Successfully validated 1 migration (execution time 00:00.065s)
+2026-08-27 12:00:23,541 INFO  org.flywaydb.core.internal.command.DbMigrate - Current version of schema "public": 1
+2026-08-27 12:00:23,549 INFO  org.flywaydb.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-08-27 12:00:23,738 INFO  org.hibernate.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-08-27 12:00:23,887 INFO  org.hibernate.Version - HHH000412: Hibernate ORM core version 6.6.53.Final
+2026-08-27 12:00:23,974 INFO  org.hibernate.cache.internal.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-08-27 12:00:24,471 INFO  org.springframework.orm.jpa.persistenceunit.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-08-27 12:00:24,593 INFO  org.hibernate.orm.connections.pooling - HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 16.12
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-08-27 12:00:26,225 INFO  org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-08-27 12:00:26,297 INFO  org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-08-27 12:00:28,524 INFO  org.springframework.boot.devtools.autoconfigure.OptionalLiveReloadServer - LiveReload server is running on port 35729
+2026-08-27 12:00:28,591 INFO  org.springframework.boot.web.embedded.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path '/api'
+2026-08-27 12:00:28,608 INFO  com.riesgopsicosocial.RiesgoPsicosocialApiApplication - Started RiesgoPsicosocialApiApplication in 10.084 seconds (process running for 13.056)
+2026-08-27 12:00:28,616 WARN  org.springdoc.core.events.SpringDocAppInitializer - SpringDoc /v3/api-docs endpoint is enabled by default. To disable it in production, set the property 'springdoc.api-docs.enabled=false'
+2026-08-27 12:00:28,616 WARN  org.springdoc.core.events.SpringDocAppInitializer - SpringDoc /swagger-ui.html endpoint is enabled by default. To disable it in production, set the property 'springdoc.swagger-ui.enabled=false'
+2026-08-27 12:02:27,553 INFO  org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/api] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-08-27 12:02:27,553 INFO  org.springframework.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-08-27 12:02:27,556 INFO  org.springframework.web.servlet.DispatcherServlet - Completed initialization in 3 ms
+2026-08-27 12:02:28,826 INFO  org.springdoc.api.AbstractOpenApiResource - Init duration for springdoc-openapi is: 850 ms
+2026-08-27 17:23:09,952 INFO  org.springframework.boot.web.embedded.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-08-27 17:23:10,448 INFO  org.springframework.boot.web.embedded.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-08-27 17:23:10,467 INFO  org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-08-27 17:23:10,498 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-08-27 17:23:10,509 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.

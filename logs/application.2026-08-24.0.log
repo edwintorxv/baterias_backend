@@ -1,0 +1,76 @@
+2026-08-24 14:44:09,582 INFO  com.riesgopsicosocial.RiesgoPsicosocialApiApplication - Starting RiesgoPsicosocialApiApplication using Java 17.0.16 with PID 15320 (C:\Users\gachae\Documents\Personal\Backend\riesgo-psicosocial-api\target\classes started by gachae in C:\Users\gachae\Documents\Personal\Backend\riesgo-psicosocial-api)
+2026-08-24 14:44:09,598 INFO  com.riesgopsicosocial.RiesgoPsicosocialApiApplication - The following 1 profile is active: "dev"
+2026-08-24 14:44:09,744 INFO  org.springframework.boot.devtools.env.DevToolsPropertyDefaultsPostProcessor - Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-08-24 14:44:09,745 INFO  org.springframework.boot.devtools.env.DevToolsPropertyDefaultsPostProcessor - For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-08-24 14:44:12,359 INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-08-24 14:44:12,839 INFO  org.springframework.data.repository.config.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 449 ms. Found 21 JPA repository interfaces.
+2026-08-24 14:44:14,810 INFO  org.springframework.boot.web.embedded.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-08-24 14:44:14,858 INFO  org.apache.catalina.core.StandardService - Starting service [Tomcat]
+2026-08-24 14:44:14,859 INFO  org.apache.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-08-24 14:44:15,003 INFO  org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/api] - Initializing Spring embedded WebApplicationContext
+2026-08-24 14:44:15,004 INFO  org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 5257 ms
+2026-08-24 14:44:15,875 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-08-24 14:44:16,496 INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@2966a356
+2026-08-24 14:44:16,503 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-08-24 14:44:16,585 INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://localhost:5432/bateria_psicosocial (PostgreSQL 16.12)
+2026-08-24 14:44:16,768 INFO  org.flywaydb.core.internal.command.DbValidate - Successfully validated 1 migration (execution time 00:00.118s)
+2026-08-24 14:44:16,811 INFO  org.flywaydb.core.internal.command.DbMigrate - Current version of schema "public": 1
+2026-08-24 14:44:16,820 INFO  org.flywaydb.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-08-24 14:44:17,272 INFO  org.hibernate.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-08-24 14:44:17,588 INFO  org.hibernate.Version - HHH000412: Hibernate ORM core version 6.6.53.Final
+2026-08-24 14:44:17,793 INFO  org.hibernate.cache.internal.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-08-24 14:44:18,757 INFO  org.springframework.orm.jpa.persistenceunit.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-08-24 14:44:19,109 INFO  org.hibernate.orm.connections.pooling - HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 16.12
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-08-24 14:44:20,889 INFO  org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-08-24 14:44:21,009 INFO  org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-08-24 14:44:23,767 INFO  org.springframework.boot.devtools.autoconfigure.OptionalLiveReloadServer - LiveReload server is running on port 35729
+2026-08-24 14:44:23,856 INFO  org.springframework.boot.web.embedded.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path '/api'
+2026-08-24 14:44:23,877 INFO  com.riesgopsicosocial.RiesgoPsicosocialApiApplication - Started RiesgoPsicosocialApiApplication in 15.767 seconds (process running for 28.768)
+2026-08-24 14:44:23,886 WARN  org.springdoc.core.events.SpringDocAppInitializer - SpringDoc /v3/api-docs endpoint is enabled by default. To disable it in production, set the property 'springdoc.api-docs.enabled=false'
+2026-08-24 14:44:23,887 WARN  org.springdoc.core.events.SpringDocAppInitializer - SpringDoc /swagger-ui.html endpoint is enabled by default. To disable it in production, set the property 'springdoc.swagger-ui.enabled=false'
+2026-08-24 14:46:02,926 INFO  org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/api] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-08-24 14:46:02,926 INFO  org.springframework.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-08-24 14:46:02,930 INFO  org.springframework.web.servlet.DispatcherServlet - Completed initialization in 4 ms
+2026-08-24 14:46:04,368 INFO  org.springdoc.api.AbstractOpenApiResource - Init duration for springdoc-openapi is: 974 ms
+2026-08-24 15:39:47,790 WARN  org.hibernate.engine.jdbc.spi.SqlExceptionHelper - SQL Error: 0, SQLState: 23503
+2026-08-24 15:39:47,790 ERROR org.hibernate.engine.jdbc.spi.SqlExceptionHelper - ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 15:39:47,813 WARN  com.riesgopsicosocial.shared.exception.GlobalExceptionHandler - Violacion de integirdad de datos ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 15:39:47,819 WARN  org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver - Resolved [org.springframework.dao.DataIntegrityViolationException: could not execute statement [ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»<EOL>  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».] [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; SQL [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; constraint [null]]
+2026-08-24 15:49:59,699 WARN  org.hibernate.engine.jdbc.spi.SqlExceptionHelper - SQL Error: 0, SQLState: 23503
+2026-08-24 15:49:59,699 ERROR org.hibernate.engine.jdbc.spi.SqlExceptionHelper - ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 15:49:59,703 WARN  com.riesgopsicosocial.shared.exception.GlobalExceptionHandler - Violacion de integirdad de datos ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 15:49:59,705 WARN  org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver - Resolved [org.springframework.dao.DataIntegrityViolationException: could not execute statement [ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»<EOL>  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».] [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; SQL [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; constraint [null]]
+2026-08-24 15:57:57,258 WARN  org.hibernate.engine.jdbc.spi.SqlExceptionHelper - SQL Error: 0, SQLState: 23503
+2026-08-24 15:57:57,259 ERROR org.hibernate.engine.jdbc.spi.SqlExceptionHelper - ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 15:57:57,260 WARN  com.riesgopsicosocial.shared.exception.GlobalExceptionHandler - Violacion de integirdad de datos ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 15:57:57,262 WARN  org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver - Resolved [org.springframework.dao.DataIntegrityViolationException: could not execute statement [ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»<EOL>  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».] [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; SQL [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; constraint [null]]
+2026-08-24 16:00:03,493 WARN  org.hibernate.engine.jdbc.spi.SqlExceptionHelper - SQL Error: 0, SQLState: 23503
+2026-08-24 16:00:03,494 ERROR org.hibernate.engine.jdbc.spi.SqlExceptionHelper - ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 16:00:03,496 WARN  com.riesgopsicosocial.shared.exception.GlobalExceptionHandler - Violacion de integirdad de datos ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 16:00:03,497 WARN  org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver - Resolved [org.springframework.dao.DataIntegrityViolationException: could not execute statement [ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»<EOL>  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».] [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; SQL [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; constraint [null]]
+2026-08-24 16:00:30,048 WARN  org.hibernate.engine.jdbc.spi.SqlExceptionHelper - SQL Error: 0, SQLState: 23503
+2026-08-24 16:00:30,049 ERROR org.hibernate.engine.jdbc.spi.SqlExceptionHelper - ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 16:00:30,050 WARN  com.riesgopsicosocial.shared.exception.GlobalExceptionHandler - Violacion de integirdad de datos ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»
+  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».
+2026-08-24 16:00:30,051 WARN  org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver - Resolved [org.springframework.dao.DataIntegrityViolationException: could not execute statement [ERROR: inserción o actualización en la tabla «cliente» viola la llave foránea «fk_cliente_industria»<EOL>  Detail: La llave (fk_industria)=(0) no está presente en la tabla «industria».] [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; SQL [update cliente set cargo_contacto=?,direccion=?,fecha_modificado=?,fk_ciudad_municipio=?,fk_industria=?,nit=?,nombre=?,nombre_contacto=?,telefono=?,telefono_contacto=?,usuario_crea=?,usuario_modifica=? where id=?]; constraint [null]]
+2026-08-24 17:31:37,735 INFO  org.springframework.boot.web.embedded.tomcat.GracefulShutdown - Commencing graceful shutdown. Waiting for active requests to complete
+2026-08-24 17:31:38,095 INFO  org.springframework.boot.web.embedded.tomcat.GracefulShutdown - Graceful shutdown complete
+2026-08-24 17:31:38,122 INFO  org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-08-24 17:31:38,151 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-08-24 17:31:38,158 INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
