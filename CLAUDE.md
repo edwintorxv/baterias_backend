@@ -36,18 +36,16 @@ No todas las tablas usan hexagonal completo (`domain` + `application`). Los cat�
 - **Grupo C** (`POST`, `PUT`, `GET`, `GET/{id}`, sin `DELETE`):
   - Ya implementados antes de esta sesión: `cuestionario`, `dominio`, `dimension`, `opcion_respuesta` (se les quitó el `DELETE`) — ✅
   - Implementados en esta sesión: `cliente`, `evaluado`, `evaluado_cliente`, `aplicacion` — ✅
-  - **Pendientes**: `dimension_cuestionario`, `dominio_cuestionario`, `pregunta`, `baremo_dimension`, `baremo_dominio`
-- **Grupo D** (transaccional, `POST`, `PUT`, `GET/{id}`, sin listar todo, sin `delete`): `respuesta`, `resultado_cuestionario`, `resultado_dimension`, `resultado_dominio` — **pendiente, sin diseñar**. Requiere resolver antes:
-  - ¿Cómo se consultan las respuestas de una aplicación sin un `GET` general? (¿`@RequestParam` obligatorio `fkAplicacion`, o anidado dentro de `GET /aplicaciones/{id}`?)
-  - ¿`valor_obtenido` en `respuesta` lo calcula el backend (buscando en `escala_detalle` según `fk_opcion_respuesta` + `fk_escala` de la pregunta) o lo manda el frontend? Si lo calcula el backend, esto empieza a ser lógica de negocio real → candidato a `domain`/`application`.
-  - ¿Tiene sentido de negocio editar (`PUT`) una respuesta ya dada?
+  - Implementados en sesión posterior: `dimension_cuestionario`, `dominio_cuestionario`, `pregunta`, `baremo_dimension`, `baremo_dominio` — ✅ (Grupo C completo)
+- **Grupo D** (transaccional, sin listar todo genérico, sin `delete`):
+  - `respuesta` (`POST`, `GET/{id}`, `GET` filtrado por `@RequestParam` **obligatorio** `fkAplicacion`, **sin `PUT`** — inmutable una vez creada) — ✅ implementado. Decisiones tomadas:
+    - Consulta: `GET /respuestas?fkAplicacion=X` (mismo patrón `@RequestParam` que el resto del proyecto, `fkAplicacion` obligatorio en vez de opcional porque no hay listado general).
+    - `valor_obtenido`: lo calcula el backend. `RespuestaService.crear` busca la `PreguntaEntity` (para obtener `fkEscala`) y luego en `EscalaDetalleJpaRepository.findByFkEscalaAndFkOpcionRespuesta` el valor correspondiente; si no existe esa combinación lanza `BusinessException` (409). Decisión del usuario: las tablas `escala`, `opcion_respuesta` y `escala_detalle` se diseñaron justamente para que el backend calcule ese valor, no para que lo mande el frontend.
+    - `PUT`: no existe. Una respuesta ya registrada es inmutable; si hay un error se maneja a nivel de aplicación completa, no editando la respuesta puntual.
+    - Se creó `EscalaDetalleEntity` + `EscalaDetalleJpaRepository` (paquete `escaladetalle`) como pieza de soporte interna — no tenía controller/CRUD propio definido en ninguna sesión anterior y solo se usa como lookup desde `RespuestaService`. Si en el futuro hace falta gestionar sus valores por API, agregar el molde catálogo/entidad plana que corresponda.
+  - `resultado_cuestionario`, `resultado_dimension`, `resultado_dominio` (motor de cálculo de riesgo) — **pendiente**, decisión de alcance tomada: se implementan en una etapa aparte, con diseño hexagonal completo (`domain`/`application`), ya que agregan puntajes de `respuesta`, aplican `factor_transformacion` de `dimension_cuestionario`/`dominio_cuestionario` y determinan `nivel_riesgo` según los rangos de `baremo_dimension`/`baremo_dominio`/`baremo_cuestionario`. Falta definir el disparador (¿se calcula automáticamente al finalizar la `aplicacion`, o mediante un endpoint explícito?).
 
-**Próximo paso acordado**: cerrar primero las tablas de configuración de cuestionario del Grupo C, en este orden de dependencia:
-1. `dimension_cuestionario` y `dominio_cuestionario` (dependen de `cuestionario`/`dimension`/`dominio`)
-2. `pregunta` (depende de `dimension_cuestionario`)
-3. `baremo_dimension` y `baremo_dominio` (dependen de `dimension_cuestionario`/`dominio_cuestionario`)
-
-Y solo después volver a `respuesta` (Grupo D) con las preguntas de diseño resueltas.
+**Próximo paso acordado**: diseñar e implementar el motor de cálculo de riesgo (`resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`) en `domain`/`application`, incluyendo el disparador del cálculo.
 
 ---
 
@@ -279,12 +277,11 @@ spring.jpa.properties.hibernate.jdbc.time_zone=America/Bogota
 
 ## 8. Preguntas abiertas / pendientes antes de continuar
 
-1. **`ErrorCode.DATA_INTEGRITY_VIOLATION`**: confirmar si ya se agregó esa constante al enum `ErrorCode` (se propuso en esta sesión, no se vio el archivo completo).
+1. **`ErrorCode.DATA_INTEGRITY_VIOLATION`**: ✅ confirmado, ya está agregado al enum `ErrorCode`.
 2. **`aplicacion.estado`**: ¿existe un catálogo cerrado de valores (`FINALIZADA`, `EN_PROGRESO`, `ANULADA`...) o es texto libre por ahora? Sin resolver aún.
-3. **Diseño de Grupo D (`respuesta`, `resultado_*`)**: pendiente definir:
-   - Cómo se consultan las respuestas de una aplicación (filtro obligatorio vs. anidado en `aplicacion`)
-   - Si `valor_obtenido` lo calcula el backend (vía `escala_detalle`) o lo manda el frontend
-   - Si tiene sentido permitir `PUT` sobre una respuesta ya registrada
+3. **Diseño de Grupo D — `respuesta`**: ✅ resuelto (ver sección 2). Pendiente solo el motor de cálculo (`resultado_*`):
+   - Definir el disparador del cálculo (automático al finalizar `aplicacion` vs. endpoint explícito)
+   - Diseñar el `domain`/`application` del motor de cálculo de riesgo
 
 ---
 
@@ -296,4 +293,8 @@ El script de creación de las ~34 tablas (`cuestionario`, `dominio`, `dimension`
 
 ## 10. Siguiente paso acordado
 
-Implementar `dimension_cuestionario` y `dominio_cuestionario` (estructuras gemelas, dependen de tablas ya implementadas), siguiendo el molde "entidad plana" de la sección 3.2. La unicidad en ambas ya viene dada por el SQL como `UNIQUE (fk_dimension, fk_cuestionario)` / `UNIQUE (fk_dominio, fk_cuestionario)` — hay que decidir si esa validación se hace explícita en el service (lanzando `BusinessException`) antes del `INSERT`, o si se delega igual que las FKs al handler de `DataIntegrityViolationException` (Postgres ya la rechazaría con un error de `UNIQUE constraint`).
+Grupo C completo y `respuesta` (Grupo D) implementado (ver sección 2). El siguiente paso es diseñar e implementar el motor de cálculo de riesgo: `resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`, en `domain`/`application` (hexagonal completo), incluyendo:
+- El disparador del cálculo (automático al finalizar la `aplicacion` vs. endpoint explícito).
+- La lógica de suma de `puntaje_bruto` a partir de `respuesta` agrupado por `dimension_cuestionario`/`dominio_cuestionario`/`cuestionario`.
+- La aplicación de `factor_transformacion` para obtener `puntaje_transformado`.
+- La búsqueda del `nivel_riesgo` correspondiente según los rangos (`valor_minimo`/`valor_maximo`) de `baremo_dimension`/`baremo_dominio`/`baremo_cuestionario`.
