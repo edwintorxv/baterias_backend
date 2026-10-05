@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record AplicacionRequest(
 
         @NotNull Long fkEvaluadoCliente,
+        Long fkGrupoOcupacional,
         LocalDateTime fechaAplicacion,
         String observaciones,
         @Size(max = 20) String estado

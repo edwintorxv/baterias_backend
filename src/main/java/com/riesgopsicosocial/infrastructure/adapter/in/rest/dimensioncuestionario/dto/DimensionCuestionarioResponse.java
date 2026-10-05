@@ -6,5 +6,6 @@ public record DimensionCuestionarioResponse(
         Long id,
         Long fkDimension,
         Long fkCuestionario,
-        BigDecimal factorTransformacion) {
+        BigDecimal factorTransformacion,
+        BigDecimal peso) {
 }

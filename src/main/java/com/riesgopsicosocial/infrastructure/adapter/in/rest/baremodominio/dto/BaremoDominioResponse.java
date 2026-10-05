@@ -6,6 +6,7 @@ public record BaremoDominioResponse(
         Long id,
         Long fkDominioCuestionario,
         Long fkNivelRiesgo,
+        Long fkGrupoOcupacional,
         BigDecimal valorMinimo,
         BigDecimal valorMaximo) {
 }

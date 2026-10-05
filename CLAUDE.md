@@ -2,6 +2,25 @@
 
 > Documento de contexto para continuar el desarrollo desde IntelliJ (Claude Pro / Claude Code).
 > Generado a partir de una sesión de diseño e implementación del backend.
+> Última actualización: 2026-10-04 (motor de cálculo implementado; ver sección 2).
+
+---
+
+## 0. Puesta en marcha en otro computador
+
+Requisitos: **JDK 17**, **PostgreSQL 16** (la máquina original usa `C:\Program Files\PostgreSQL\16`), Maven vía `./mvnw` (incluido en el repo). Repo: `https://github.com/edwintorxv/baterias_backend.git`, rama `main`.
+
+1. Crear la BD vacía: `CREATE DATABASE bateria_psicosocial;` (usuario `postgres` / clave `1234`, según `application-dev.properties`; si cambian, ajustar ese archivo localmente sin subirlo).
+2. **Ojo — los datos maestros NO están en las migraciones.** `V1__initial_schema.sql` solo crea tablas (los `INSERT` se quitaron, ver incidente 6.1) y `V2` solo inserta `grupo_ocupacional`. Catálogos, cuestionarios, dimensiones/dominios, preguntas, escalas, baremos y los datos de prueba (aplicaciones 1 y 2) viven únicamente en la BD local de la máquina original. Para tenerlos en la nueva hay dos caminos:
+   - **Copiar la BD completa (recomendado)**: en la máquina original
+     `& "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" -U postgres -d bateria_psicosocial -F c -f bateria_psicosocial.dump`
+     y en la nueva (con la BD vacía creada)
+     `pg_restore -U postgres -d bateria_psicosocial bateria_psicosocial.dump`.
+     Esto trae también `flyway_schema_history`, así que Flyway no vuelve a aplicar V1/V2. El `.dump` contiene datos de evaluados: **no subirlo a git**; pasarlo por otro medio.
+   - **BD vacía**: dejar que Flyway aplique V1 y V2 al arrancar (funcionan sobre tablas vacías) y cargar los datos maestros a mano. Pendiente a futuro: crear una migración `V3__datos_maestros.sql` con esos `INSERT` para que el repo sea autosuficiente.
+3. Arrancar: `./mvnw spring-boot:run` (perfil `dev` por defecto). API en `http://localhost:8080/api`, Swagger en `http://localhost:8080/api/swagger-ui.html`.
+4. Tests: `./mvnw test` (incluye `CalculadoraResultadoTest`, lógica pura sin BD).
+5. La carpeta `logs/` está en `.gitignore` (se generan localmente al arrancar).
 
 ---
 
@@ -45,7 +64,30 @@ No todas las tablas usan hexagonal completo (`domain` + `application`). Los cat�
     - Se creó `EscalaDetalleEntity` + `EscalaDetalleJpaRepository` (paquete `escaladetalle`) como pieza de soporte interna — no tenía controller/CRUD propio definido en ninguna sesión anterior y solo se usa como lookup desde `RespuestaService`. Si en el futuro hace falta gestionar sus valores por API, agregar el molde catálogo/entidad plana que corresponda.
   - `resultado_cuestionario`, `resultado_dimension`, `resultado_dominio` (motor de cálculo de riesgo) — **pendiente**, decisión de alcance tomada: se implementan en una etapa aparte, con diseño hexagonal completo (`domain`/`application`), ya que agregan puntajes de `respuesta`, aplican `factor_transformacion` de `dimension_cuestionario`/`dominio_cuestionario` y determinan `nivel_riesgo` según los rangos de `baremo_dimension`/`baremo_dominio`/`baremo_cuestionario`. Falta definir el disparador (¿se calcula automáticamente al finalizar la `aplicacion`, o mediante un endpoint explícito?).
 
-**Próximo paso acordado**: diseñar e implementar el motor de cálculo de riesgo (`resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`) en `domain`/`application`, incluyendo el disparador del cálculo.
+- **Migración `V2__grupo_ocupacional_y_metodo_calculo.sql`** (preparación del motor de cálculo):
+  - Catálogo `grupo_ocupacional` (1 = Jefes, profesionales y técnicos; 2 = Auxiliares y operarios). `tipo_cargo.fk_grupo_ocupacional` (cargos 1,2 → grupo 1; 3,4 → grupo 2).
+  - `aplicacion.fk_grupo_ocupacional` NOT NULL: **foto del grupo al momento de aplicar** (decisión del usuario, "opción 2"). `AplicacionService.crear` lo deriva de `evaluado_cliente → tipo_cargo` si el request no lo manda; así un cambio de cargo posterior no altera los baremos de resultados históricos.
+  - `baremo_dimension`/`baremo_dominio`/`baremo_cuestionario.fk_grupo_ocupacional` NOT NULL: los cuestionarios C (extralaboral) y D (estrés) tienen baremos distintos por grupo. Los baremos existentes de C se asignaron al grupo 1 — **verificar contra el manual** y cargar el juego del grupo 2.
+  - `cuestionario.factor_transformacion` (A=492, B=388, C=124, D=61.16) y `cuestionario.metodo_calculo` (enum `domain.model.resultado.configuracion.MetodoCalculo`: `SUMA_POR_DOMINIOS` para A/B, `SUMA_DIRECTA` para C, `PROMEDIO_PONDERADO` para D).
+  - `dimension_cuestionario.peso` (solo D: fisiológicos 4, comportamiento social 3, intelectuales 2, psicoemocionales 1). Total estrés = Σ promedio(dimensión) × peso, transformado = bruto / 61.16 × 100. El manual no trae baremos por dimensión para D, solo total.
+  - `UNIQUE (fk_aplicacion, ...)` en `resultado_dominio` y `resultado_cuestionario`.
+  - Aclaración: los cuestionarios C y D son **los mismos para todos los cargos** (mismas preguntas y respuestas); lo único que varía por grupo es el baremo con el que se interpreta el puntaje. Por eso el grupo vive en `baremo_*` y en `aplicacion`, nunca en `respuesta`.
+  - Estado de datos de prueba (2026-09-24): las aplicaciones 1 y 2 (evaluados con cargo "Profesional" → grupo 1) tienen 123 respuestas cada una, **solo forma A**. Para probar el flujo completo con jefes faltan: las respuestas de C (31) y D (31) en esas aplicaciones, y 10 filas en `baremo_cuestionario` (total C y total D, grupo 1). Los baremos del grupo 2 para C/D se cargan después, antes de evaluar auxiliares/operarios.
+  - La V2 ya está aplicada en la BD local (confirmado en `flyway_schema_history` el 2026-09-25).
+- **Comportamiento esperado del motor si falta un baremo**: `BusinessException` (409) indicando qué falta (cuestionario/dimensión, grupo, puntaje); nunca guardar resultados parciales en silencio.
+- **Disparador del cálculo**: endpoint explícito `POST /aplicaciones/{id}/resultados` (recalculable: borra y reinserta en la misma transacción) + `GET /aplicaciones/{id}/resultados`.
+
+**Motor de cálculo — ✅ implementado (2026-09-25)**:
+  - Estructura (organizada por módulo `resultado` en cada capa):
+    - `domain/model/resultado/` → resultados (`ResultadoAplicacion`, `ResultadoCuestionario`, `ResultadoDominio`, `ResultadoDimension`, `NivelRiesgo`); `domain/model/resultado/configuracion/` → entrada del cálculo (`Configuracion*`, `RangoBaremo`, `RespuestaCalculo`, `MetodoCalculo`).
+    - `domain/service/resultado/CalculadoraResultado` (lógica pura, sin Spring; test en `src/test/.../domain/service/resultado/CalculadoraResultadoTest`).
+    - `application/port/in/resultado/` (`CalcularResultadosUseCase`, `ConsultarResultadosUseCase`), `application/port/out/resultado/` (`DatosCalculoPort`, `ResultadoPort`), `application/service/resultado/ResultadoAplicacionService`.
+    - Persistencia: una carpeta por tabla (`resultadodimension/`, `resultadodominio/`, `resultadocuestionario/`, `baremocuestionario/`: Entity + JpaRepository) y `persistence/resultado/` con los adaptadores (`DatosCalculoPersistenceAdapter`, `ResultadoPersistenceAdapter`) + `CatalogoCalculoLoader` (configuración y niveles, compartido; los adaptadores no dependen entre sí).
+    - REST: `infrastructure/adapter/in/rest/resultado/ResultadoController` + `dto/`.
+  - Reglas: transformado = bruto / factor × 100 redondeado a 1 decimal (HALF_UP); solo se calculan los cuestionarios con al menos una respuesta; dentro de uno, todas las dimensiones deben estar completas (si no → 409); D solo guarda total (sin baremo por dimensión); C guarda dimensiones + total; A/B dimensiones + dominios + total.
+  - Probado: aplicaciones 1 y 2 (forma A) → 57.9 y 52.4, "Riesgo muy alto".
+  - **Datos a corregir antes de calcular C**: `dimension_cuestionario` 38 (dimensión 22) tiene 0 preguntas y la 37 (dimensión 21) tiene 8 (factor 12 → debería tener 3); el motor lo rechaza con 409.
+  - **Pendiente**: ítems condicionales de forma A/B (atención a clientes, jefes con colaboradores) — hoy se exige respuesta a todo; revisar en el manual cómo se califican cuando no aplican. Puntaje total general (intralaboral + extralaboral) no implementado.
 
 ---
 
@@ -293,7 +335,7 @@ El script de creación de las ~34 tablas (`cuestionario`, `dominio`, `dimension`
 
 ## 10. Siguiente paso acordado
 
-Grupo C completo y `respuesta` (Grupo D) implementado (ver sección 2). El siguiente paso es diseñar e implementar el motor de cálculo de riesgo: `resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`, en `domain`/`application` (hexagonal completo), incluyendo:
+Motor de cálculo implementado (ver sección 2). Pendientes: corregir preguntas de forma C, cargar baremos totales de C/D, ítems condicionales de A/B y puntaje total general. Diseño original del motor: `resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`, en `domain`/`application` (hexagonal completo), incluyendo:
 - El disparador del cálculo (automático al finalizar la `aplicacion` vs. endpoint explícito).
 - La lógica de suma de `puntaje_bruto` a partir de `respuesta` agrupado por `dimension_cuestionario`/`dominio_cuestionario`/`cuestionario`.
 - La aplicación de `factor_transformacion` para obtener `puntaje_transformado`.

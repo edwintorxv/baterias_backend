@@ -17,6 +17,9 @@ public class TipoCargoEntity implements Identificable, Nombrable {
     @Column(name = "nombre", nullable = false, length = 50)
     private String nombre;
 
+    @Column(name = "fk_grupo_ocupacional", nullable = false)
+    private Long fkGrupoOcupacional;
+
     @Override
     public Long getId() {
         return id;
@@ -35,6 +38,14 @@ public class TipoCargoEntity implements Identificable, Nombrable {
     @Override
     public void setNombre(String nombre) {
         this.nombre = nombre;
+    }
+
+    public Long getFkGrupoOcupacional() {
+        return fkGrupoOcupacional;
+    }
+
+    public void setFkGrupoOcupacional(Long fkGrupoOcupacional) {
+        this.fkGrupoOcupacional = fkGrupoOcupacional;
     }
 
 }

@@ -27,4 +27,7 @@ public class DimensionCuestionarioEntity {
     @Column(name = "factor_transformacion", nullable = false, precision = 10, scale = 2)
     private BigDecimal factorTransformacion;
 
+    @Column(name = "peso", precision = 5, scale = 2)
+    private BigDecimal peso;
+
 }

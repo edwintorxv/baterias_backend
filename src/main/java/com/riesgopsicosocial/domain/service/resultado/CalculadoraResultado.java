@@ -1,0 +1,206 @@
+package com.riesgopsicosocial.domain.service.resultado;
+
+import com.riesgopsicosocial.domain.model.resultado.*;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.*;
+import com.riesgopsicosocial.shared.exception.BusinessException;
+
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Calcula el resultado de un cuestionario a partir de sus respuestas, siguiendo el método
+ * definido en {@link MetodoCalculo}. No depende de Spring ni de la persistencia.
+ *
+ * <p>Reglas comunes:
+ * <ul>
+ *   <li>Puntaje transformado = bruto / factor × 100, redondeado a un decimal (como los baremos).</li>
+ *   <li>Cada dimensión debe tener respondidas todas sus preguntas; si no, no se calcula nada.</li>
+ *   <li>Si un puntaje no cae en ningún rango del baremo se lanza {@link BusinessException}:
+ *       nunca se devuelven resultados parciales.</li>
+ * </ul>
+ */
+public class CalculadoraResultado {
+
+    private static final BigDecimal CIEN = BigDecimal.valueOf(100);
+    private static final MathContext PRECISION = MathContext.DECIMAL64;
+
+    public ResultadoCuestionario calcular(ConfiguracionCuestionario config, List<RespuestaCalculo> respuestas) {
+        Map<Long, List<BigDecimal>> valoresPorDimension = agruparYValidar(config, respuestas);
+
+        return switch (config.metodoCalculo()) {
+            case SUMA_POR_DOMINIOS -> calcularSumaPorDominios(config, valoresPorDimension);
+            case SUMA_DIRECTA -> calcularSumaDirecta(config, valoresPorDimension);
+            case PROMEDIO_PONDERADO -> calcularPromedioPonderado(config, valoresPorDimension);
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Métodos de cálculo
+    // ------------------------------------------------------------------
+
+    /** Formas A y B: dimensión → dominio → total. */
+    private ResultadoCuestionario calcularSumaPorDominios(ConfiguracionCuestionario config,
+                                                          Map<Long, List<BigDecimal>> valores) {
+        List<Long> sinDominio = config.dimensiones().stream()
+                .filter(d -> config.dominios().stream()
+                        .noneMatch(dom -> dom.idDominioCuestionario().equals(d.idDominioCuestionario())))
+                .map(ConfiguracionDimension::idDimensionCuestionario)
+                .toList();
+        if (!sinDominio.isEmpty()) {
+            throw new BusinessException("Configuración incompleta del cuestionario " + config.forma()
+                    + ": las dimensiones (dimension_cuestionario) " + sinDominio
+                    + " no tienen dominio_cuestionario asociado");
+        }
+
+        List<ResultadoDimension> dimensiones = calcularDimensiones(config, valores);
+
+        Map<Long, BigDecimal> brutoPorDimension = dimensiones.stream()
+                .collect(Collectors.toMap(ResultadoDimension::idDimensionCuestionario, ResultadoDimension::puntajeBruto));
+
+        List<ResultadoDominio> dominios = new ArrayList<>();
+        for (ConfiguracionDominio dominio : config.dominios()) {
+            List<ConfiguracionDimension> suyas = config.dimensiones().stream()
+                    .filter(d -> dominio.idDominioCuestionario().equals(d.idDominioCuestionario()))
+                    .toList();
+            if (suyas.isEmpty()) {
+                continue;
+            }
+            BigDecimal bruto = suyas.stream()
+                    .map(d -> brutoPorDimension.get(d.idDimensionCuestionario()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal transformado = transformar(bruto, dominio.factorTransformacion());
+            NivelRiesgo nivel = buscarNivel(dominio.baremos(), transformado,
+                    "dominio '" + dominio.nombre() + "' del cuestionario " + config.forma(), config);
+            dominios.add(new ResultadoDominio(dominio.idDominioCuestionario(), dominio.nombre(),
+                    escalaBruto(bruto), transformado, nivel));
+        }
+
+        BigDecimal brutoTotal = sumar(brutoPorDimension.values());
+        return totalizar(config, brutoTotal, dominios, dimensiones);
+    }
+
+    /** Forma C (extralaboral): dimensión → total. */
+    private ResultadoCuestionario calcularSumaDirecta(ConfiguracionCuestionario config,
+                                                      Map<Long, List<BigDecimal>> valores) {
+        List<ResultadoDimension> dimensiones = calcularDimensiones(config, valores);
+        BigDecimal brutoTotal = sumar(dimensiones.stream().map(ResultadoDimension::puntajeBruto).toList());
+        return totalizar(config, brutoTotal, List.of(), dimensiones);
+    }
+
+    /**
+     * Forma D (estrés): total bruto = Σ promedio(ítems de la dimensión) × peso.
+     * No hay baremos por dimensión, así que solo se devuelve el total.
+     */
+    private ResultadoCuestionario calcularPromedioPonderado(ConfiguracionCuestionario config,
+                                                            Map<Long, List<BigDecimal>> valores) {
+        BigDecimal brutoTotal = BigDecimal.ZERO;
+        for (ConfiguracionDimension dimension : config.dimensiones()) {
+            if (dimension.peso() == null) {
+                throw new BusinessException("Configuración incompleta del cuestionario " + config.forma()
+                        + ": la dimensión '" + dimension.nombre() + "' no tiene peso definido");
+            }
+            List<BigDecimal> items = valores.get(dimension.idDimensionCuestionario());
+            BigDecimal promedio = sumar(items).divide(BigDecimal.valueOf(items.size()), PRECISION);
+            brutoTotal = brutoTotal.add(promedio.multiply(dimension.peso()));
+        }
+        return totalizar(config, brutoTotal, List.of(), List.of());
+    }
+
+    // ------------------------------------------------------------------
+    // Auxiliares
+    // ------------------------------------------------------------------
+
+    private List<ResultadoDimension> calcularDimensiones(ConfiguracionCuestionario config,
+                                                         Map<Long, List<BigDecimal>> valores) {
+        List<ResultadoDimension> resultados = new ArrayList<>();
+        for (ConfiguracionDimension dimension : config.dimensiones()) {
+            BigDecimal bruto = sumar(valores.get(dimension.idDimensionCuestionario()));
+            BigDecimal transformado = transformar(bruto, dimension.factorTransformacion());
+            NivelRiesgo nivel = buscarNivel(dimension.baremos(), transformado,
+                    "dimensión '" + dimension.nombre() + "' del cuestionario " + config.forma(), config);
+            resultados.add(new ResultadoDimension(dimension.idDimensionCuestionario(), dimension.nombre(),
+                    escalaBruto(bruto), transformado, nivel));
+        }
+        return resultados;
+    }
+
+    private ResultadoCuestionario totalizar(ConfiguracionCuestionario config, BigDecimal brutoTotal,
+                                            List<ResultadoDominio> dominios, List<ResultadoDimension> dimensiones) {
+        BigDecimal transformado = transformar(brutoTotal, config.factorTransformacion());
+        NivelRiesgo nivel = buscarNivel(config.baremos(), transformado,
+                "total del cuestionario " + config.forma(), config);
+        return new ResultadoCuestionario(config.idCuestionario(), config.forma(),
+                escalaBruto(brutoTotal), transformado, nivel, dominios, dimensiones);
+    }
+
+    /**
+     * Agrupa los valores por dimensión y exige que cada dimensión del cuestionario tenga
+     * exactamente una respuesta por pregunta.
+     */
+    private Map<Long, List<BigDecimal>> agruparYValidar(ConfiguracionCuestionario config,
+                                                        List<RespuestaCalculo> respuestas) {
+        if (config.dimensiones().isEmpty()) {
+            throw new BusinessException("El cuestionario " + config.forma() + " no tiene dimensiones configuradas");
+        }
+
+        Set<Long> preguntasVistas = new HashSet<>();
+        List<Long> duplicadas = new ArrayList<>();
+        Map<Long, List<BigDecimal>> valores = new HashMap<>();
+        for (RespuestaCalculo r : respuestas) {
+            if (!preguntasVistas.add(r.idPregunta())) {
+                duplicadas.add(r.idPregunta());
+            }
+            valores.computeIfAbsent(r.idDimensionCuestionario(), k -> new ArrayList<>()).add(r.valor());
+        }
+        if (!duplicadas.isEmpty()) {
+            throw new BusinessException("El cuestionario " + config.forma()
+                    + " tiene preguntas respondidas más de una vez: " + duplicadas);
+        }
+
+        List<String> problemas = new ArrayList<>();
+        for (ConfiguracionDimension dimension : config.dimensiones()) {
+            int respondidas = valores.getOrDefault(dimension.idDimensionCuestionario(), List.of()).size();
+            if (dimension.numeroPreguntas() == 0) {
+                problemas.add("'" + dimension.nombre() + "' no tiene preguntas configuradas");
+            } else if (respondidas != dimension.numeroPreguntas()) {
+                problemas.add("'" + dimension.nombre() + "' tiene " + respondidas + " de "
+                        + dimension.numeroPreguntas() + " preguntas respondidas");
+            }
+        }
+        if (!problemas.isEmpty()) {
+            throw new BusinessException("No se puede calcular el cuestionario " + config.forma() + ": "
+                    + String.join("; ", problemas));
+        }
+        return valores;
+    }
+
+    private NivelRiesgo buscarNivel(List<RangoBaremo> baremos, BigDecimal puntaje, String que,
+                                    ConfiguracionCuestionario config) {
+        if (baremos.isEmpty()) {
+            throw new BusinessException("No hay baremo para " + que + " y grupo ocupacional "
+                    + config.idGrupoOcupacional());
+        }
+        return baremos.stream()
+                .filter(rango -> rango.contiene(puntaje))
+                .findFirst()
+                .map(RangoBaremo::nivelRiesgo)
+                .orElseThrow(() -> new BusinessException("El puntaje transformado " + puntaje + " de " + que
+                        + " no cae en ningún rango del baremo del grupo ocupacional " + config.idGrupoOcupacional()));
+    }
+
+    private BigDecimal transformar(BigDecimal bruto, BigDecimal factor) {
+        return bruto.multiply(CIEN).divide(factor, PRECISION).setScale(1, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal escalaBruto(BigDecimal bruto) {
+        return bruto.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal sumar(Collection<BigDecimal> valores) {
+        return valores.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+}

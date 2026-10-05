@@ -2,6 +2,7 @@ package com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremodomin
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface BaremoDominioJpaRepository extends JpaRepository<BaremoDominioEntity, Long> {
@@ -9,5 +10,8 @@ public interface BaremoDominioJpaRepository extends JpaRepository<BaremoDominioE
     List<BaremoDominioEntity> findByFkDominioCuestionario(Long fkDominioCuestionario);
 
     List<BaremoDominioEntity> findByFkNivelRiesgo(Long fkNivelRiesgo);
+
+    List<BaremoDominioEntity> findByFkDominioCuestionarioInAndFkGrupoOcupacional(
+            Collection<Long> fkDominioCuestionario, Long fkGrupoOcupacional);
 
 }

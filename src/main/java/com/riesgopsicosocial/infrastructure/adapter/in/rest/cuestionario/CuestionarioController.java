@@ -28,8 +28,10 @@ public class CuestionarioController {
     private CuestionarioResponse toResponse(CuestionarioEntity cuestionarioEntity) {
         return new CuestionarioResponse(
                 cuestionarioEntity.getId(),
+                cuestionarioEntity.getForma(),
                 cuestionarioEntity.getNombre(),
-                cuestionarioEntity.getForma()
+                cuestionarioEntity.getFactorTransformacion(),
+                cuestionarioEntity.getMetodoCalculo()
         );
     }
 
@@ -38,6 +40,8 @@ public class CuestionarioController {
         CuestionarioEntity entidad = new CuestionarioEntity();
         entidad.setForma(request.forma());
         entidad.setNombre(request.descripcion());
+        entidad.setFactorTransformacion(request.factorTransformacion());
+        entidad.setMetodoCalculo(request.metodoCalculo());
         CuestionarioEntity creado = service.crear(entidad);
 
         return ResponseEntity.status(HttpStatus.CREATED)

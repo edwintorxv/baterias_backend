@@ -6,6 +6,7 @@ public record BaremoDimensionResponse(
         Long id,
         Long fkDimensionCuestionario,
         Long fkNivelRiesgo,
+        Long fkGrupoOcupacional,
         BigDecimal valorMinimo,
         BigDecimal valorMaximo) {
 }

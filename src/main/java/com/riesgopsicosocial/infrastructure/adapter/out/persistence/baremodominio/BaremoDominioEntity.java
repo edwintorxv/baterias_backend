@@ -24,6 +24,9 @@ public class BaremoDominioEntity {
     @Column(name = "fk_nivel_riesgo", nullable = false)
     private Long fkNivelRiesgo;
 
+    @Column(name = "fk_grupo_ocupacional", nullable = false)
+    private Long fkGrupoOcupacional;
+
     @Column(name = "valor_minimo", nullable = false, precision = 5, scale = 2)
     private BigDecimal valorMinimo;
 

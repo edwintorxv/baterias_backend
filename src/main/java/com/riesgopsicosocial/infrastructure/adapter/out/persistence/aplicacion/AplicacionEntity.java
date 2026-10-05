@@ -21,6 +21,9 @@ public class AplicacionEntity {
     @Column(name = "fk_evaluado_cliente", nullable = false)
     private Long fkEvaluadoCliente;
 
+    @Column(name = "fk_grupo_ocupacional", nullable = false)
+    private Long fkGrupoOcupacional;
+
     @Column(name = "fecha_aplicacion", nullable = false)
     private LocalDateTime fechaAplicacion;
 

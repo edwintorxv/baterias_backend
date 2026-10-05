@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 public record BaremoDominioRequest(
         @NotNull Long fkDominioCuestionario,
         @NotNull Long fkNivelRiesgo,
+        @NotNull Long fkGrupoOcupacional,
         @NotNull BigDecimal valorMinimo,
         @NotNull BigDecimal valorMaximo) {
 }

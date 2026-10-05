@@ -29,6 +29,7 @@ public class BaremoDominioController {
                 entidad.getId(),
                 entidad.getFkDominioCuestionario(),
                 entidad.getFkNivelRiesgo(),
+                entidad.getFkGrupoOcupacional(),
                 entidad.getValorMinimo(),
                 entidad.getValorMaximo());
     }
@@ -37,6 +38,7 @@ public class BaremoDominioController {
         BaremoDominioEntity entidad = new BaremoDominioEntity();
         entidad.setFkDominioCuestionario(request.fkDominioCuestionario());
         entidad.setFkNivelRiesgo(request.fkNivelRiesgo());
+        entidad.setFkGrupoOcupacional(request.fkGrupoOcupacional());
         entidad.setValorMinimo(request.valorMinimo());
         entidad.setValorMaximo(request.valorMaximo());
         return entidad;

@@ -29,6 +29,7 @@ public class BaremoDimensionController {
                 entidad.getId(),
                 entidad.getFkDimensionCuestionario(),
                 entidad.getFkNivelRiesgo(),
+                entidad.getFkGrupoOcupacional(),
                 entidad.getValorMinimo(),
                 entidad.getValorMaximo());
     }
@@ -37,6 +38,7 @@ public class BaremoDimensionController {
         BaremoDimensionEntity entidad = new BaremoDimensionEntity();
         entidad.setFkDimensionCuestionario(request.fkDimensionCuestionario());
         entidad.setFkNivelRiesgo(request.fkNivelRiesgo());
+        entidad.setFkGrupoOcupacional(request.fkGrupoOcupacional());
         entidad.setValorMinimo(request.valorMinimo());
         entidad.setValorMaximo(request.valorMaximo());
         return entidad;

@@ -23,6 +23,7 @@ public class BaremoDimensionService {
 
         existente.setFkDimensionCuestionario(datos.getFkDimensionCuestionario());
         existente.setFkNivelRiesgo(datos.getFkNivelRiesgo());
+        existente.setFkGrupoOcupacional(datos.getFkGrupoOcupacional());
         existente.setValorMinimo(datos.getValorMinimo());
         existente.setValorMaximo(datos.getValorMaximo());
 

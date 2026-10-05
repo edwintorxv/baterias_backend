@@ -41,6 +41,7 @@ public class DimensionCuestionarioService {
         existente.setFkDimension(datos.getFkDimension());
         existente.setFkCuestionario(datos.getFkCuestionario());
         existente.setFactorTransformacion(datos.getFactorTransformacion());
+        existente.setPeso(datos.getPeso());
 
         return repository.save(existente);
     }

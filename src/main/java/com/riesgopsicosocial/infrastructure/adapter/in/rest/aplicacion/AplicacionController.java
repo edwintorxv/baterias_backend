@@ -28,6 +28,7 @@ public class AplicacionController {
         return new AplicacionResponse(
                 aplicacionEntity.getId(),
                 aplicacionEntity.getFkEvaluadoCliente(),
+                aplicacionEntity.getFkGrupoOcupacional(),
                 aplicacionEntity.getFechaAplicacion(),
                 aplicacionEntity.getObservaciones(),
                 aplicacionEntity.getEstado()
@@ -37,6 +38,7 @@ public class AplicacionController {
     private AplicacionEntity toEntity(AplicacionRequest aplicacionRequest) {
         AplicacionEntity aplicacionEntity = new AplicacionEntity();
         aplicacionEntity.setFkEvaluadoCliente(aplicacionRequest.fkEvaluadoCliente());
+        aplicacionEntity.setFkGrupoOcupacional(aplicacionRequest.fkGrupoOcupacional());
         aplicacionEntity.setFechaAplicacion(aplicacionRequest.fechaAplicacion());
         aplicacionEntity.setObservaciones(aplicacionRequest.observaciones());
         aplicacionEntity.setEstado(aplicacionRequest.estado());

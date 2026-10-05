@@ -6,6 +6,7 @@ public record AplicacionResponse(
 
         Long id,
         Long fkEvaluadoCliente,
+        Long fkGrupoOcupacional,
         LocalDateTime fechaAplicacion,
         String observaciones,
         String estado

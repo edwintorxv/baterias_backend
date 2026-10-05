@@ -2,6 +2,7 @@ package com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremodimen
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface BaremoDimensionJpaRepository extends JpaRepository<BaremoDimensionEntity, Long> {
@@ -9,5 +10,8 @@ public interface BaremoDimensionJpaRepository extends JpaRepository<BaremoDimens
     List<BaremoDimensionEntity> findByFkDimensionCuestionario(Long fkDimensionCuestionario);
 
     List<BaremoDimensionEntity> findByFkNivelRiesgo(Long fkNivelRiesgo);
+
+    List<BaremoDimensionEntity> findByFkDimensionCuestionarioInAndFkGrupoOcupacional(
+            Collection<Long> fkDimensionCuestionario, Long fkGrupoOcupacional);
 
 }

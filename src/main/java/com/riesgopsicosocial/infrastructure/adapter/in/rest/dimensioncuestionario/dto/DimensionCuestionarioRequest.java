@@ -7,5 +7,6 @@ import java.math.BigDecimal;
 public record DimensionCuestionarioRequest(
         @NotNull Long fkDimension,
         @NotNull Long fkCuestionario,
-        @NotNull BigDecimal factorTransformacion) {
+        @NotNull BigDecimal factorTransformacion,
+        BigDecimal peso) {
 }
