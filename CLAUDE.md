@@ -17,8 +17,8 @@ Requisitos: **JDK 17**, **PostgreSQL 16** (la máquina original usa `C:\Program 
      y en la nueva (con la BD vacía creada)
      `pg_restore -U postgres -d bateria_psicosocial bateria_psicosocial.dump`.
      Esto trae también `flyway_schema_history`, así que Flyway no vuelve a aplicar V1/V2. El `.dump` contiene datos de evaluados: **no subirlo a git**; pasarlo por otro medio.
-   - **BD vacía**: dejar que Flyway aplique V1 y V2 al arrancar (funcionan sobre tablas vacías) y cargar los datos maestros a mano. Pendiente a futuro: crear una migración `V3__datos_maestros.sql` con esos `INSERT` para que el repo sea autosuficiente.
-3. Arrancar: `./mvnw spring-boot:run` (perfil `dev` por defecto). API en `http://localhost:8080/api`, Swagger en `http://localhost:8080/api/swagger-ui.html`.
+   - **BD vacía**: dejar que Flyway aplique V1 y V2 al arrancar (funcionan sobre tablas vacías) y cargar los datos maestros a mano. Pendiente a futuro: crear una migración `V4__datos_maestros.sql` con esos `INSERT` (ya con los valores corregidos por la V3) para que el repo sea autosuficiente.
+3. Arrancar: `./mvnw spring-boot:run` (perfil `dev` por defecto; en macOS/Linux, si `mvnw` no tiene permiso de ejecución porque viene de Windows, usar `sh mvnw spring-boot:run`). API en `http://localhost:8080/api`, Swagger en `http://localhost:8080/api/swagger-ui.html`.
 4. Tests: `./mvnw test` (incluye `CalculadoraResultadoTest`, lógica pura sin BD).
 5. La carpeta `logs/` está en `.gitignore` (se generan localmente al arrancar).
 
@@ -85,8 +85,8 @@ No todas las tablas usan hexagonal completo (`domain` + `application`). Los cat�
     - Persistencia: una carpeta por tabla (`resultadodimension/`, `resultadodominio/`, `resultadocuestionario/`, `baremocuestionario/`: Entity + JpaRepository) y `persistence/resultado/` con los adaptadores (`DatosCalculoPersistenceAdapter`, `ResultadoPersistenceAdapter`) + `CatalogoCalculoLoader` (configuración y niveles, compartido; los adaptadores no dependen entre sí).
     - REST: `infrastructure/adapter/in/rest/resultado/ResultadoController` + `dto/`.
   - Reglas: transformado = bruto / factor × 100 redondeado a 1 decimal (HALF_UP); solo se calculan los cuestionarios con al menos una respuesta; dentro de uno, todas las dimensiones deben estar completas (si no → 409); D solo guarda total (sin baremo por dimensión); C guarda dimensiones + total; A/B dimensiones + dominios + total.
-  - Probado: aplicaciones 1 y 2 (forma A) → 57.9 y 52.4, "Riesgo muy alto".
-  - **Datos a corregir antes de calcular C**: `dimension_cuestionario` 38 (dimensión 22) tiene 0 preguntas y la 37 (dimensión 21) tiene 8 (factor 12 → debería tener 3); el motor lo rechaza con 409.
+  - Probado: aplicaciones 1 y 2 (forma A) → 46.3 y 47.6, "Riesgo muy alto" (recalculado tras la V3; los valores anteriores 57.9/52.4 estaban mal por la escala invertida).
+  - **Migración `V3__corregir_escalas_y_dimensiones_forma_c.sql`** (2026-10-07): (1) los valores de `escala_detalle` de las escalas 1 y 2 estaban invertidos; según la Tabla 21 del manual, escala 1 = Siempre 0 … Nunca 4 (ítems positivos) y escala 2 = Siempre 4 … Nunca 0. La asignación de ítems a cada escala se verificó contra el manual y coincide 100 %: forma A (Tabla 21, 73 + 50) y forma B (Tabla 22, 68 + 29) y forma C (Tabla 11, 23 + 8). (2) Se recalculó `respuesta.valor_obtenido` (había además una respuesta de A con valor 9.00). (3) Forma C: ítems 18, 19, 20, 21, 23 → "Comunicación y relaciones interpersonales" (dimensión 22); "Relaciones familiares" (dimensión 21) queda con 22, 25, 27.
   - **Pendiente**: ítems condicionales de forma A/B (atención a clientes, jefes con colaboradores) — hoy se exige respuesta a todo; revisar en el manual cómo se califican cuando no aplican. Puntaje total general (intralaboral + extralaboral) no implementado.
 
 ---
