@@ -361,8 +361,8 @@ El script de creación de las ~34 tablas (`cuestionario`, `dominio`, `dimension`
 
 ### Estado al cierre del 2026-10-07
 - Motor de cálculo completo y probado con datos para las cuatro formas y el total general (ver sección 2): datos maestros verificados contra los manuales (V3–V6), ítems condicionales y faltantes (V7–V8), total general (V9). Migraciones aplicadas en la BD local hasta **V9**; todo commiteado y subido a `origin/main`.
-- Aplicación 1 = A + C + D (respuestas de C y D de prueba); aplicación 2 = solo A. Resultados de referencia en la sección 2.
-- Tests: 21 (`./mvnw test`, o `sh mvnw test` en macOS): 16 de la calculadora, 4 de arquitectura y el de contexto.
+- Aplicación 1 = A + C + D (respuestas de C y D de prueba); aplicación 2 = solo A. Resultados de referencia en la sección 2. (2026-10-08) La BD local de la máquina macOS tiene además las aplicaciones 3–18 del cliente 1 (evaluados 193–208), cargadas aparte; la 3 no tiene resultados calculados.
+- Tests: 30 (`./mvnw test`, o `sh mvnw test` en macOS): 16 de la calculadora, 9 de `InformeEvaluadoServiceTest`, 4 de arquitectura y el de contexto.
 - Forma de trabajo acordada: **paso a paso**, mostrando diseño y diff antes de cada commit.
 - Al retomar en otra máquina: arrancar la app para que Flyway aplique V3–V9 (sobre una BD sin datos maestros solo crean la estructura; ver sección 0). Si quedó una instancia vieja de la app corriendo (p. ej. IntelliJ en el 8080), reiniciarla para que tome el código nuevo.
 
@@ -374,10 +374,23 @@ Objetivo del usuario:
 El modelo ya lo soporta: `aplicacion → evaluado_cliente → cliente / evaluado`, y los resultados están persistidos por aplicación (`resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`, `resultado_total_general`).
 
 **Decisiones tomadas (2026-10-08):**
-- Período del informe de empresa: **rango de fechas** en la consulta (`fechaDesde`/`fechaHasta`), sin tabla de medición por ahora.
-- Confidencialidad: **solo agregados + mínimo N** evaluados por grupo (propuesto N = 5, configurable en `application.properties`); por debajo, el grupo sale `oculto` sin desglose. El informe individual es un endpoint aparte.
+- Navegación prevista del front (aún no existe): listado de clientes → (a) descargar informe de empresa por año, o (b) entrar a los empleados del cliente → descargar informe individual por año.
+- Período: **por año** (las evaluaciones son anuales o cada 2 años según el nivel de riesgo). Tanto el informe de empresa como el individual ofrecen solo los años con aplicaciones.
+- Confidencialidad: **solo agregados + mínimo N** evaluados por grupo (propuesto N = 5, configurable en `application.properties`); por debajo, el grupo sale `oculto` sin desglose. Manual intralaboral pág. 1349: el informe individual es del trabajador (historia clínica ocupacional); la empresa solo lo conoce con autorización escrita y vía el médico de SO → el individual es para el psicólogo/firma evaluadora, no para el cliente. **No hay autenticación en la API**: pendiente antes de producción (roles).
 - Orden: **primero endpoints JSON**, luego PDF/Word a partir de los mismos modelos.
-- Diseño propuesto (pendiente de visto bueno en los detalles): módulo `informe` hexagonal (agregación pura en `domain/service/informe/` con tests). Paso 1: `GET /evaluados/{id}/informe?fkCliente=` (historial por fecha, aplicaciones sin resultados marcadas como pendientes). Paso 2: `GET /clientes/{id}/informe?fechaDesde&fechaHasta` (por forma: distribución por nivel y promedio en total/dominios/dimensiones; total general A+C y B+C por separado; si un trabajador tiene varias aplicaciones en el rango, la más reciente; carga en bloque con `findByFkAplicacionIn`). Por confirmar con el usuario: "la más reciente" y N = 5.
+- Módulo `informe` hexagonal (`domain/model/informe`, `application/{port,service}/informe`, `persistence/informe`, `rest/informe`). `ResultadoResponseMapper` (rest/resultado) es compartido entre `ResultadoController` e `InformeController`.
+
+**Informe individual JSON — ✅ implementado (2026-10-08):**
+- `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe?anio=` → cliente, evaluado y sus aplicaciones con ese cliente (todas las relaciones `evaluado_cliente` del par, activas o no), de la más antigua a la más reciente; cada una con cargo/área, grupo ocupacional, `estadoResultados` (`CALCULADO`/`PENDIENTE`) y `resultados` (mismo formato que `GET /aplicaciones/{id}/resultados`, `null` si pendiente). Sin `anio` = historial completo; año sin aplicaciones → 404.
+- `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe/anios` → años con aplicaciones, descendente.
+- 404 si no existe el cliente, el evaluado o la relación entre ambos.
+
+**Informe de empresa — pendiente (diseño propuesto):** `GET /clientes/{id}/informe/anios` y `GET /clientes/{id}/informe?anio=` (por forma: distribución por nivel y promedio en total/dominios/dimensiones; total general A+C y B+C por separado; si un trabajador tiene varias aplicaciones en el año, la más reciente; carga en bloque con `findByFkAplicacionIn`). Por confirmar: "la más reciente" y N = 5. Para la vista de empleados del front, proponer `GET /clientes/{id}/evaluados` (nombre, cédula, cargo, última aplicación), porque `GET /evaluado-clientes?fkCliente=` no trae nombres.
+
+**Archivo PDF/Word del informe individual — en curso (plan acordado 2026-10-08):**
+- Formatos oficiales: Anexos 4 (A) y 5 (B) de `2.-Bateria-riesgo-psicosocial-2.pdf`, Anexo 2 (C) del manual extralaboral. El Anexo 3 (D) del manual de estrés **falta** en el PDF local (está cortado en la pág. 37): usar la misma estructura hasta conseguirlo. Contenido: datos del trabajador (nombre, ID, cargo, área, edad, sexo, fecha de aplicación, empresa), datos del evaluador (nombre, c.c., profesión, posgrado, tarjeta profesional, licencia SO y fecha — "todo informe que carezca de estos datos no será válido"), tabla de resultados, interpretación genérica de niveles, observaciones, recomendaciones, fecha de elaboración y firma.
+- Decisiones: **PDF y Word** (mismo modelo, dos renderizadores: Thymeleaf + OpenHTMLtoPDF y Apache POI); **un archivo por aplicación con una sección por forma**; **tabla `evaluador` primero**.
+- Pasos: (1) V10 `evaluador` (CRUD sin DELETE, `activo`, firma por `PUT/GET /evaluadores/{id}/firma`) + `aplicacion.fk_evaluador` y `aplicacion.recomendaciones` (un juego de observaciones/recomendaciones por aplicación); (2) completar `InformeEvaluado` (edad, sexo, área, evaluador, textos); (3) PDF `GET .../informe/archivo?anio=&formato=pdf`; (4) Word `formato=docx`. Reglas: sin evaluador → 409; resultados pendientes → 409; varias aplicaciones en el año → una sección por cada una.
 
 **Decisiones originales (referencia):**
 1. **Período del informe de empresa**: rango de fechas en la consulta (sin cambiar el modelo, sugerido para empezar) o una tabla de "medición"/campaña a la que pertenezca cada aplicación.
