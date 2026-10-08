@@ -1,8 +1,8 @@
 package com.riesgopsicosocial.domain.service.resultado;
 
+import com.riesgopsicosocial.domain.exception.ReglaNegocioException;
 import com.riesgopsicosocial.domain.model.resultado.*;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.*;
-import com.riesgopsicosocial.shared.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -69,7 +69,7 @@ class CalculadoraResultadoTest {
     void dimensionIncompleta_lanzaExcepcion() {
         ConfiguracionCuestionario config = sumaDirecta(dimension(10L, null, "8", null, 2));
 
-        BusinessException ex = assertThrows(BusinessException.class,
+        ReglaNegocioException ex = assertThrows(ReglaNegocioException.class,
                 () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "1")), SIN_FILTROS));
         assertTrue(ex.getMessage().contains("1 de 2"));
     }
@@ -79,7 +79,7 @@ class CalculadoraResultadoTest {
         // 5 / 4 × 100 = 125, fuera de todos los rangos
         ConfiguracionCuestionario config = sumaDirecta(dimension(10L, null, "4", null, 1));
 
-        assertThrows(BusinessException.class,
+        assertThrows(ReglaNegocioException.class,
                 () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "5")), SIN_FILTROS));
     }
 
@@ -88,7 +88,7 @@ class CalculadoraResultadoTest {
         ConfiguracionCuestionario config = new ConfiguracionCuestionario(3L, "C", MetodoCalculo.SUMA_DIRECTA,
                 bd("8"), 2L, new ArrayList<>(List.of(dimension(10L, null, "8", null, 1))), List.of(), List.of());
 
-        BusinessException ex = assertThrows(BusinessException.class,
+        ReglaNegocioException ex = assertThrows(ReglaNegocioException.class,
                 () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "1")), SIN_FILTROS));
         assertTrue(ex.getMessage().contains("grupo ocupacional 2"));
     }
@@ -123,7 +123,7 @@ class CalculadoraResultadoTest {
         ConfiguracionCuestionario config = sumaDirecta(
                 dimension(11L, null, "8", 2, CondicionAplicacion.ES_JEFE, 0));
 
-        BusinessException ex = assertThrows(BusinessException.class,
+        ReglaNegocioException ex = assertThrows(ReglaNegocioException.class,
                 () -> calculadora.calcular(config, List.of(respuesta(1L, 11L, "1")),
                         new FiltrosAplicacion(null, false)));
         assertTrue(ex.getMessage().contains("no aplica (ES_JEFE = no) pero tiene 1 respuestas"));
@@ -135,7 +135,7 @@ class CalculadoraResultadoTest {
                 dimension(11L, null, "8", 2, CondicionAplicacion.ATIENDE_CLIENTES, 0));
 
         for (FiltrosAplicacion filtros : List.of(SIN_FILTROS, new FiltrosAplicacion(true, null))) {
-            BusinessException ex = assertThrows(BusinessException.class,
+            ReglaNegocioException ex = assertThrows(ReglaNegocioException.class,
                     () -> calculadora.calcular(config, List.of(), filtros));
             assertTrue(ex.getMessage().contains("0 de 2"), "filtros " + filtros);
         }
@@ -157,7 +157,7 @@ class CalculadoraResultadoTest {
     void itemsFaltantesSobreTolerancia_lanzaExcepcion() {
         ConfiguracionCuestionario config = sumaDirecta(dimension(10L, null, "12", 3, null, 1));
 
-        BusinessException ex = assertThrows(BusinessException.class,
+        ReglaNegocioException ex = assertThrows(ReglaNegocioException.class,
                 () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "4")), SIN_FILTROS));
         assertTrue(ex.getMessage().contains("1 de 3 preguntas respondidas (se admite hasta 1 sin respuesta)"));
     }
@@ -170,7 +170,7 @@ class CalculadoraResultadoTest {
                         dimension(21L, null, "1", 1, null, 1)),
                 List.of(), BAREMO);
 
-        BusinessException ex = assertThrows(BusinessException.class,
+        ReglaNegocioException ex = assertThrows(ReglaNegocioException.class,
                 () -> calculadora.calcular(config,
                         List.of(respuesta(1L, 20L, "9"), respuesta(2L, 21L, "0")), SIN_FILTROS));
         assertTrue(ex.getMessage().contains("'Dimensión 20', 'Dimensión 21'"));
@@ -228,7 +228,7 @@ class CalculadoraResultadoTest {
 
     @Test
     void totalGeneral_sinBaremo_lanzaExcepcion() {
-        BusinessException ex = assertThrows(BusinessException.class, () -> calculadora.calcularTotalGeneral(
+        ReglaNegocioException ex = assertThrows(ReglaNegocioException.class, () -> calculadora.calcularTotalGeneral(
                 total(2L, "B", MetodoCalculo.SUMA_POR_DOMINIOS, "388"), resultado(2L, "B", "100"),
                 total(3L, "C", MetodoCalculo.SUMA_DIRECTA, "124"), resultado(3L, "C", "28"),
                 List.of()));
@@ -237,7 +237,7 @@ class CalculadoraResultadoTest {
 
     @Test
     void totalGeneral_conCuestionariosQueNoSonIntraYExtra_lanzaExcepcion() {
-        BusinessException ex = assertThrows(BusinessException.class, () -> calculadora.calcularTotalGeneral(
+        ReglaNegocioException ex = assertThrows(ReglaNegocioException.class, () -> calculadora.calcularTotalGeneral(
                 total(3L, "C", MetodoCalculo.SUMA_DIRECTA, "124"), resultado(3L, "C", "28"),
                 total(4L, "D", MetodoCalculo.PROMEDIO_PONDERADO, "61.16"), resultado(4L, "D", "10"),
                 BAREMO_TOTAL_A));

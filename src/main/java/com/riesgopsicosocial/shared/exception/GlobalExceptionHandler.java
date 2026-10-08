@@ -1,5 +1,6 @@
 package com.riesgopsicosocial.shared.exception;
 
+import com.riesgopsicosocial.domain.exception.ReglaNegocioException;
 import com.riesgopsicosocial.shared.response.ApiError;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import org.slf4j.Logger;
@@ -30,8 +31,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiError> handleBusinessException(BusinessException ex) {
+    @ExceptionHandler({BusinessException.class, ReglaNegocioException.class})
+    public ResponseEntity<ApiError> handleBusinessException(RuntimeException ex) {
         ApiError error = ResponseBuilder.error(
                 ex.getMessage(),
                 ErrorCode.BUSINESS_ERROR.name(),

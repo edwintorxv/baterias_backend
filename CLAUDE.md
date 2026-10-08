@@ -2,7 +2,7 @@
 
 > Documento de contexto para continuar el desarrollo desde IntelliJ (Claude Pro / Claude Code).
 > Generado a partir de una sesión de diseño e implementación del backend.
-> Última actualización: 2026-10-07 (datos maestros verificados contra los manuales, ítems condicionales, total general; siguiente: informes — ver sección 10).
+> Última actualización: 2026-10-08 (excepción de dominio propia y reglas de arquitectura con ArchUnit; decisiones de informes tomadas; siguiente: informes — ver sección 10).
 
 ---
 
@@ -19,7 +19,7 @@ Requisitos: **JDK 17**, **PostgreSQL 16** (la máquina original usa `C:\Program 
      Esto trae también `flyway_schema_history`, así que Flyway no vuelve a aplicar V1/V2. El `.dump` contiene datos de evaluados: **no subirlo a git**; pasarlo por otro medio.
    - **BD vacía**: dejar que Flyway aplique V1 y V2 al arrancar (funcionan sobre tablas vacías) y cargar los datos maestros a mano. Pendiente a futuro: crear una migración `V10__datos_maestros.sql` (o la siguiente libre) con esos `INSERT` (ya con los valores corregidos por V3–V9); como los `UPDATE`/`INSERT` de datos de V3–V9 no tocan nada sobre una BD vacía (la estructura de V7–V9 sí se crea), esa migración debe traer los datos ya corregidos —incluidos `condicion_aplicacion`/`max_items_sin_respuesta` (V8) y `baremo_total_general` (V9)— y terminar con `setval` de las secuencias para que el repo sea autosuficiente.
 3. Arrancar: `./mvnw spring-boot:run` (perfil `dev` por defecto; en macOS/Linux, si `mvnw` no tiene permiso de ejecución porque viene de Windows, usar `sh mvnw spring-boot:run`). API en `http://localhost:8080/api`, Swagger en `http://localhost:8080/api/swagger-ui.html`.
-4. Tests: `./mvnw test` (incluye `CalculadoraResultadoTest`, lógica pura sin BD).
+4. Tests: `./mvnw test` (incluye `CalculadoraResultadoTest`, lógica pura sin BD, y `ArquitecturaHexagonalTest`, reglas de ArchUnit).
 5. La carpeta `logs/` está en `.gitignore` (se generan localmente al arrancar).
 
 ---
@@ -45,6 +45,15 @@ shared/response/  → ApiResponse, ApiError, ResponseBuilder
 ### Decisión clave de arquitectura
 
 No todas las tablas usan hexagonal completo (`domain` + `application`). Los catálogos simples usan un patrón CRUD directo (`Controller → Service → JpaRepository`) apoyado en `shared/catalogo`. El hexagonal completo se reserva para el **Grupo 5 / motor de cálculo de riesgo** (`resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`), y posiblemente partes del Grupo D.
+
+### Reglas del hexágono (verificadas con ArchUnit, 2026-10-08)
+
+`src/test/.../arquitectura/ArquitecturaHexagonalTest` falla el build si se rompe alguna:
+- `domain` solo depende de `java..` y de sí mismo (nada de Spring, JPA, `shared` ni otras capas). Por eso el dominio lanza su propia `domain.exception.ReglaNegocioException`; el `GlobalExceptionHandler` la traduce a 409 `BUSINESS_ERROR`, igual que `BusinessException`.
+- `application` no depende de `infrastructure`, `jakarta.persistence` ni Spring Data (sí puede usar `shared.exception` y `@Service`/`@Transactional`, compromiso aceptado).
+- Los puertos (`application.port..`) solo usan modelos del dominio: nunca entidades ni DTOs.
+- Los adaptadores de entrada (`infrastructure.adapter.in..`) usan los casos de uso (`port.in`), no `application.service`.
+- El CRUD (`Controller → Service → JpaRepository`) queda fuera a propósito. `RespuestaService` (`valor_obtenido`) y `AplicacionService` (grupo ocupacional) tienen reglas de negocio pequeñas fuera del hexágono; moverlas si crecen.
 
 ---
 
@@ -74,7 +83,7 @@ No todas las tablas usan hexagonal completo (`domain` + `application`). Los cat�
   - Aclaración: los cuestionarios C y D son **los mismos para todos los cargos** (mismas preguntas y respuestas); lo único que varía por grupo es el baremo con el que se interpreta el puntaje. Por eso el grupo vive en `baremo_*` y en `aplicacion`, nunca en `respuesta`.
   - Estado de datos de prueba (2026-10-07): aplicaciones 1 y 2 (cargo "Profesional" → grupo 1). La **1 tiene A (123) + C (31) + D (31)**; la **2 solo A (123)**. Las respuestas de C y D de la aplicación 1 son de prueba, cargadas por `POST /respuestas`: C con opción = ((número − 1) mod 5) + 1; D rotando Siempre, Casi siempre, A veces, Nunca (opciones 1, 2, 3, 5; D no tiene "Casi nunca"). Resultados de referencia: A 46,3 / C 54,8 / D 57,4 (bruto 35,08) / total general 48,1, todos nivel 5 (C, D y total general verificados a mano contra los manuales). Los baremos de C/D de ambos grupos ya están cargados (V4).
   - La V2 ya está aplicada en la BD local (confirmado en `flyway_schema_history` el 2026-09-25).
-- **Comportamiento esperado del motor si falta un baremo**: `BusinessException` (409) indicando qué falta (cuestionario/dimensión, grupo, puntaje); nunca guardar resultados parciales en silencio.
+- **Comportamiento esperado del motor si falta un baremo**: `ReglaNegocioException` (409) indicando qué falta (cuestionario/dimensión, grupo, puntaje); nunca guardar resultados parciales en silencio.
 - **Disparador del cálculo**: endpoint explícito `POST /aplicaciones/{id}/resultados` (recalculable: borra y reinserta en la misma transacción) + `GET /aplicaciones/{id}/resultados`.
 
 **Motor de cálculo — ✅ implementado (2026-09-25)**:
@@ -353,7 +362,7 @@ El script de creación de las ~34 tablas (`cuestionario`, `dominio`, `dimension`
 ### Estado al cierre del 2026-10-07
 - Motor de cálculo completo y probado con datos para las cuatro formas y el total general (ver sección 2): datos maestros verificados contra los manuales (V3–V6), ítems condicionales y faltantes (V7–V8), total general (V9). Migraciones aplicadas en la BD local hasta **V9**; todo commiteado y subido a `origin/main`.
 - Aplicación 1 = A + C + D (respuestas de C y D de prueba); aplicación 2 = solo A. Resultados de referencia en la sección 2.
-- Tests: 17 (`./mvnw test`, o `sh mvnw test` en macOS).
+- Tests: 21 (`./mvnw test`, o `sh mvnw test` en macOS): 16 de la calculadora, 4 de arquitectura y el de contexto.
 - Forma de trabajo acordada: **paso a paso**, mostrando diseño y diff antes de cada commit.
 - Al retomar en otra máquina: arrancar la app para que Flyway aplique V3–V9 (sobre una BD sin datos maestros solo crean la estructura; ver sección 0). Si quedó una instancia vieja de la app corriendo (p. ej. IntelliJ en el 8080), reiniciarla para que tome el código nuevo.
 
@@ -364,7 +373,13 @@ Objetivo del usuario:
 
 El modelo ya lo soporta: `aplicacion → evaluado_cliente → cliente / evaluado`, y los resultados están persistidos por aplicación (`resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`, `resultado_total_general`).
 
-**Decisiones a tomar antes de diseñar (preguntar al usuario):**
+**Decisiones tomadas (2026-10-08):**
+- Período del informe de empresa: **rango de fechas** en la consulta (`fechaDesde`/`fechaHasta`), sin tabla de medición por ahora.
+- Confidencialidad: **solo agregados + mínimo N** evaluados por grupo (propuesto N = 5, configurable en `application.properties`); por debajo, el grupo sale `oculto` sin desglose. El informe individual es un endpoint aparte.
+- Orden: **primero endpoints JSON**, luego PDF/Word a partir de los mismos modelos.
+- Diseño propuesto (pendiente de visto bueno en los detalles): módulo `informe` hexagonal (agregación pura en `domain/service/informe/` con tests). Paso 1: `GET /evaluados/{id}/informe?fkCliente=` (historial por fecha, aplicaciones sin resultados marcadas como pendientes). Paso 2: `GET /clientes/{id}/informe?fechaDesde&fechaHasta` (por forma: distribución por nivel y promedio en total/dominios/dimensiones; total general A+C y B+C por separado; si un trabajador tiene varias aplicaciones en el rango, la más reciente; carga en bloque con `findByFkAplicacionIn`). Por confirmar con el usuario: "la más reciente" y N = 5.
+
+**Decisiones originales (referencia):**
 1. **Período del informe de empresa**: rango de fechas en la consulta (sin cambiar el modelo, sugerido para empezar) o una tabla de "medición"/campaña a la que pertenezca cada aplicación.
 2. **Confidencialidad**: según la Resolución 2404 de 2019 (a confirmar con el psicólogo responsable), los resultados individuales son confidenciales y la empresa recibe solo agregados → el informe de empresa no debe permitir identificar personas (cuidado con grupos pequeños) y el individual debe quedar restringido.
 3. **Contenido**: pedir al usuario un modelo o informe anterior para replicar.

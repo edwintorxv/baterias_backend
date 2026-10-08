@@ -1,8 +1,8 @@
 package com.riesgopsicosocial.domain.service.resultado;
 
+import com.riesgopsicosocial.domain.exception.ReglaNegocioException;
 import com.riesgopsicosocial.domain.model.resultado.*;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.*;
-import com.riesgopsicosocial.shared.exception.BusinessException;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
  *       {@code maxItemsSinRespuesta} que admite el manual; si no, no se calcula nada.</li>
  *   <li>Una dimensión con condición cuya pregunta filtro la aplicación tiene en "no" vale
  *       puntaje bruto 0 y no debe traer respuestas.</li>
- *   <li>Si un puntaje no cae en ningún rango del baremo se lanza {@link BusinessException}:
+ *   <li>Si un puntaje no cae en ningún rango del baremo se lanza {@link ReglaNegocioException}:
  *       nunca se devuelven resultados parciales.</li>
  * </ul>
  */
@@ -57,7 +57,7 @@ public class CalculadoraResultado {
                                                       List<RangoBaremo> baremos) {
         if (configIntralaboral.metodoCalculo() != MetodoCalculo.SUMA_POR_DOMINIOS
                 || configExtralaboral.metodoCalculo() != MetodoCalculo.SUMA_DIRECTA) {
-            throw new BusinessException("El total general requiere un cuestionario intralaboral ("
+            throw new ReglaNegocioException("El total general requiere un cuestionario intralaboral ("
                     + MetodoCalculo.SUMA_POR_DOMINIOS + ") y uno extralaboral (" + MetodoCalculo.SUMA_DIRECTA
                     + "); se recibieron " + configIntralaboral.forma() + " y " + configExtralaboral.forma());
         }
@@ -85,7 +85,7 @@ public class CalculadoraResultado {
                 .map(ConfiguracionDimension::idDimensionCuestionario)
                 .toList();
         if (!sinDominio.isEmpty()) {
-            throw new BusinessException("Configuración incompleta del cuestionario " + config.forma()
+            throw new ReglaNegocioException("Configuración incompleta del cuestionario " + config.forma()
                     + ": las dimensiones (dimension_cuestionario) " + sinDominio
                     + " no tienen dominio_cuestionario asociado");
         }
@@ -134,7 +134,7 @@ public class CalculadoraResultado {
         BigDecimal brutoTotal = BigDecimal.ZERO;
         for (ConfiguracionDimension dimension : config.dimensiones()) {
             if (dimension.peso() == null) {
-                throw new BusinessException("Configuración incompleta del cuestionario " + config.forma()
+                throw new ReglaNegocioException("Configuración incompleta del cuestionario " + config.forma()
                         + ": la dimensión '" + dimension.nombre() + "' no tiene peso definido");
             }
             List<BigDecimal> items = valores.get(dimension.idDimensionCuestionario());
@@ -181,7 +181,7 @@ public class CalculadoraResultado {
                 .map(d -> "'" + d.nombre() + "'")
                 .toList();
         if (!invalidas.isEmpty()) {
-            throw new BusinessException("Configuración inválida del cuestionario " + config.forma()
+            throw new ReglaNegocioException("Configuración inválida del cuestionario " + config.forma()
                     + ": las dimensiones " + String.join(", ", invalidas)
                     + " tienen condición o ítems sin respuesta permitidos, que el método "
                     + MetodoCalculo.PROMEDIO_PONDERADO + " no admite");
@@ -196,7 +196,7 @@ public class CalculadoraResultado {
                                                         List<RespuestaCalculo> respuestas,
                                                         FiltrosAplicacion filtros) {
         if (config.dimensiones().isEmpty()) {
-            throw new BusinessException("El cuestionario " + config.forma() + " no tiene dimensiones configuradas");
+            throw new ReglaNegocioException("El cuestionario " + config.forma() + " no tiene dimensiones configuradas");
         }
 
         Set<Long> preguntasVistas = new HashSet<>();
@@ -209,7 +209,7 @@ public class CalculadoraResultado {
             valores.computeIfAbsent(r.idDimensionCuestionario(), k -> new ArrayList<>()).add(r.valor());
         }
         if (!duplicadas.isEmpty()) {
-            throw new BusinessException("El cuestionario " + config.forma()
+            throw new ReglaNegocioException("El cuestionario " + config.forma()
                     + " tiene preguntas respondidas más de una vez: " + duplicadas);
         }
 
@@ -232,7 +232,7 @@ public class CalculadoraResultado {
             }
         }
         if (!problemas.isEmpty()) {
-            throw new BusinessException("No se puede calcular el cuestionario " + config.forma() + ": "
+            throw new ReglaNegocioException("No se puede calcular el cuestionario " + config.forma() + ": "
                     + String.join("; ", problemas));
         }
         return valores;
@@ -246,13 +246,13 @@ public class CalculadoraResultado {
     /** @param baremo de qué baremo se trata, para el mensaje de error (ej. "grupo ocupacional 1") */
     private NivelRiesgo buscarNivel(List<RangoBaremo> baremos, BigDecimal puntaje, String que, String baremo) {
         if (baremos.isEmpty()) {
-            throw new BusinessException("No hay baremo para " + que + " y " + baremo);
+            throw new ReglaNegocioException("No hay baremo para " + que + " y " + baremo);
         }
         return baremos.stream()
                 .filter(rango -> rango.contiene(puntaje))
                 .findFirst()
                 .map(RangoBaremo::nivelRiesgo)
-                .orElseThrow(() -> new BusinessException("El puntaje transformado " + puntaje + " de " + que
+                .orElseThrow(() -> new ReglaNegocioException("El puntaje transformado " + puntaje + " de " + que
                         + " no cae en ningún rango del baremo del " + baremo));
     }
 
