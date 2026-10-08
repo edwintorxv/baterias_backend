@@ -1,5 +1,6 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.dimensioncuestionario;
 
+import com.riesgopsicosocial.domain.model.resultado.configuracion.CondicionAplicacion;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -29,5 +30,12 @@ public class DimensionCuestionarioEntity {
 
     @Column(name = "peso", precision = 5, scale = 2)
     private BigDecimal peso;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "condicion_aplicacion", length = 30)
+    private CondicionAplicacion condicionAplicacion;
+
+    @Column(name = "max_items_sin_respuesta", nullable = false)
+    private Short maxItemsSinRespuesta;
 
 }

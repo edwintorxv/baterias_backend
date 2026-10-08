@@ -9,6 +9,9 @@ import java.util.List;
 @Service
 public class DimensionCuestionarioService {
 
+    /** Hibernate envía null en el INSERT e ignora el DEFAULT 0 de la columna. */
+    private static final short MAX_ITEMS_SIN_RESPUESTA_DEFAULT = 0;
+
     private final DimensionCuestionarioJpaRepository repository;
 
     public DimensionCuestionarioService(DimensionCuestionarioJpaRepository repository) {
@@ -21,6 +24,9 @@ public class DimensionCuestionarioService {
                 entidad.getFkDimension(), entidad.getFkCuestionario())) {
             throw new BusinessException(
                     "Ya existe una configuración de esta dimensión para este cuestionario.");
+        }
+        if (entidad.getMaxItemsSinRespuesta() == null) {
+            entidad.setMaxItemsSinRespuesta(MAX_ITEMS_SIN_RESPUESTA_DEFAULT);
         }
 
         return repository.save(entidad);
@@ -42,6 +48,9 @@ public class DimensionCuestionarioService {
         existente.setFkCuestionario(datos.getFkCuestionario());
         existente.setFactorTransformacion(datos.getFactorTransformacion());
         existente.setPeso(datos.getPeso());
+        existente.setCondicionAplicacion(datos.getCondicionAplicacion());
+        existente.setMaxItemsSinRespuesta(datos.getMaxItemsSinRespuesta() != null
+                ? datos.getMaxItemsSinRespuesta() : MAX_ITEMS_SIN_RESPUESTA_DEFAULT);
 
         return repository.save(existente);
     }

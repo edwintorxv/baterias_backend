@@ -30,7 +30,9 @@ public class DimensionCuestionarioController {
                 entidad.getFkDimension(),
                 entidad.getFkCuestionario(),
                 entidad.getFactorTransformacion(),
-                entidad.getPeso());
+                entidad.getPeso(),
+                entidad.getCondicionAplicacion(),
+                entidad.getMaxItemsSinRespuesta());
     }
 
     private DimensionCuestionarioEntity toEntity(DimensionCuestionarioRequest request) {
@@ -39,6 +41,8 @@ public class DimensionCuestionarioController {
         entidad.setFkCuestionario(request.fkCuestionario());
         entidad.setFactorTransformacion(request.factorTransformacion());
         entidad.setPeso(request.peso());
+        entidad.setCondicionAplicacion(request.condicionAplicacion());
+        entidad.setMaxItemsSinRespuesta(request.maxItemsSinRespuesta());
         return entidad;
     }
 
