@@ -1,6 +1,8 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion;
 
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteEntity;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorEntity;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.tipocargo.TipoCargoEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.tipocargo.TipoCargoJpaRepository;
@@ -19,13 +21,16 @@ public class AplicacionService {
     private final AplicacionJpaRepository repository;
     private final EvaluadoClienteJpaRepository evaluadoClienteRepository;
     private final TipoCargoJpaRepository tipoCargoRepository;
+    private final EvaluadorJpaRepository evaluadorRepository;
 
     public AplicacionService(AplicacionJpaRepository repository,
                              EvaluadoClienteJpaRepository evaluadoClienteRepository,
-                             TipoCargoJpaRepository tipoCargoRepository) {
+                             TipoCargoJpaRepository tipoCargoRepository,
+                             EvaluadorJpaRepository evaluadorRepository) {
         this.repository = repository;
         this.evaluadoClienteRepository = evaluadoClienteRepository;
         this.tipoCargoRepository = tipoCargoRepository;
+        this.evaluadorRepository = evaluadorRepository;
     }
 
     public AplicacionEntity crear(AplicacionEntity entidad) {
@@ -37,6 +42,9 @@ public class AplicacionService {
         }
         if (entidad.getFkGrupoOcupacional() == null) {
             entidad.setFkGrupoOcupacional(resolverGrupoOcupacional(entidad.getFkEvaluadoCliente()));
+        }
+        if (entidad.getFkEvaluador() != null) {
+            validarEvaluadorActivo(entidad.getFkEvaluador());
         }
         return repository.save(entidad);
     }
@@ -55,6 +63,7 @@ public class AplicacionService {
             existente.setFechaAplicacion(datos.getFechaAplicacion());
         }
         existente.setObservaciones(datos.getObservaciones());
+        existente.setRecomendaciones(datos.getRecomendaciones());
         if (datos.getEstado() != null && !datos.getEstado().isBlank()) {
             existente.setEstado(datos.getEstado());
         }
@@ -63,6 +72,11 @@ public class AplicacionService {
         }
         if (datos.getEsJefe() != null) {
             existente.setEsJefe(datos.getEsJefe());
+        }
+        // Solo se valida al cambiarlo: si el evaluador se retiró después, la aplicación conserva el suyo.
+        if (datos.getFkEvaluador() != null && !datos.getFkEvaluador().equals(existente.getFkEvaluador())) {
+            validarEvaluadorActivo(datos.getFkEvaluador());
+            existente.setFkEvaluador(datos.getFkEvaluador());
         }
 
         return repository.save(existente);
@@ -83,6 +97,15 @@ public class AplicacionService {
 
     public List<AplicacionEntity> listarPorEstado(String estado) {
         return repository.findByEstado(estado);
+    }
+
+    /** Un evaluador retirado (activo = false) no puede recibir aplicaciones nuevas. */
+    private void validarEvaluadorActivo(Long fkEvaluador) {
+        EvaluadorEntity evaluador = evaluadorRepository.findById(fkEvaluador)
+                .orElseThrow(() -> new ResourceNotFoundException("Evaluador no encontrado con id: " + fkEvaluador));
+        if (!Boolean.TRUE.equals(evaluador.getActivo())) {
+            throw new BusinessException("El evaluador " + fkEvaluador + " está inactivo y no puede asignarse a una aplicación");
+        }
     }
 
     /**

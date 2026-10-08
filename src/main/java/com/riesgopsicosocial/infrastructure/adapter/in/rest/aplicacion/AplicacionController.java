@@ -31,9 +31,11 @@ public class AplicacionController {
                 aplicacionEntity.getFkGrupoOcupacional(),
                 aplicacionEntity.getFechaAplicacion(),
                 aplicacionEntity.getObservaciones(),
+                aplicacionEntity.getRecomendaciones(),
                 aplicacionEntity.getEstado(),
                 aplicacionEntity.getAtiendeClientes(),
-                aplicacionEntity.getEsJefe()
+                aplicacionEntity.getEsJefe(),
+                aplicacionEntity.getFkEvaluador()
         );
     }
 
@@ -46,6 +48,8 @@ public class AplicacionController {
         aplicacionEntity.setEstado(aplicacionRequest.estado());
         aplicacionEntity.setAtiendeClientes(aplicacionRequest.atiendeClientes());
         aplicacionEntity.setEsJefe(aplicacionRequest.esJefe());
+        aplicacionEntity.setRecomendaciones(aplicacionRequest.recomendaciones());
+        aplicacionEntity.setFkEvaluador(aplicacionRequest.fkEvaluador());
         return aplicacionEntity;
     }
 

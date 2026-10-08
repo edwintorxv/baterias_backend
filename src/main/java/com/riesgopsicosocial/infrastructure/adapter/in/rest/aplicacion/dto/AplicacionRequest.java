@@ -11,9 +11,11 @@ public record AplicacionRequest(
         Long fkGrupoOcupacional,
         LocalDateTime fechaAplicacion,
         String observaciones,
+        String recomendaciones,
         @Size(max = 20) String estado,
         Boolean atiendeClientes,
-        Boolean esJefe
+        Boolean esJefe,
+        Long fkEvaluador
 
 ) {
 }

@@ -39,6 +39,12 @@ public class AplicacionEntity {
     @Column(name = "es_jefe")
     private Boolean esJefe;
 
+    @Column(name = "fk_evaluador")
+    private Long fkEvaluador;
+
+    @Column(columnDefinition = "TEXT")
+    private String recomendaciones;
+
     @Column(name = "fecha_creado", insertable = false, updatable = false)
     private LocalDateTime fechaCreado;
 
