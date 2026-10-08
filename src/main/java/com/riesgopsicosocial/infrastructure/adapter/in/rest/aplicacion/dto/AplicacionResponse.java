@@ -9,7 +9,9 @@ public record AplicacionResponse(
         Long fkGrupoOcupacional,
         LocalDateTime fechaAplicacion,
         String observaciones,
-        String estado
+        String estado,
+        Boolean atiendeClientes,
+        Boolean esJefe
 
 ) {
 }

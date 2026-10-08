@@ -11,7 +11,9 @@ public record AplicacionRequest(
         Long fkGrupoOcupacional,
         LocalDateTime fechaAplicacion,
         String observaciones,
-        @Size(max = 20) String estado
+        @Size(max = 20) String estado,
+        Boolean atiendeClientes,
+        Boolean esJefe
 
 ) {
 }

@@ -33,6 +33,12 @@ public class AplicacionEntity {
     @Column(length = 20)
     private String estado;
 
+    @Column(name = "atiende_clientes")
+    private Boolean atiendeClientes;
+
+    @Column(name = "es_jefe")
+    private Boolean esJefe;
+
     @Column(name = "fecha_creado", insertable = false, updatable = false)
     private LocalDateTime fechaCreado;
 

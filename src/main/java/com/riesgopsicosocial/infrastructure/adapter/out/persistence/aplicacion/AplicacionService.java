@@ -58,6 +58,12 @@ public class AplicacionService {
         if (datos.getEstado() != null && !datos.getEstado().isBlank()) {
             existente.setEstado(datos.getEstado());
         }
+        if (datos.getAtiendeClientes() != null) {
+            existente.setAtiendeClientes(datos.getAtiendeClientes());
+        }
+        if (datos.getEsJefe() != null) {
+            existente.setEsJefe(datos.getEsJefe());
+        }
 
         return repository.save(existente);
     }
