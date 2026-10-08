@@ -8,7 +8,8 @@ public record ResultadoAplicacionResponse(
         Long fkAplicacion,
         Long fkGrupoOcupacional,
         LocalDateTime fechaCalculo,
-        List<ResultadoCuestionarioResponse> cuestionarios
+        List<ResultadoCuestionarioResponse> cuestionarios,
+        ResultadoTotalGeneralResponse totalGeneral
 
 ) {
 }

@@ -6,6 +6,7 @@ import com.riesgopsicosocial.domain.model.resultado.*;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.resultado.dto.ResultadoAplicacionResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.resultado.dto.ResultadoCuestionarioResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.resultado.dto.ResultadoDetalleResponse;
+import com.riesgopsicosocial.infrastructure.adapter.in.rest.resultado.dto.ResultadoTotalGeneralResponse;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import org.springframework.http.ResponseEntity;
@@ -31,8 +32,22 @@ public class ResultadoController {
                 resultado.idAplicacion(),
                 resultado.idGrupoOcupacional(),
                 resultado.fechaCalculo(),
-                resultado.cuestionarios().stream().map(this::toResponse).toList()
+                resultado.cuestionarios().stream().map(this::toResponse).toList(),
+                toResponse(resultado.totalGeneral())
         );
+    }
+
+    private ResultadoTotalGeneralResponse toResponse(ResultadoTotalGeneral total) {
+        if (total == null) {
+            return null;
+        }
+        return new ResultadoTotalGeneralResponse(
+                total.idCuestionarioIntralaboral(),
+                total.formaIntralaboral(),
+                total.puntajeBruto(),
+                total.puntajeTransformado(),
+                total.nivelRiesgo().id(),
+                total.nivelRiesgo().nombre());
     }
 
     private ResultadoCuestionarioResponse toResponse(ResultadoCuestionario rc) {

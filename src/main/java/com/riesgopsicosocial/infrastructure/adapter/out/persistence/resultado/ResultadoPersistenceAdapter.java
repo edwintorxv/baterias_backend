@@ -7,6 +7,8 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadodom
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadodominio.ResultadoDominioEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadodimension.ResultadoDimensionJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadodimension.ResultadoDimensionEntity;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadototalgeneral.ResultadoTotalGeneralEntity;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadototalgeneral.ResultadoTotalGeneralJpaRepository;
 import com.riesgopsicosocial.domain.model.resultado.*;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.*;
 import org.springframework.stereotype.Component;
@@ -21,15 +23,18 @@ public class ResultadoPersistenceAdapter implements ResultadoPort {
     private final ResultadoDimensionJpaRepository resultadoDimensionRepository;
     private final ResultadoDominioJpaRepository resultadoDominioRepository;
     private final ResultadoCuestionarioJpaRepository resultadoCuestionarioRepository;
+    private final ResultadoTotalGeneralJpaRepository resultadoTotalGeneralRepository;
     private final CatalogoCalculoLoader catalogo;
 
     public ResultadoPersistenceAdapter(ResultadoDimensionJpaRepository resultadoDimensionRepository,
                                        ResultadoDominioJpaRepository resultadoDominioRepository,
                                        ResultadoCuestionarioJpaRepository resultadoCuestionarioRepository,
+                                       ResultadoTotalGeneralJpaRepository resultadoTotalGeneralRepository,
                                        CatalogoCalculoLoader catalogo) {
         this.resultadoDimensionRepository = resultadoDimensionRepository;
         this.resultadoDominioRepository = resultadoDominioRepository;
         this.resultadoCuestionarioRepository = resultadoCuestionarioRepository;
+        this.resultadoTotalGeneralRepository = resultadoTotalGeneralRepository;
         this.catalogo = catalogo;
     }
 
@@ -41,6 +46,7 @@ public class ResultadoPersistenceAdapter implements ResultadoPort {
         resultadoDimensionRepository.eliminarPorAplicacion(idAplicacion);
         resultadoDominioRepository.eliminarPorAplicacion(idAplicacion);
         resultadoCuestionarioRepository.eliminarPorAplicacion(idAplicacion);
+        resultadoTotalGeneralRepository.eliminarPorAplicacion(idAplicacion);
 
         List<ResultadoDimensionEntity> dimensiones = new ArrayList<>();
         List<ResultadoDominioEntity> dominios = new ArrayList<>();
@@ -58,6 +64,13 @@ public class ResultadoPersistenceAdapter implements ResultadoPort {
         resultadoCuestionarioRepository.saveAll(cuestionarios);
         resultadoDominioRepository.saveAll(dominios);
         resultadoDimensionRepository.saveAll(dimensiones);
+
+        ResultadoTotalGeneral total = resultado.totalGeneral();
+        if (total != null) {
+            resultadoTotalGeneralRepository.save(new ResultadoTotalGeneralEntity(null, idAplicacion,
+                    total.idCuestionarioIntralaboral(), total.puntajeBruto(), total.puntajeTransformado(),
+                    total.nivelRiesgo().id(), fecha));
+        }
     }
 
     @Override
@@ -65,7 +78,7 @@ public class ResultadoPersistenceAdapter implements ResultadoPort {
         List<ResultadoCuestionarioEntity> cuestionarios = resultadoCuestionarioRepository.findByFkAplicacion(idAplicacion)
                 .stream().sorted(Comparator.comparing(ResultadoCuestionarioEntity::getFkCuestionario)).toList();
         if (cuestionarios.isEmpty()) {
-            return new ResultadoAplicacion(idAplicacion, idGrupoOcupacional, null, List.of());
+            return new ResultadoAplicacion(idAplicacion, idGrupoOcupacional, null, List.of(), null);
         }
 
         Map<Long, ResultadoDominioEntity> dominios = resultadoDominioRepository.findByFkAplicacion(idAplicacion).stream()
@@ -99,7 +112,18 @@ public class ResultadoPersistenceAdapter implements ResultadoPort {
                 })
                 .toList();
 
-        return new ResultadoAplicacion(idAplicacion, idGrupoOcupacional, cuestionarios.get(0).getFechaCalculo(), resultado);
+        // La forma intralaboral se toma de su propio resultado, que siempre existe si hay total general.
+        ResultadoTotalGeneral totalGeneral = resultadoTotalGeneralRepository.findByFkAplicacion(idAplicacion)
+                .map(t -> new ResultadoTotalGeneral(t.getFkCuestionarioIntralaboral(),
+                        resultado.stream()
+                                .filter(rc -> rc.idCuestionario().equals(t.getFkCuestionarioIntralaboral()))
+                                .map(ResultadoCuestionario::forma)
+                                .findFirst().orElse(null),
+                        t.getPuntajeBruto(), t.getPuntajeTransformado(), niveles.get(t.getFkNivelRiesgo())))
+                .orElse(null);
+
+        return new ResultadoAplicacion(idAplicacion, idGrupoOcupacional, cuestionarios.get(0).getFechaCalculo(),
+                resultado, totalGeneral);
     }
 
 }

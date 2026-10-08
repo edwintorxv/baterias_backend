@@ -7,6 +7,7 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremodimens
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremodimension.BaremoDimensionJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremodominio.BaremoDominioEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremodominio.BaremoDominioJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremototalgeneral.BaremoTotalGeneralJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cuestionario.CuestionarioEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cuestionario.CuestionarioJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.dimension.DimensionEntity;
@@ -45,6 +46,7 @@ public class CatalogoCalculoLoader {
     private final BaremoDimensionJpaRepository baremoDimensionRepository;
     private final BaremoDominioJpaRepository baremoDominioRepository;
     private final BaremoCuestionarioJpaRepository baremoCuestionarioRepository;
+    private final BaremoTotalGeneralJpaRepository baremoTotalGeneralRepository;
     private final NivelRiesgoJpaRepository nivelRiesgoRepository;
 
     public CatalogoCalculoLoader(CuestionarioJpaRepository cuestionarioRepository,
@@ -56,6 +58,7 @@ public class CatalogoCalculoLoader {
                                 BaremoDimensionJpaRepository baremoDimensionRepository,
                                 BaremoDominioJpaRepository baremoDominioRepository,
                                 BaremoCuestionarioJpaRepository baremoCuestionarioRepository,
+                                BaremoTotalGeneralJpaRepository baremoTotalGeneralRepository,
                                 NivelRiesgoJpaRepository nivelRiesgoRepository) {
         this.cuestionarioRepository = cuestionarioRepository;
         this.dimensionCuestionarioRepository = dimensionCuestionarioRepository;
@@ -66,6 +69,7 @@ public class CatalogoCalculoLoader {
         this.baremoDimensionRepository = baremoDimensionRepository;
         this.baremoDominioRepository = baremoDominioRepository;
         this.baremoCuestionarioRepository = baremoCuestionarioRepository;
+        this.baremoTotalGeneralRepository = baremoTotalGeneralRepository;
         this.nivelRiesgoRepository = nivelRiesgoRepository;
     }
 
@@ -148,6 +152,14 @@ public class CatalogoCalculoLoader {
                 configDimensiones,
                 configDominios,
                 baremosCuestionario);
+    }
+
+    /** Baremo del total general (intra + extra) para la forma intralaboral indicada. */
+    public List<RangoBaremo> cargarBaremosTotalGeneral(Long idCuestionarioIntralaboral) {
+        Map<Long, NivelRiesgo> niveles = cargarNiveles();
+        return baremoTotalGeneralRepository.findByFkCuestionarioIntralaboral(idCuestionarioIntralaboral).stream()
+                .map(b -> rango(b.getValorMinimo(), b.getValorMaximo(), b.getFkNivelRiesgo(), niveles))
+                .toList();
     }
 
     public Map<Long, NivelRiesgo> cargarNiveles() {

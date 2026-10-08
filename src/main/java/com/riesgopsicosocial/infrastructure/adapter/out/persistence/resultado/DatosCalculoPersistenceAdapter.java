@@ -78,6 +78,11 @@ public class DatosCalculoPersistenceAdapter implements DatosCalculoPort {
         return catalogo.cargarConfiguracion(idCuestionario, idGrupoOcupacional);
     }
 
+    @Override
+    public List<RangoBaremo> cargarBaremosTotalGeneral(Long idCuestionarioIntralaboral) {
+        return catalogo.cargarBaremosTotalGeneral(idCuestionarioIntralaboral);
+    }
+
     private static <T> Map<Long, T> porId(Iterable<T> entidades, Function<T, Long> id) {
         Map<Long, T> mapa = new HashMap<>();
         entidades.forEach(e -> mapa.put(id.apply(e), e));
