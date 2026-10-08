@@ -43,6 +43,13 @@ public class DatosCalculoPersistenceAdapter implements DatosCalculoPort {
     }
 
     @Override
+    public FiltrosAplicacion buscarFiltros(Long idAplicacion) {
+        return aplicacionRepository.findById(idAplicacion)
+                .map(a -> new FiltrosAplicacion(a.getAtiendeClientes(), a.getEsJefe()))
+                .orElse(FiltrosAplicacion.SIN_REGISTRO);
+    }
+
+    @Override
     public List<RespuestaCalculo> buscarRespuestas(Long idAplicacion) {
         List<RespuestaEntity> respuestas = respuestaRepository.findByFkAplicacion(idAplicacion);
         if (respuestas.isEmpty()) {

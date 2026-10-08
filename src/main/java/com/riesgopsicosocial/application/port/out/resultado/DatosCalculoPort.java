@@ -1,6 +1,7 @@
 package com.riesgopsicosocial.application.port.out.resultado;
 
 import com.riesgopsicosocial.domain.model.resultado.configuracion.ConfiguracionCuestionario;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.FiltrosAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.RespuestaCalculo;
 
 import java.util.List;
@@ -14,6 +15,9 @@ public interface DatosCalculoPort {
 
     /** Grupo ocupacional guardado en la aplicación; vacío si la aplicación no existe. */
     Optional<Long> buscarGrupoOcupacional(Long idAplicacion);
+
+    /** Preguntas filtro (atiende clientes, es jefe) guardadas en la aplicación. */
+    FiltrosAplicacion buscarFiltros(Long idAplicacion);
 
     List<RespuestaCalculo> buscarRespuestas(Long idAplicacion);
 

@@ -5,6 +5,7 @@ import com.riesgopsicosocial.application.port.in.resultado.ConsultarResultadosUs
 import com.riesgopsicosocial.application.port.out.resultado.DatosCalculoPort;
 import com.riesgopsicosocial.application.port.out.resultado.ResultadoPort;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.ConfiguracionCuestionario;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.FiltrosAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.RespuestaCalculo;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoCuestionario;
@@ -39,6 +40,7 @@ public class ResultadoAplicacionService implements CalcularResultadosUseCase, Co
         if (respuestas.isEmpty()) {
             throw new BusinessException("La aplicación " + idAplicacion + " no tiene respuestas registradas");
         }
+        FiltrosAplicacion filtros = datosCalculoPort.buscarFiltros(idAplicacion);
 
         // Solo se calculan los cuestionarios que tienen al menos una respuesta (ej. A + C + D).
         Map<Long, List<RespuestaCalculo>> porCuestionario = respuestas.stream()
@@ -47,7 +49,7 @@ public class ResultadoAplicacionService implements CalcularResultadosUseCase, Co
         List<ResultadoCuestionario> cuestionarios = new ArrayList<>();
         porCuestionario.forEach((idCuestionario, suyas) -> {
             ConfiguracionCuestionario config = datosCalculoPort.cargarConfiguracion(idCuestionario, idGrupo);
-            cuestionarios.add(calculadora.calcular(config, suyas));
+            cuestionarios.add(calculadora.calcular(config, suyas, filtros));
         });
 
         ResultadoAplicacion resultado = new ResultadoAplicacion(idAplicacion, idGrupo, LocalDateTime.now(), cuestionarios);

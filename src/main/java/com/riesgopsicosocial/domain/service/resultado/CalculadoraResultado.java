@@ -17,7 +17,10 @@ import java.util.stream.Collectors;
  * <p>Reglas comunes:
  * <ul>
  *   <li>Puntaje transformado = bruto / factor × 100, redondeado a un decimal (como los baremos).</li>
- *   <li>Cada dimensión debe tener respondidas todas sus preguntas; si no, no se calcula nada.</li>
+ *   <li>Cada dimensión debe tener respondidas todas sus preguntas, salvo las
+ *       {@code maxItemsSinRespuesta} que admite el manual; si no, no se calcula nada.</li>
+ *   <li>Una dimensión con condición cuya pregunta filtro la aplicación tiene en "no" vale
+ *       puntaje bruto 0 y no debe traer respuestas.</li>
  *   <li>Si un puntaje no cae en ningún rango del baremo se lanza {@link BusinessException}:
  *       nunca se devuelven resultados parciales.</li>
  * </ul>
@@ -27,8 +30,12 @@ public class CalculadoraResultado {
     private static final BigDecimal CIEN = BigDecimal.valueOf(100);
     private static final MathContext PRECISION = MathContext.DECIMAL64;
 
-    public ResultadoCuestionario calcular(ConfiguracionCuestionario config, List<RespuestaCalculo> respuestas) {
-        Map<Long, List<BigDecimal>> valoresPorDimension = agruparYValidar(config, respuestas);
+    public ResultadoCuestionario calcular(ConfiguracionCuestionario config, List<RespuestaCalculo> respuestas,
+                                          FiltrosAplicacion filtros) {
+        if (config.metodoCalculo() == MetodoCalculo.PROMEDIO_PONDERADO) {
+            validarSinItemsOpcionales(config);
+        }
+        Map<Long, List<BigDecimal>> valoresPorDimension = agruparYValidar(config, respuestas, filtros);
 
         return switch (config.metodoCalculo()) {
             case SUMA_POR_DOMINIOS -> calcularSumaPorDominios(config, valoresPorDimension);
@@ -137,11 +144,29 @@ public class CalculadoraResultado {
     }
 
     /**
-     * Agrupa los valores por dimensión y exige que cada dimensión del cuestionario tenga
-     * exactamente una respuesta por pregunta.
+     * El promedio de PROMEDIO_PONDERADO divide por los ítems respondidos: una dimensión que
+     * pudiera quedar vacía o incompleta haría el cálculo inválido.
+     */
+    private void validarSinItemsOpcionales(ConfiguracionCuestionario config) {
+        List<String> invalidas = config.dimensiones().stream()
+                .filter(d -> d.condicion() != null || d.maxItemsSinRespuesta() > 0)
+                .map(d -> "'" + d.nombre() + "'")
+                .toList();
+        if (!invalidas.isEmpty()) {
+            throw new BusinessException("Configuración inválida del cuestionario " + config.forma()
+                    + ": las dimensiones " + String.join(", ", invalidas)
+                    + " tienen condición o ítems sin respuesta permitidos, que el método "
+                    + MetodoCalculo.PROMEDIO_PONDERADO + " no admite");
+        }
+    }
+
+    /**
+     * Agrupa los valores por dimensión y valida que cada una tenga sus preguntas respondidas
+     * (con la tolerancia de la dimensión), o ninguna si la pregunta filtro la deja sin aplicar.
      */
     private Map<Long, List<BigDecimal>> agruparYValidar(ConfiguracionCuestionario config,
-                                                        List<RespuestaCalculo> respuestas) {
+                                                        List<RespuestaCalculo> respuestas,
+                                                        FiltrosAplicacion filtros) {
         if (config.dimensiones().isEmpty()) {
             throw new BusinessException("El cuestionario " + config.forma() + " no tiene dimensiones configuradas");
         }
@@ -162,12 +187,20 @@ public class CalculadoraResultado {
 
         List<String> problemas = new ArrayList<>();
         for (ConfiguracionDimension dimension : config.dimensiones()) {
-            int respondidas = valores.getOrDefault(dimension.idDimensionCuestionario(), List.of()).size();
-            if (dimension.numeroPreguntas() == 0) {
+            // Una dimensión que no aplica queda con lista vacía → puntaje bruto 0.
+            int respondidas = valores.computeIfAbsent(dimension.idDimensionCuestionario(), k -> new ArrayList<>()).size();
+            if (dimension.condicion() != null && filtros.noAplica(dimension.condicion())) {
+                if (respondidas > 0) {
+                    problemas.add("'" + dimension.nombre() + "' no aplica (" + dimension.condicion()
+                            + " = no) pero tiene " + respondidas + " respuestas");
+                }
+            } else if (dimension.numeroPreguntas() == 0) {
                 problemas.add("'" + dimension.nombre() + "' no tiene preguntas configuradas");
-            } else if (respondidas != dimension.numeroPreguntas()) {
+            } else if (dimension.numeroPreguntas() - respondidas > dimension.maxItemsSinRespuesta()) {
                 problemas.add("'" + dimension.nombre() + "' tiene " + respondidas + " de "
-                        + dimension.numeroPreguntas() + " preguntas respondidas");
+                        + dimension.numeroPreguntas() + " preguntas respondidas"
+                        + (dimension.maxItemsSinRespuesta() > 0
+                        ? " (se admite hasta " + dimension.maxItemsSinRespuesta() + " sin respuesta)" : ""));
             }
         }
         if (!problemas.isEmpty()) {

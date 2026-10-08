@@ -126,6 +126,8 @@ public class CatalogoCalculoLoader {
                             dc.getFactorTransformacion(),
                             dc.getPeso(),
                             preguntasPorDimension.getOrDefault(dc.getId(), 0L).intValue(),
+                            dc.getCondicionAplicacion(),
+                            dc.getMaxItemsSinRespuesta(),
                             baremosDimension.getOrDefault(dc.getId(), List.of()));
                 })
                 .toList();

@@ -20,6 +20,8 @@ class CalculadoraResultadoTest {
             new RangoBaremo(bd("0"), bd("50.0"), BAJO),
             new RangoBaremo(bd("50.1"), bd("100"), ALTO));
 
+    private static final FiltrosAplicacion SIN_FILTROS = FiltrosAplicacion.SIN_REGISTRO;
+
     private final CalculadoraResultado calculadora = new CalculadoraResultado();
 
     @Test
@@ -32,7 +34,7 @@ class CalculadoraResultadoTest {
                 BAREMO);
 
         ResultadoCuestionario r = calculadora.calcular(config, List.of(
-                respuesta(1L, 10L, "1"), respuesta(2L, 10L, "2"), respuesta(3L, 11L, "4")));
+                respuesta(1L, 10L, "1"), respuesta(2L, 10L, "2"), respuesta(3L, 11L, "4")), SIN_FILTROS);
 
         assertEquals(bd("3.00"), r.dimensiones().get(0).puntajeBruto());
         assertEquals(bd("37.5"), r.dimensiones().get(0).puntajeTransformado());
@@ -55,7 +57,7 @@ class CalculadoraResultadoTest {
                 List.of(), BAREMO);
 
         ResultadoCuestionario r = calculadora.calcular(config, List.of(
-                respuesta(1L, 20L, "9"), respuesta(2L, 20L, "3"), respuesta(3L, 21L, "0")));
+                respuesta(1L, 20L, "9"), respuesta(2L, 20L, "3"), respuesta(3L, 21L, "0")), SIN_FILTROS);
 
         assertEquals(bd("24.00"), r.puntajeBruto());
         assertEquals(bd("39.2"), r.puntajeTransformado());
@@ -68,7 +70,7 @@ class CalculadoraResultadoTest {
         ConfiguracionCuestionario config = sumaDirecta(dimension(10L, null, "8", null, 2));
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "1"))));
+                () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "1")), SIN_FILTROS));
         assertTrue(ex.getMessage().contains("1 de 2"));
     }
 
@@ -78,7 +80,7 @@ class CalculadoraResultadoTest {
         ConfiguracionCuestionario config = sumaDirecta(dimension(10L, null, "4", null, 1));
 
         assertThrows(BusinessException.class,
-                () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "5"))));
+                () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "5")), SIN_FILTROS));
     }
 
     @Test
@@ -87,7 +89,7 @@ class CalculadoraResultadoTest {
                 bd("8"), 2L, new ArrayList<>(List.of(dimension(10L, null, "8", null, 1))), List.of(), List.of());
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "1"))));
+                () -> calculadora.calcular(config, List.of(respuesta(1L, 10L, "1")), SIN_FILTROS));
         assertTrue(ex.getMessage().contains("grupo ocupacional 2"));
     }
 
@@ -98,7 +100,7 @@ class CalculadoraResultadoTest {
 
     private static ConfiguracionDimension dimension(Long id, Long idDominio, String factor, String peso, int preguntas) {
         return new ConfiguracionDimension(id, idDominio, "Dimensión " + id, bd(factor),
-                peso == null ? null : bd(peso), preguntas, BAREMO);
+                peso == null ? null : bd(peso), preguntas, null, 0, BAREMO);
     }
 
     private static RespuestaCalculo respuesta(Long idPregunta, Long idDimension, String valor) {
