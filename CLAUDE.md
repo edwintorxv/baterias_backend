@@ -2,7 +2,7 @@
 
 > Documento de contexto para continuar el desarrollo desde IntelliJ (Claude Pro / Claude Code).
 > Generado a partir de una sesión de diseño e implementación del backend.
-> Última actualización: 2026-10-04 (motor de cálculo implementado; ver sección 2).
+> Última actualización: 2026-10-07 (datos maestros verificados contra los manuales, ítems condicionales, total general; siguiente: informes — ver sección 10).
 
 ---
 
@@ -17,7 +17,7 @@ Requisitos: **JDK 17**, **PostgreSQL 16** (la máquina original usa `C:\Program 
      y en la nueva (con la BD vacía creada)
      `pg_restore -U postgres -d bateria_psicosocial bateria_psicosocial.dump`.
      Esto trae también `flyway_schema_history`, así que Flyway no vuelve a aplicar V1/V2. El `.dump` contiene datos de evaluados: **no subirlo a git**; pasarlo por otro medio.
-   - **BD vacía**: dejar que Flyway aplique V1 y V2 al arrancar (funcionan sobre tablas vacías) y cargar los datos maestros a mano. Pendiente a futuro: crear una migración `V7__datos_maestros.sql` (o la siguiente libre) con esos `INSERT` (ya con los valores corregidos por V3–V6); como V3–V6 no hacen nada sobre una BD vacía, esa migración debe traer los datos ya corregidos y terminar con `setval` de las secuencias para que el repo sea autosuficiente.
+   - **BD vacía**: dejar que Flyway aplique V1 y V2 al arrancar (funcionan sobre tablas vacías) y cargar los datos maestros a mano. Pendiente a futuro: crear una migración `V10__datos_maestros.sql` (o la siguiente libre) con esos `INSERT` (ya con los valores corregidos por V3–V9); como los `UPDATE`/`INSERT` de datos de V3–V9 no tocan nada sobre una BD vacía (la estructura de V7–V9 sí se crea), esa migración debe traer los datos ya corregidos —incluidos `condicion_aplicacion`/`max_items_sin_respuesta` (V8) y `baremo_total_general` (V9)— y terminar con `setval` de las secuencias para que el repo sea autosuficiente.
 3. Arrancar: `./mvnw spring-boot:run` (perfil `dev` por defecto; en macOS/Linux, si `mvnw` no tiene permiso de ejecución porque viene de Windows, usar `sh mvnw spring-boot:run`). API en `http://localhost:8080/api`, Swagger en `http://localhost:8080/api/swagger-ui.html`.
 4. Tests: `./mvnw test` (incluye `CalculadoraResultadoTest`, lógica pura sin BD).
 5. La carpeta `logs/` está en `.gitignore` (se generan localmente al arrancar).
@@ -348,10 +348,33 @@ El script de creación de las ~34 tablas (`cuestionario`, `dominio`, `dimension`
 
 ---
 
-## 10. Siguiente paso acordado
+## 10. Siguiente paso acordado (retomar el 2026-10-08)
 
-Motor de cálculo implementado (ver sección 2), con datos maestros verificados contra el manual (V3–V6) e ítems condicionales (V7–V8). Total general implementado (V9); las cuatro formas probadas con datos (aplicación 1). Pendiente: informes PDF/Word (uno por empresa con total general y separado por formas A, B, C, D; otro por trabajador con su historial de aplicaciones para seguimiento). Decisiones abiertas de los informes: período del informe de empresa (rango de fechas vs. tabla de "medición"), confidencialidad de resultados individuales (Resolución 2404 de 2019, verificar con el psicólogo responsable) y librería PDF/Word (un modelo de datos por informe y dos renderizadores). Forma de trabajo acordada: paso a paso, mostrando diseño y diff antes de cada commit. Diseño original del motor: `resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`, en `domain`/`application` (hexagonal completo), incluyendo:
-- El disparador del cálculo (automático al finalizar la `aplicacion` vs. endpoint explícito).
-- La lógica de suma de `puntaje_bruto` a partir de `respuesta` agrupado por `dimension_cuestionario`/`dominio_cuestionario`/`cuestionario`.
-- La aplicación de `factor_transformacion` para obtener `puntaje_transformado`.
-- La búsqueda del `nivel_riesgo` correspondiente según los rangos (`valor_minimo`/`valor_maximo`) de `baremo_dimension`/`baremo_dominio`/`baremo_cuestionario`.
+### Estado al cierre del 2026-10-07
+- Motor de cálculo completo y probado con datos para las cuatro formas y el total general (ver sección 2): datos maestros verificados contra los manuales (V3–V6), ítems condicionales y faltantes (V7–V8), total general (V9). Migraciones aplicadas en la BD local hasta **V9**; todo commiteado y subido a `origin/main`.
+- Aplicación 1 = A + C + D (respuestas de C y D de prueba); aplicación 2 = solo A. Resultados de referencia en la sección 2.
+- Tests: 17 (`./mvnw test`, o `sh mvnw test` en macOS).
+- Forma de trabajo acordada: **paso a paso**, mostrando diseño y diff antes de cada commit.
+- Al retomar en otra máquina: arrancar la app para que Flyway aplique V3–V9 (sobre una BD sin datos maestros solo crean la estructura; ver sección 0). Si quedó una instancia vieja de la app corriendo (p. ej. IntelliJ en el 8080), reiniciarla para que tome el código nuevo.
+
+### Siguiente: informes PDF y Word
+Objetivo del usuario:
+1. **Informe por empresa (`cliente`)**: total general y resultados separados por forma A, B, C y D (distribución de trabajadores por nivel de riesgo, por dimensión/dominio/total). Total general A+C y B+C por separado (baremos distintos).
+2. **Informe por trabajador**: sus resultados y el historial de sus aplicaciones (ordenadas por fecha) para seguimiento.
+
+El modelo ya lo soporta: `aplicacion → evaluado_cliente → cliente / evaluado`, y los resultados están persistidos por aplicación (`resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`, `resultado_total_general`).
+
+**Decisiones a tomar antes de diseñar (preguntar al usuario):**
+1. **Período del informe de empresa**: rango de fechas en la consulta (sin cambiar el modelo, sugerido para empezar) o una tabla de "medición"/campaña a la que pertenezca cada aplicación.
+2. **Confidencialidad**: según la Resolución 2404 de 2019 (a confirmar con el psicólogo responsable), los resultados individuales son confidenciales y la empresa recibe solo agregados → el informe de empresa no debe permitir identificar personas (cuidado con grupos pequeños) y el individual debe quedar restringido.
+3. **Contenido**: pedir al usuario un modelo o informe anterior para replicar.
+4. **Librería**: un modelo de datos por informe y dos renderizadores (p. ej. Apache POI para Word y plantilla HTML → PDF); elegir al diseñar.
+
+**Ya decidido para los informes:** la forma D se muestra con las etiquetas del manual de estrés (1 Muy bajo, 2 Bajo, 3 Medio, 4 Alto, 5 Muy alto) y el título "Nivel de síntomas de estrés" (ver sección 2).
+
+**Plan sugerido:** (1) endpoints JSON con las consultas agregadas (empresa e individual); (2) generación de PDF/Word a partir de esos mismos datos.
+
+### Otros pendientes menores
+- `aplicacion.estado`: definir si es catálogo cerrado (sección 8).
+- Migración de datos maestros (`V10__datos_maestros.sql` o la siguiente libre) para que el repo arranque solo sobre una BD vacía (sección 0).
+- El `PUT /aplicaciones` no permite volver `atiendeClientes`/`esJefe` a `NULL` (solo por SQL); ajustar si hiciera falta.
