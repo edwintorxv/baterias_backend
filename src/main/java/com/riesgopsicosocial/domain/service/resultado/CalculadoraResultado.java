@@ -44,6 +44,34 @@ public class CalculadoraResultado {
         };
     }
 
+    /**
+     * Total general = bruto intralaboral + bruto extralaboral, transformado con la suma de
+     * los factores de ambos cuestionarios (616 para A + C, 512 para B + C).
+     *
+     * @param baremos baremo del total general para la forma intralaboral (no depende del grupo ocupacional)
+     */
+    public ResultadoTotalGeneral calcularTotalGeneral(ConfiguracionCuestionario configIntralaboral,
+                                                      ResultadoCuestionario intralaboral,
+                                                      ConfiguracionCuestionario configExtralaboral,
+                                                      ResultadoCuestionario extralaboral,
+                                                      List<RangoBaremo> baremos) {
+        if (configIntralaboral.metodoCalculo() != MetodoCalculo.SUMA_POR_DOMINIOS
+                || configExtralaboral.metodoCalculo() != MetodoCalculo.SUMA_DIRECTA) {
+            throw new BusinessException("El total general requiere un cuestionario intralaboral ("
+                    + MetodoCalculo.SUMA_POR_DOMINIOS + ") y uno extralaboral (" + MetodoCalculo.SUMA_DIRECTA
+                    + "); se recibieron " + configIntralaboral.forma() + " y " + configExtralaboral.forma());
+        }
+
+        BigDecimal bruto = intralaboral.puntajeBruto().add(extralaboral.puntajeBruto());
+        BigDecimal factor = configIntralaboral.factorTransformacion().add(configExtralaboral.factorTransformacion());
+        BigDecimal transformado = transformar(bruto, factor);
+        NivelRiesgo nivel = buscarNivel(baremos, transformado,
+                "total general (" + configIntralaboral.forma() + " + " + configExtralaboral.forma() + ")",
+                "forma intralaboral " + configIntralaboral.forma());
+        return new ResultadoTotalGeneral(configIntralaboral.idCuestionario(), configIntralaboral.forma(),
+                escalaBruto(bruto), transformado, nivel);
+    }
+
     // ------------------------------------------------------------------
     // Métodos de cálculo
     // ------------------------------------------------------------------
@@ -212,16 +240,20 @@ public class CalculadoraResultado {
 
     private NivelRiesgo buscarNivel(List<RangoBaremo> baremos, BigDecimal puntaje, String que,
                                     ConfiguracionCuestionario config) {
+        return buscarNivel(baremos, puntaje, que, "grupo ocupacional " + config.idGrupoOcupacional());
+    }
+
+    /** @param baremo de qué baremo se trata, para el mensaje de error (ej. "grupo ocupacional 1") */
+    private NivelRiesgo buscarNivel(List<RangoBaremo> baremos, BigDecimal puntaje, String que, String baremo) {
         if (baremos.isEmpty()) {
-            throw new BusinessException("No hay baremo para " + que + " y grupo ocupacional "
-                    + config.idGrupoOcupacional());
+            throw new BusinessException("No hay baremo para " + que + " y " + baremo);
         }
         return baremos.stream()
                 .filter(rango -> rango.contiene(puntaje))
                 .findFirst()
                 .map(RangoBaremo::nivelRiesgo)
                 .orElseThrow(() -> new BusinessException("El puntaje transformado " + puntaje + " de " + que
-                        + " no cae en ningún rango del baremo del grupo ocupacional " + config.idGrupoOcupacional()));
+                        + " no cae en ningún rango del baremo del " + baremo));
     }
 
     private BigDecimal transformar(BigDecimal bruto, BigDecimal factor) {

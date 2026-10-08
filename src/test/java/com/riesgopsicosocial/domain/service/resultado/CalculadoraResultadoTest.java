@@ -184,6 +184,75 @@ class CalculadoraResultadoTest {
         assertFalse(SIN_FILTROS.noAplica(CondicionAplicacion.ATIENDE_CLIENTES));
     }
 
+    // ------------------------------------------------------------------
+    // Total general (intralaboral + extralaboral)
+    // ------------------------------------------------------------------
+
+    private static final NivelRiesgo SIN_RIESGO = new NivelRiesgo(1L, "Sin riesgo o riesgo despreciable");
+    private static final NivelRiesgo MEDIO = new NivelRiesgo(3L, "Riesgo medio");
+    private static final NivelRiesgo MUY_ALTO = new NivelRiesgo(5L, "Riesgo muy alto");
+    /** Tabla 34, fila A + C. */
+    private static final List<RangoBaremo> BAREMO_TOTAL_A = List.of(
+            new RangoBaremo(bd("0.0"), bd("18.8"), SIN_RIESGO),
+            new RangoBaremo(bd("18.9"), bd("24.4"), BAJO),
+            new RangoBaremo(bd("24.5"), bd("29.5"), MEDIO),
+            new RangoBaremo(bd("29.6"), bd("35.4"), ALTO),
+            new RangoBaremo(bd("35.5"), bd("100"), MUY_ALTO));
+
+    @Test
+    void totalGeneral_ejemplo4DelManual() {
+        // Manual extralaboral, ejemplo 4: bruto general 306 con forma A → 306 / 616 × 100 = 49,7 (muy alto)
+        ResultadoTotalGeneral r = calculadora.calcularTotalGeneral(
+                total(1L, "A", MetodoCalculo.SUMA_POR_DOMINIOS, "492"), resultado(1L, "A", "250"),
+                total(3L, "C", MetodoCalculo.SUMA_DIRECTA, "124"), resultado(3L, "C", "56"),
+                BAREMO_TOTAL_A);
+
+        assertEquals(bd("306.00"), r.puntajeBruto());
+        assertEquals(bd("49.7"), r.puntajeTransformado());
+        assertEquals(MUY_ALTO, r.nivelRiesgo());
+        assertEquals(1L, r.idCuestionarioIntralaboral());
+        assertEquals("A", r.formaIntralaboral());
+    }
+
+    @Test
+    void totalGeneral_formaB_usaLaSumaDeFactores() {
+        // 388 + 124 = 512: (100 + 28) / 512 × 100 = 25,0
+        ResultadoTotalGeneral r = calculadora.calcularTotalGeneral(
+                total(2L, "B", MetodoCalculo.SUMA_POR_DOMINIOS, "388"), resultado(2L, "B", "100"),
+                total(3L, "C", MetodoCalculo.SUMA_DIRECTA, "124"), resultado(3L, "C", "28"),
+                BAREMO_TOTAL_A);
+
+        assertEquals(bd("25.0"), r.puntajeTransformado());
+        assertEquals("B", r.formaIntralaboral());
+    }
+
+    @Test
+    void totalGeneral_sinBaremo_lanzaExcepcion() {
+        BusinessException ex = assertThrows(BusinessException.class, () -> calculadora.calcularTotalGeneral(
+                total(2L, "B", MetodoCalculo.SUMA_POR_DOMINIOS, "388"), resultado(2L, "B", "100"),
+                total(3L, "C", MetodoCalculo.SUMA_DIRECTA, "124"), resultado(3L, "C", "28"),
+                List.of()));
+        assertTrue(ex.getMessage().contains("No hay baremo para total general (B + C) y forma intralaboral B"));
+    }
+
+    @Test
+    void totalGeneral_conCuestionariosQueNoSonIntraYExtra_lanzaExcepcion() {
+        BusinessException ex = assertThrows(BusinessException.class, () -> calculadora.calcularTotalGeneral(
+                total(3L, "C", MetodoCalculo.SUMA_DIRECTA, "124"), resultado(3L, "C", "28"),
+                total(4L, "D", MetodoCalculo.PROMEDIO_PONDERADO, "61.16"), resultado(4L, "D", "10"),
+                BAREMO_TOTAL_A));
+        assertTrue(ex.getMessage().contains("se recibieron C y D"));
+    }
+
+    /** Configuración mínima: el total general solo usa id, forma, método y factor. */
+    private static ConfiguracionCuestionario total(Long id, String forma, MetodoCalculo metodo, String factor) {
+        return new ConfiguracionCuestionario(id, forma, metodo, bd(factor), 1L, List.of(), List.of(), List.of());
+    }
+
+    private static ResultadoCuestionario resultado(Long id, String forma, String bruto) {
+        return new ResultadoCuestionario(id, forma, bd(bruto), bd("0"), BAJO, List.of(), List.of());
+    }
+
     private static ConfiguracionCuestionario sumaPorDominios(ConfiguracionDimension... dimensiones) {
         return new ConfiguracionCuestionario(1L, "A", MetodoCalculo.SUMA_POR_DOMINIOS, bd("16"), 1L,
                 List.of(dimensiones), List.of(new ConfiguracionDominio(100L, "Dominio", bd("16"), BAREMO)), BAREMO);
