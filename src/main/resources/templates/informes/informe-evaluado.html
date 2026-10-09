@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Informe individual de resultados</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 2cm 1.8cm 2cm 1.8cm;
+            @top-center {
+                content: "CONFIDENCIAL – Hace parte de la historia clínica ocupacional del trabajador";
+                font-family: Helvetica, sans-serif; font-size: 7.5pt; color: #8a1c1c;
+            }
+            @bottom-center {
+                content: "Página " counter(page) " de " counter(pages);
+                font-family: Helvetica, sans-serif; font-size: 8pt; color: #555555;
+            }
+        }
+        body { font-family: Helvetica, sans-serif; font-size: 9.5pt; color: #222222; }
+        h1 { font-size: 12.5pt; text-align: center; margin: 0 0 4pt 0; }
+        .subtitulo { text-align: center; font-size: 9pt; color: #444444; margin-bottom: 12pt; }
+        h2 { font-size: 10.5pt; background: #1f3b57; color: #ffffff; padding: 4pt 6pt; margin: 14pt 0 6pt 0; }
+        h3 { font-size: 10pt; margin: 12pt 0 4pt 0; color: #1f3b57; text-transform: uppercase; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 6pt; }
+        td, th { border: 0.6pt solid #9aa5b1; padding: 3pt 5pt; vertical-align: middle; }
+        th { background: #e7ecf1; font-weight: bold; text-align: center; }
+        .datos td.etiqueta { width: 38%; background: #f3f5f7; font-weight: bold; }
+        .resultados td.puntaje { width: 13%; text-align: center; }
+        .resultados td.nivel { width: 24%; text-align: center; }
+        .resultados td.dominio { width: 22%; font-weight: bold; background: #f3f5f7; }
+        .fila-total td { font-weight: bold; background: #eef1f4; }
+        .fila-total-general td { font-weight: bold; background: #dfe6ed; }
+        .nivel-1 { background: #d9f0d3 !important; }
+        .nivel-2 { background: #eef6c9 !important; }
+        .nivel-3 { background: #fff2b3 !important; }
+        .nivel-4 { background: #ffd2a8 !important; }
+        .nivel-5 { background: #f7b4b0 !important; }
+        .nota { font-size: 8pt; color: #555555; font-style: italic; }
+        .interpretacion p { margin: 3pt 0; text-align: justify; font-size: 8.5pt; }
+        .texto-libre { border: 0.6pt solid #9aa5b1; padding: 6pt; min-height: 40pt; white-space: pre-wrap; }
+        .firma { margin-top: 18pt; }
+        .firma img { max-height: 60pt; max-width: 200pt; }
+        .linea-firma { border-top: 0.6pt solid #222222; width: 220pt; padding-top: 3pt; }
+        .bloque { page-break-inside: avoid; }
+        .salto { page-break-before: always; margin-top: 0; }
+        .aplicacion { page-break-before: always; }
+        .aplicacion.primera { page-break-before: auto; }
+    </style>
+</head>
+<body>
+
+<div th:each="aplicacion, estado : ${informe.aplicaciones()}"
+     th:class="${estado.first} ? 'aplicacion primera' : 'aplicacion'">
+
+    <h1>INFORME DE RESULTADOS DE LA BATERÍA DE INSTRUMENTOS PARA LA EVALUACIÓN DE FACTORES DE RIESGO PSICOSOCIAL</h1>
+    <div class="subtitulo">Informe individual – Ministerio de la Protección Social, Pontificia Universidad Javeriana (2010)</div>
+
+    <h2>DATOS GENERALES DEL TRABAJADOR</h2>
+    <table class="datos">
+        <tr><td class="etiqueta">Nombre del trabajador</td><td th:text="${informe.nombreTrabajador()}"></td></tr>
+        <tr><td class="etiqueta">Número de identificación (ID)</td><td th:text="${informe.identificacion()}"></td></tr>
+        <tr><td class="etiqueta">Cargo</td><td th:text="${aplicacion.cargo()}"></td></tr>
+        <tr><td class="etiqueta">Departamento o sección</td><td th:text="${aplicacion.area()}"></td></tr>
+        <tr><td class="etiqueta">Edad</td><td th:text="${aplicacion.edad()}"></td></tr>
+        <tr><td class="etiqueta">Sexo</td><td th:text="${informe.sexo()}"></td></tr>
+        <tr><td class="etiqueta">Fecha de aplicación del cuestionario</td><td th:text="${aplicacion.fechaAplicacion()}"></td></tr>
+        <tr><td class="etiqueta">Nombre de la empresa</td><td th:text="${informe.empresa() + ' (NIT ' + informe.nitEmpresa() + ')'}"></td></tr>
+        <tr><td class="etiqueta">Grupo ocupacional (baremos)</td><td th:text="${aplicacion.grupoOcupacional()}"></td></tr>
+    </table>
+
+    <h2>DATOS DEL EVALUADOR</h2>
+    <table class="datos">
+        <tr><td class="etiqueta">Nombre del evaluador</td><td th:text="${aplicacion.evaluador().nombre()}"></td></tr>
+        <tr><td class="etiqueta">Número de identificación (c.c.)</td><td th:text="${aplicacion.evaluador().identificacion()}"></td></tr>
+        <tr><td class="etiqueta">Profesión</td><td th:text="${aplicacion.evaluador().profesion()}"></td></tr>
+        <tr><td class="etiqueta">Posgrado</td><td th:text="${aplicacion.evaluador().posgrado()}"></td></tr>
+        <tr><td class="etiqueta">No. tarjeta profesional</td><td th:text="${aplicacion.evaluador().tarjetaProfesional()}"></td></tr>
+        <tr><td class="etiqueta">No. licencia en salud ocupacional</td><td th:text="${aplicacion.evaluador().licenciaSaludOcupacional()}"></td></tr>
+        <tr><td class="etiqueta">Fecha de expedición de la licencia en salud ocupacional</td><td th:text="${aplicacion.evaluador().fechaExpedicionLicencia()}"></td></tr>
+    </table>
+
+    <h2 class="salto">RESULTADOS DE LOS CUESTIONARIOS</h2>
+
+    <div th:each="cuestionario : ${aplicacion.cuestionarios()}" class="bloque">
+        <h3 th:text="${cuestionario.titulo()}"></h3>
+
+        <!-- Intralaboral (A/B): dominios con sus dimensiones -->
+        <table class="resultados" th:if="${cuestionario.tipo().name() == 'INTRALABORAL'}">
+            <tr><th>Dominios</th><th>Dimensiones</th><th>Puntaje (transformado)</th><th th:text="${cuestionario.tituloNivel()}"></th></tr>
+            <th:block th:each="dominio : ${cuestionario.dominios()}">
+                <tr th:each="dimension, iter : ${dominio.dimensiones()}">
+                    <td class="dominio" th:if="${iter.first}" th:rowspan="${dominio.dimensiones().size()}" th:text="${dominio.nombre()}"></td>
+                    <td th:text="${dimension.nombre()}"></td>
+                    <td class="puntaje" th:text="${dimension.puntaje()}"></td>
+                    <td th:class="'nivel nivel-' + ${dimension.idNivel()}" th:text="${dimension.nivel()}"></td>
+                </tr>
+                <tr class="fila-total">
+                    <td colspan="2" th:text="${dominio.total().nombre()}"></td>
+                    <td class="puntaje" th:text="${dominio.total().puntaje()}"></td>
+                    <td th:class="'nivel nivel-' + ${dominio.total().idNivel()}" th:text="${dominio.total().nivel()}"></td>
+                </tr>
+            </th:block>
+            <tr class="fila-total-general">
+                <td colspan="2" th:text="${#strings.toUpperCase(cuestionario.total().nombre())}"></td>
+                <td class="puntaje" th:text="${cuestionario.total().puntaje()}"></td>
+                <td th:class="'nivel nivel-' + ${cuestionario.total().idNivel()}" th:text="${cuestionario.total().nivel()}"></td>
+            </tr>
+        </table>
+
+        <!-- Extralaboral (C): solo dimensiones -->
+        <table class="resultados" th:if="${cuestionario.tipo().name() == 'EXTRALABORAL'}">
+            <tr><th>Dimensiones</th><th>Puntaje (transformado)</th><th th:text="${cuestionario.tituloNivel()}"></th></tr>
+            <tr th:each="dimension : ${cuestionario.dimensiones()}">
+                <td th:text="${dimension.nombre()}"></td>
+                <td class="puntaje" th:text="${dimension.puntaje()}"></td>
+                <td th:class="'nivel nivel-' + ${dimension.idNivel()}" th:text="${dimension.nivel()}"></td>
+            </tr>
+            <tr class="fila-total-general">
+                <td th:text="${#strings.toUpperCase(cuestionario.total().nombre())}"></td>
+                <td class="puntaje" th:text="${cuestionario.total().puntaje()}"></td>
+                <td th:class="'nivel nivel-' + ${cuestionario.total().idNivel()}" th:text="${cuestionario.total().nivel()}"></td>
+            </tr>
+        </table>
+
+        <!-- Estrés (D): solo total -->
+        <table class="resultados" th:if="${cuestionario.tipo().name() == 'ESTRES'}">
+            <tr><th></th><th>Puntaje (transformado)</th><th th:text="${cuestionario.tituloNivel()}"></th></tr>
+            <tr class="fila-total-general">
+                <td th:text="${#strings.toUpperCase(cuestionario.total().nombre())}"></td>
+                <td class="puntaje" th:text="${cuestionario.total().puntaje()}"></td>
+                <td th:class="'nivel nivel-' + ${cuestionario.total().idNivel()}" th:text="${cuestionario.total().nivel()}"></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="bloque" th:if="${aplicacion.totalGeneral() != null}">
+        <h3>Puntaje total general de factores de riesgo psicosocial</h3>
+        <table class="resultados">
+            <tr><th></th><th>Puntaje (transformado)</th><th>Nivel de riesgo</th></tr>
+            <tr class="fila-total-general">
+                <td th:text="${aplicacion.totalGeneral().nombre()}"></td>
+                <td class="puntaje" th:text="${aplicacion.totalGeneral().puntaje()}"></td>
+                <td th:class="'nivel nivel-' + ${aplicacion.totalGeneral().idNivel()}" th:text="${aplicacion.totalGeneral().nivel()}"></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="bloque interpretacion">
+        <h2>INTERPRETACIÓN GENÉRICA DE LOS NIVELES DE RIESGO</h2>
+        <p><b>Sin riesgo o riesgo despreciable:</b> ausencia de riesgo o riesgo tan bajo que no amerita desarrollar actividades de intervención. Las dimensiones y dominios que se encuentren bajo esta categoría serán objeto de acciones o programas de promoción.</p>
+        <p><b>Riesgo bajo:</b> no se espera que los factores psicosociales que obtengan puntuaciones de este nivel estén relacionados con síntomas o respuestas de estrés significativas. Las dimensiones y dominios que se encuentren bajo esta categoría serán objeto de acciones o programas de intervención, a fin de mantenerlos en los niveles de riesgo más bajos posibles.</p>
+        <p><b>Riesgo medio:</b> nivel de riesgo en el que se esperaría una respuesta de estrés moderada. Las dimensiones y dominios que se encuentren bajo esta categoría ameritan observación y acciones sistemáticas de intervención para prevenir efectos perjudiciales en la salud.</p>
+        <p><b>Riesgo alto:</b> nivel de riesgo que tiene una importante posibilidad de asociación con respuestas de estrés alto y por tanto, las dimensiones y dominios que se encuentren bajo esta categoría requieren intervención en el marco de un sistema de vigilancia epidemiológica.</p>
+        <p><b>Riesgo muy alto:</b> nivel de riesgo con amplia posibilidad de asociarse a respuestas muy altas de estrés. Por consiguiente las dimensiones y dominios que se encuentren bajo esta categoría requieren intervención inmediata en el marco de un sistema de vigilancia epidemiológica.</p>
+    </div>
+
+    <div class="bloque interpretacion" th:if="${aplicacion.incluyeEstres()}">
+        <h2>INTERPRETACIÓN DE LOS NIVELES DE SÍNTOMAS DE ESTRÉS</h2>
+        <p><b>Muy bajo:</b> ausencia de síntomas de estrés u ocurrencia muy rara que no amerita desarrollar actividades de intervención específicas, salvo acciones o programas de promoción en salud.</p>
+        <p><b>Bajo:</b> es indicativo de baja frecuencia de síntomas de estrés y por tanto escasa afectación del estado general de salud. Es pertinente desarrollar acciones o programas de intervención, a fin de mantener la baja frecuencia de síntomas.</p>
+        <p><b>Medio:</b> la presentación de síntomas es indicativa de una respuesta de estrés moderada. Los síntomas más frecuentes y críticos ameritan observación y acciones sistemáticas de intervención para prevenir efectos perjudiciales en la salud. Además, se sugiere identificar los factores de riesgo psicosocial intra y extralaboral que pudieran tener alguna relación con los efectos identificados.</p>
+        <p><b>Alto:</b> la cantidad de síntomas y su frecuencia de presentación es indicativa de una respuesta de estrés alto. Los síntomas más críticos y frecuentes requieren intervención en el marco de un sistema de vigilancia epidemiológica. Además es muy importante identificar los factores de riesgo psicosocial intra y extralaboral que pudieran tener alguna relación con los efectos identificados.</p>
+        <p><b>Muy alto:</b> la cantidad de síntomas y su frecuencia de presentación es indicativa de una respuesta de estrés severa y perjudicial para la salud. Los síntomas más críticos y frecuentes requieren intervención inmediata en el marco de un sistema de vigilancia epidemiológica. Así mismo, es imperativo identificar los factores de riesgo psicosocial intra y extralaboral que pudieran tener alguna relación con los efectos identificados.</p>
+    </div>
+
+    <div class="bloque">
+        <h2>OBSERVACIONES Y COMENTARIOS DEL EVALUADOR</h2>
+        <div class="texto-libre" th:text="${aplicacion.observaciones()}"></div>
+
+        <h2>RECOMENDACIONES PARTICULARES</h2>
+        <div class="texto-libre" th:text="${aplicacion.recomendaciones()}"></div>
+
+        <p>Fecha de elaboración del informe: <b th:text="${informe.fechaElaboracion()}"></b></p>
+
+        <div class="firma">
+            <img th:if="${aplicacion.evaluador().firmaDataUri() != null}" th:src="${aplicacion.evaluador().firmaDataUri()}" alt="Firma"/>
+            <div class="linea-firma">
+                <div>Firma del evaluador</div>
+                <div th:text="${aplicacion.evaluador().nombre()}"></div>
+                <div th:text="${'T.P. ' + aplicacion.evaluador().tarjetaProfesional() + ' – Licencia SO ' + aplicacion.evaluador().licenciaSaludOcupacional()}"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

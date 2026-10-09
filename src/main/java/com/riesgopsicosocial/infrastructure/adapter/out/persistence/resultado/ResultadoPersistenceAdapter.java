@@ -103,8 +103,9 @@ public class ResultadoPersistenceAdapter implements ResultadoPort {
                             .filter(d -> dimensiones.containsKey(d.idDimensionCuestionario()))
                             .map(d -> {
                                 ResultadoDimensionEntity e = dimensiones.get(d.idDimensionCuestionario());
-                                return new ResultadoDimension(d.idDimensionCuestionario(), d.nombre(), e.getPuntajeBruto(),
-                                        e.getPuntajeTransformado(), niveles.get(e.getFkNivelRiesgo()));
+                                return new ResultadoDimension(d.idDimensionCuestionario(), d.idDominioCuestionario(),
+                                        d.nombre(), e.getPuntajeBruto(), e.getPuntajeTransformado(),
+                                        niveles.get(e.getFkNivelRiesgo()));
                             })
                             .toList();
                     return new ResultadoCuestionario(rc.getFkCuestionario(), config.forma(), rc.getPuntajeBruto(),

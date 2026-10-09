@@ -5,6 +5,7 @@ import com.riesgopsicosocial.domain.model.informe.DatosAplicacion;
 import com.riesgopsicosocial.domain.model.informe.DatosCliente;
 import com.riesgopsicosocial.domain.model.informe.DatosEvaluado;
 import com.riesgopsicosocial.domain.model.informe.DatosEvaluador;
+import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cliente.ClienteJpaRepository;
@@ -99,6 +100,13 @@ public class InformeEvaluadoPersistenceAdapter implements InformeEvaluadoPort {
                             a.getObservaciones(), a.getRecomendaciones());
                 })
                 .toList();
+    }
+
+    @Override
+    public Optional<FirmaEvaluador> buscarFirma(Long idEvaluador) {
+        return evaluadorRepository.findById(idEvaluador)
+                .filter(e -> e.getFirma() != null)
+                .map(e -> new FirmaEvaluador(e.getFirma(), e.getFirmaTipoContenido()));
     }
 
     private static DatosEvaluador toDatosEvaluador(EvaluadorEntity e) {

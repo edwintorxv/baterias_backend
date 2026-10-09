@@ -10,8 +10,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -61,6 +63,26 @@ public class GlobalExceptionHandler {
                 "Error de validación en los datos enviados",
                 ErrorCode.VALIDATION_ERROR.name(),
                 details
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParameter(MissingServletRequestParameterException ex) {
+        ApiError error = ResponseBuilder.error(
+                "Falta el parámetro obligatorio '" + ex.getParameterName() + "'",
+                ErrorCode.VALIDATION_ERROR.name(),
+                null
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        ApiError error = ResponseBuilder.error(
+                "Valor no válido para el parámetro '" + ex.getName() + "': " + ex.getValue(),
+                ErrorCode.VALIDATION_ERROR.name(),
+                null
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }

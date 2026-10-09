@@ -141,6 +141,11 @@ class InformeEvaluadoServiceTest {
         public List<DatosAplicacion> buscarAplicaciones(Long idCliente, Long idEvaluado) {
             return aplicaciones;
         }
+
+        @Override
+        public Optional<FirmaEvaluador> buscarFirma(Long idEvaluador) {
+            return Optional.empty();
+        }
     }
 
     private static class ResultadosFalsos implements ResultadoPort {

@@ -156,8 +156,8 @@ public class CalculadoraResultado {
             BigDecimal transformado = transformar(bruto, dimension.factorTransformacion());
             NivelRiesgo nivel = buscarNivel(dimension.baremos(), transformado,
                     "dimensión '" + dimension.nombre() + "' del cuestionario " + config.forma(), config);
-            resultados.add(new ResultadoDimension(dimension.idDimensionCuestionario(), dimension.nombre(),
-                    escalaBruto(bruto), transformado, nivel));
+            resultados.add(new ResultadoDimension(dimension.idDimensionCuestionario(), dimension.idDominioCuestionario(),
+                    dimension.nombre(), escalaBruto(bruto), transformado, nivel));
         }
         return resultados;
     }
