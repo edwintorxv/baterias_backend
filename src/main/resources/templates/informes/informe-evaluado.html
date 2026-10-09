@@ -147,20 +147,12 @@
 
     <div class="bloque interpretacion">
         <h2>INTERPRETACIÓN GENÉRICA DE LOS NIVELES DE RIESGO</h2>
-        <p><b>Sin riesgo o riesgo despreciable:</b> ausencia de riesgo o riesgo tan bajo que no amerita desarrollar actividades de intervención. Las dimensiones y dominios que se encuentren bajo esta categoría serán objeto de acciones o programas de promoción.</p>
-        <p><b>Riesgo bajo:</b> no se espera que los factores psicosociales que obtengan puntuaciones de este nivel estén relacionados con síntomas o respuestas de estrés significativas. Las dimensiones y dominios que se encuentren bajo esta categoría serán objeto de acciones o programas de intervención, a fin de mantenerlos en los niveles de riesgo más bajos posibles.</p>
-        <p><b>Riesgo medio:</b> nivel de riesgo en el que se esperaría una respuesta de estrés moderada. Las dimensiones y dominios que se encuentren bajo esta categoría ameritan observación y acciones sistemáticas de intervención para prevenir efectos perjudiciales en la salud.</p>
-        <p><b>Riesgo alto:</b> nivel de riesgo que tiene una importante posibilidad de asociación con respuestas de estrés alto y por tanto, las dimensiones y dominios que se encuentren bajo esta categoría requieren intervención en el marco de un sistema de vigilancia epidemiológica.</p>
-        <p><b>Riesgo muy alto:</b> nivel de riesgo con amplia posibilidad de asociarse a respuestas muy altas de estrés. Por consiguiente las dimensiones y dominios que se encuentren bajo esta categoría requieren intervención inmediata en el marco de un sistema de vigilancia epidemiológica.</p>
+        <p th:each="parrafo : ${informe.interpretacionRiesgo()}"><b th:text="${parrafo.titulo() + ':'}"></b> <span th:text="${parrafo.texto()}"></span></p>
     </div>
 
     <div class="bloque interpretacion" th:if="${aplicacion.incluyeEstres()}">
         <h2>INTERPRETACIÓN DE LOS NIVELES DE SÍNTOMAS DE ESTRÉS</h2>
-        <p><b>Muy bajo:</b> ausencia de síntomas de estrés u ocurrencia muy rara que no amerita desarrollar actividades de intervención específicas, salvo acciones o programas de promoción en salud.</p>
-        <p><b>Bajo:</b> es indicativo de baja frecuencia de síntomas de estrés y por tanto escasa afectación del estado general de salud. Es pertinente desarrollar acciones o programas de intervención, a fin de mantener la baja frecuencia de síntomas.</p>
-        <p><b>Medio:</b> la presentación de síntomas es indicativa de una respuesta de estrés moderada. Los síntomas más frecuentes y críticos ameritan observación y acciones sistemáticas de intervención para prevenir efectos perjudiciales en la salud. Además, se sugiere identificar los factores de riesgo psicosocial intra y extralaboral que pudieran tener alguna relación con los efectos identificados.</p>
-        <p><b>Alto:</b> la cantidad de síntomas y su frecuencia de presentación es indicativa de una respuesta de estrés alto. Los síntomas más críticos y frecuentes requieren intervención en el marco de un sistema de vigilancia epidemiológica. Además es muy importante identificar los factores de riesgo psicosocial intra y extralaboral que pudieran tener alguna relación con los efectos identificados.</p>
-        <p><b>Muy alto:</b> la cantidad de síntomas y su frecuencia de presentación es indicativa de una respuesta de estrés severa y perjudicial para la salud. Los síntomas más críticos y frecuentes requieren intervención inmediata en el marco de un sistema de vigilancia epidemiológica. Así mismo, es imperativo identificar los factores de riesgo psicosocial intra y extralaboral que pudieran tener alguna relación con los efectos identificados.</p>
+        <p th:each="parrafo : ${informe.interpretacionEstres()}"><b th:text="${parrafo.titulo() + ':'}"></b> <span th:text="${parrafo.texto()}"></span></p>
     </div>
 
     <div class="bloque">

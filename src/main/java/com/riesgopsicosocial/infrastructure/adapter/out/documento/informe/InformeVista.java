@@ -1,5 +1,6 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.documento.informe;
 
+import java.util.Base64;
 import java.util.List;
 
 /**
@@ -13,7 +14,9 @@ public record InformeVista(
         String identificacion,
         String sexo,
         String fechaElaboracion,
-        List<AplicacionVista> aplicaciones
+        List<AplicacionVista> aplicaciones,
+        List<ParrafoVista> interpretacionRiesgo,
+        List<ParrafoVista> interpretacionEstres
 ) {
 
     /**
@@ -35,7 +38,7 @@ public record InformeVista(
     ) {
     }
 
-    /** @param firmaDataUri imagen como {@code data:} URI; {@code null} si no hay firma */
+    /** @param firma imagen PNG/JPG; {@code null} si el evaluador no la ha cargado */
     public record EvaluadorVista(
             String nombre,
             String identificacion,
@@ -44,9 +47,20 @@ public record InformeVista(
             String tarjetaProfesional,
             String licenciaSaludOcupacional,
             String fechaExpedicionLicencia,
-            String firmaDataUri,
-            byte[] firma
+            byte[] firma,
+            String firmaTipoContenido
     ) {
+
+        /** Para la plantilla HTML; {@code null} si no hay firma. */
+        public String firmaDataUri() {
+            return firma == null ? null
+                    : "data:" + firmaTipoContenido + ";base64," + Base64.getEncoder().encodeToString(firma);
+        }
+
+    }
+
+    /** Párrafo de interpretación: etiqueta en negrilla y texto. */
+    public record ParrafoVista(String titulo, String texto) {
     }
 
     /**

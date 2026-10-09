@@ -2,7 +2,7 @@
 
 > Documento de contexto para continuar el desarrollo desde IntelliJ (Claude Pro / Claude Code).
 > Generado a partir de una sesión de diseño e implementación del backend.
-> Última actualización: 2026-10-08 (excepción de dominio propia y reglas de arquitectura con ArchUnit; decisiones de informes tomadas; siguiente: informes — ver sección 10).
+> Última actualización: 2026-10-08 (informe individual completo: JSON, PDF y Word; evaluador V10; siguiente: informe de empresa, con preguntas pendientes para el área usuaria — ver sección 10).
 
 ---
 
@@ -17,7 +17,7 @@ Requisitos: **JDK 17**, **PostgreSQL 16** (la máquina original usa `C:\Program 
      y en la nueva (con la BD vacía creada)
      `pg_restore -U postgres -d bateria_psicosocial bateria_psicosocial.dump`.
      Esto trae también `flyway_schema_history`, así que Flyway no vuelve a aplicar V1/V2. El `.dump` contiene datos de evaluados: **no subirlo a git**; pasarlo por otro medio.
-   - **BD vacía**: dejar que Flyway aplique V1 y V2 al arrancar (funcionan sobre tablas vacías) y cargar los datos maestros a mano. Pendiente a futuro: crear una migración `V10__datos_maestros.sql` (o la siguiente libre) con esos `INSERT` (ya con los valores corregidos por V3–V9); como los `UPDATE`/`INSERT` de datos de V3–V9 no tocan nada sobre una BD vacía (la estructura de V7–V9 sí se crea), esa migración debe traer los datos ya corregidos —incluidos `condicion_aplicacion`/`max_items_sin_respuesta` (V8) y `baremo_total_general` (V9)— y terminar con `setval` de las secuencias para que el repo sea autosuficiente.
+   - **BD vacía**: dejar que Flyway aplique V1 y V2 al arrancar (funcionan sobre tablas vacías) y cargar los datos maestros a mano. Pendiente a futuro: crear una migración `V12__datos_maestros.sql` (o la siguiente libre) con esos `INSERT` (ya con los valores corregidos por V3–V9 y V11); como los `UPDATE`/`INSERT` de datos de V3–V11 no tocan nada sobre una BD vacía (la estructura de V7–V9 sí se crea), esa migración debe traer los datos ya corregidos —incluidos `condicion_aplicacion`/`max_items_sin_respuesta` (V8) y `baremo_total_general` (V9)— y terminar con `setval` de las secuencias para que el repo sea autosuficiente.
 3. Arrancar: `./mvnw spring-boot:run` (perfil `dev` por defecto; en macOS/Linux, si `mvnw` no tiene permiso de ejecución porque viene de Windows, usar `sh mvnw spring-boot:run`). API en `http://localhost:8080/api`, Swagger en `http://localhost:8080/api/swagger-ui.html`.
 4. Tests: `./mvnw test` (incluye `CalculadoraResultadoTest`, lógica pura sin BD, y `ArquitecturaHexagonalTest`, reglas de ArchUnit).
 5. La carpeta `logs/` está en `.gitignore` (se generan localmente al arrancar).
@@ -357,52 +357,61 @@ El script de creación de las ~34 tablas (`cuestionario`, `dominio`, `dimension`
 
 ---
 
-## 10. Siguiente paso acordado (retomar el 2026-10-08)
+## 10. Siguiente paso acordado (retomar el 2026-10-09)
 
-### Estado al cierre del 2026-10-07
-- Motor de cálculo completo y probado con datos para las cuatro formas y el total general (ver sección 2): datos maestros verificados contra los manuales (V3–V6), ítems condicionales y faltantes (V7–V8), total general (V9). Migraciones aplicadas en la BD local hasta **V9**; todo commiteado y subido a `origin/main`.
-- Aplicación 1 = A + C + D (respuestas de C y D de prueba); aplicación 2 = solo A. Resultados de referencia en la sección 2. (2026-10-08) La BD local de la máquina macOS tiene además las aplicaciones 3–18 del cliente 1 (evaluados 193–208), cargadas aparte; la 3 no tiene resultados calculados.
-- Tests: 30 (`./mvnw test`, o `sh mvnw test` en macOS): 16 de la calculadora, 9 de `InformeEvaluadoServiceTest`, 4 de arquitectura y el de contexto.
+### Estado al cierre del 2026-10-08
+- **Informe individual completo** (JSON, PDF y Word), todo commiteado y subido a `origin/main`. Migraciones aplicadas en la BD local hasta **V11**.
+- Tests: 37 (`./mvnw test`, o `sh mvnw test` en macOS): 16 `CalculadoraResultadoTest`, 11 `InformeEvaluadoServiceTest`, 3 `DocumentoInformeEvaluadoServiceTest`, 2 `GeneradoresInformeEvaluadoTest` (PDF y Word con datos de ejemplo), 4 `ArquitecturaHexagonalTest`, 1 de contexto.
 - Forma de trabajo acordada: **paso a paso**, mostrando diseño y diff antes de cada commit.
-- Al retomar en otra máquina: arrancar la app para que Flyway aplique V3–V9 (sobre una BD sin datos maestros solo crean la estructura; ver sección 0). Si quedó una instancia vieja de la app corriendo (p. ej. IntelliJ en el 8080), reiniciarla para que tome el código nuevo.
+- Al retomar en otra máquina: arrancar la app para que Flyway aplique hasta V11 (ver sección 0). Si quedó una instancia vieja de la app corriendo (p. ej. IntelliJ en el 8080), reiniciarla.
+- Datos de prueba en la BD local (macOS): cliente 1 "CALZADO CARDINS" (único cliente; Cartagena, industria "Extracción de recursos naturales") con **200 aplicaciones**, de las cuales **solo 2 tienen resultados calculados** (para probar el informe de empresa habrá que calcular el resto, si tienen respuestas). Aplicación 1 (evaluado 1) = A + C + D, con `fk_evaluador = 1` y recomendaciones de prueba; aplicación 2 = solo A; la 3 (evaluado 193) sin resultados ni evaluador. Evaluador 1 "Psicóloga de Prueba" (c.c. 52000111, activo, con una firma de prueba dibujada). Resultados de referencia en la sección 2.
 
-### Siguiente: informes PDF y Word
-Objetivo del usuario:
-1. **Informe por empresa (`cliente`)**: total general y resultados separados por forma A, B, C y D (distribución de trabajadores por nivel de riesgo, por dimensión/dominio/total). Total general A+C y B+C por separado (baremos distintos).
-2. **Informe por trabajador**: sus resultados y el historial de sus aplicaciones (ordenadas por fecha) para seguimiento.
+### Informe individual — ✅ implementado (2026-10-08)
+- Módulo `informe` hexagonal: `domain/model/informe`, `application/{port,service}/informe`, `persistence/informe`, `adapter/out/documento/informe` (generadores), `rest/informe`. `ResultadoResponseMapper` (rest/resultado) compartido entre `ResultadoController` e `InformeController`.
+- **JSON**: `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe?anio=` → cliente, evaluado (con sexo y año de nacimiento) y sus aplicaciones con ese cliente (todas las relaciones `evaluado_cliente` del par, activas o no), de la más antigua a la más reciente; cada una con cargo, área, edad (año de aplicación − año de nacimiento: puede ser 1 año mayor), grupo ocupacional, evaluador, observaciones, recomendaciones, `estadoResultados` (`CALCULADO`/`PENDIENTE`) y `resultados`. Sin `anio` = historial completo; año sin aplicaciones → 404. `GET .../informe/anios` → años con aplicaciones, descendente. 404 si no existe el cliente, el evaluado o la relación.
+- **Archivo**: `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe/archivo?anio=2026&formato=pdf|docx` (`anio` obligatorio, `formato` por defecto pdf, sin distinguir mayúsculas). Sigue los formatos modelo de la batería: Anexos 4 (A) y 5 (B) de `2.-Bateria-riesgo-psicosocial-2.pdf` y Anexo 2 (C) del manual extralaboral; D con la estructura de los demás (el Anexo 3 del manual de estrés **falta** en el PDF local, cortado en la pág. 37) y las etiquetas/interpretación del manual de estrés. Un archivo por año con una sección por aplicación; página 1 = datos del trabajador y del evaluador, desde la 2 resultados (dominios con sus dimensiones, colores por nivel), total general, interpretación de niveles (y de estrés si aplica), observaciones, recomendaciones, fecha de elaboración y firma. Encabezado "CONFIDENCIAL" y "Página X de Y".
+  - Reglas: aplicación sin evaluador o sin resultados → 409 (lista todos los problemas); formato no válido → 400.
+  - Diseño: `GenerarDocumentoInformeEvaluadoUseCase` → `DocumentoInformeEvaluadoService` → `GeneradorDocumentoInformePort` (una implementación por formato, el servicio la elige por `formato()`): `PdfInformeEvaluadoGenerator` (Thymeleaf sin Spring MVC, plantilla `templates/informes/informe-evaluado.html` en XHTML bien formado, + OpenHTMLtoPDF 1.1.22) y `DocxInformeEvaluadoGenerator` (Apache POI 5.4.1; anchos fijos en twips, barras de sección como tablas de una celda, `vMerge`/`gridSpan` para dominio y totales, campos PAGE/NUMPAGES). Ambos parten de `InformeVista` (`InformeVistaMapper`: textos y números ya formateados, coma decimal, interpretaciones del manual) para que digan exactamente lo mismo.
+  - El Word no se pudo ver en Word en la máquina macOS (sin Office/LibreOffice; Quick Look no muestra `vMerge`): **pendiente que el usuario lo abra en Word** y confirme la celda combinada del dominio y el "Página X de Y".
+- **Evaluador (V10)**: tabla `evaluador` (cédula única, nombre, profesión, posgrado, tarjeta profesional, licencia SO y fecha de expedición, firma BYTEA + tipo, `activo`). CRUD `POST/PUT/GET /evaluadores` (filtros `numeroIdentificacion`, `activo`), sin DELETE; firma por `PUT /evaluadores/{id}/firma` (multipart `archivo`, PNG/JPG ≤ 1 MB) y `GET /evaluadores/{id}/firma`. `aplicacion.fk_evaluador` (solo se asignan evaluadores activos; una aplicación conserva el suyo aunque luego se inactive) y `aplicacion.recomendaciones` (un juego de observaciones/recomendaciones por aplicación).
+- **V11**: la dimensión 26 tenía el guion como U+0096 (Windows-1252 mal importado); se revisaron todas las columnas de texto y era el único caso.
+- `GlobalExceptionHandler`: parámetro faltante (`MissingServletRequestParameterException`) o con tipo inválido (`MethodArgumentTypeMismatchException`) → 400 en toda la API (antes caían en el 500).
+- `ResultadoDimension` lleva `idDominioCuestionario` (para agrupar por dominio en los informes).
+- Pendiente para el psicólogo: la dimensión de C se llama "Tiempo fuera del trabajo" en la BD (como en el manual extralaboral), pero el Anexo 2 la lista como "Balance entre la vida laboral y familiar"; cambiar con migración si lo prefiere.
 
-El modelo ya lo soporta: `aplicacion → evaluado_cliente → cliente / evaluado`, y los resultados están persistidos por aplicación (`resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`, `resultado_total_general`).
+### Siguiente: informe de empresa — ⏸ esperando respuesta del área usuaria
+Ejemplo entregado por el usuario: `/Users/edwingacha/proyectos/Documentacion/baterias/Informe total CENTRO GEOLOGIA AC VERSION GERENCIAL.pptx` (33 diapositivas; los gráficos son capturas de un tablero Power BI; contiene datos reales de una empresa: no subirlo a git). Es el informe gerencial de **una sola empresa** (693 evaluados) con filtros **Forma (A/B), Área de trabajo, Ciudad de trabajo y Rango de edad** (18–25, 26–35, 36–45, >46). Contenido:
+1. Contexto técnico y normativo (texto fijo: batería 2010, Ley 1010/2006, Res. 2646/2008, Ley 1616/2013, Res. 2764/2022, Decreto 0728/2025).
+2. **Población participante por ciudad**: esperado, evaluados y % de cobertura.
+3. **Panorama global**: intralaboral, extralaboral y estrés — cantidad y % de trabajadores por nivel (1–5) + **puntaje promedio del grupo interpretado con el baremo** (ej. "Riesgo bajo (19,8–25,8), puntaje 25,5") y global (total general). Recomendación de periodicidad según el nivel (bajo → **bianual**; alto → anual, Res. 2764/2022).
+4. **Ranking de dominios y de dimensiones** (A y B por separado): barras 100 % apiladas por nivel; cada uno clasificado como **factor protector** o **factor de riesgo**.
+5. **Concentración del riesgo** intralaboral (dimensiones con más riesgo).
+6. **Distribución por regional (ciudad de trabajo) y por área**: barras 100 % por grupo; grupos clasificados en riesgo bajo/medio/alto.
+7. Extralaboral por dimensión (A y B por separado); estrés total y por forma.
+8. Conclusiones ejecutivas y plan de intervención (texto del psicólogo, firmado con su licencia).
 
-**Decisiones tomadas (2026-10-08):**
+**Preguntas pendientes para el área usuaria (retomar con estas respuestas):**
+1. **Segmentación**: el usuario dijo que "departamento" = departamento geográfico de la **empresa** (`cliente.fk_ciudad_municipio → ciudad_municipio.fk_departamento`) y "área" = **industria** (`cliente.fk_industria`, con `industria.fk_sector_economico`). Pero el ejemplo segmenta por datos **del trabajador** dentro de una empresa (`evaluado_cliente.fk_ciudad_trabajo` y `nombre_area`). ¿Es lo del ejemplo, un consolidado que compara **varias empresas** por ciudad/departamento/industria, o ambos (dos informes distintos)?
+2. **Factor protector / de riesgo** y **criticidad**: ¿con qué regla se clasifica una dimensión, un área o una ciudad? Propuesta: criticidad = % de trabajadores en riesgo alto + muy alto (los que según el manual requieren intervención), para ordenar de más a menos crítico.
+3. **Población esperada** por ciudad: ¿de dónde sale? (¿relaciones activas del cliente por ciudad?)
+4. **Formato de salida**: ¿PowerPoint como el ejemplo, PDF/Word, o datos JSON para un tablero (Power BI o el futuro frontend)?
+5. **Conclusiones y plan de intervención**: ¿los escribe el psicólogo en el sistema para que salgan en el informe, o se agregan a mano después?
+6. Pendientes de antes: si un trabajador tiene varias aplicaciones en el año, ¿se toma la más reciente? ¿Mínimo N = 5 evaluados por grupo para mostrar su desglose (si es consolidado de empresas compartido con terceros, también un mínimo de empresas por grupo)?
+7. ¿Quién recibe el informe (solo el psicólogo, la empresa, la ARL)? Define cuánto proteger los grupos pequeños.
+
+**Notas de datos para el diseño:**
+- Cliente 1: ciudad de trabajo completa (200/200) en 10 ciudades (Bogotá 142, Cali 17, Medellín 15, Barranquilla 13, Villavicencio 7, Pasto 2 y 4 ciudades con 1); área completa pero **texto libre** ("Comercial" 118, "Operaciones" 54, "Secreatrias" 11, "VENTAS" 8, "Jefatura" 5, "Direccion" 3, "EAF" 1). Si se agrupa por área conviene un catálogo de áreas por cliente o al menos normalizar.
+- Ciudad, área y cargo viven en `evaluado_cliente` (valor actual). Para informes de años pasados conviene guardarlos como **foto en la aplicación** (igual que el grupo ocupacional) — decidir al diseñar.
+- Diseño base propuesto (por ajustar con las respuestas): `GET /clientes/{id}/informe/anios` y `GET /clientes/{id}/informe?anio=&agruparPor=` (distribución por nivel, % alto + muy alto, puntaje promedio con su nivel por baremo, ranking de dimensiones; total general A+C y B+C por separado; carga en bloque con `findByFkAplicacionIn`). Para la vista de empleados del front: `GET /clientes/{id}/evaluados` (nombre, cédula, cargo, última aplicación), porque `GET /evaluado-clientes?fkCliente=` no trae nombres.
+
+### Decisiones vigentes para los informes
 - Navegación prevista del front (aún no existe): listado de clientes → (a) descargar informe de empresa por año, o (b) entrar a los empleados del cliente → descargar informe individual por año.
-- Período: **por año** (las evaluaciones son anuales o cada 2 años según el nivel de riesgo). Tanto el informe de empresa como el individual ofrecen solo los años con aplicaciones.
-- Confidencialidad: **solo agregados + mínimo N** evaluados por grupo (propuesto N = 5, configurable en `application.properties`); por debajo, el grupo sale `oculto` sin desglose. Manual intralaboral pág. 1349: el informe individual es del trabajador (historia clínica ocupacional); la empresa solo lo conoce con autorización escrita y vía el médico de SO → el individual es para el psicólogo/firma evaluadora, no para el cliente. **No hay autenticación en la API**: pendiente antes de producción (roles).
-- Orden: **primero endpoints JSON**, luego PDF/Word a partir de los mismos modelos.
-- Módulo `informe` hexagonal (`domain/model/informe`, `application/{port,service}/informe`, `persistence/informe`, `rest/informe`). `ResultadoResponseMapper` (rest/resultado) es compartido entre `ResultadoController` e `InformeController`.
-
-**Informe individual JSON — ✅ implementado (2026-10-08):**
-- `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe?anio=` → cliente, evaluado y sus aplicaciones con ese cliente (todas las relaciones `evaluado_cliente` del par, activas o no), de la más antigua a la más reciente; cada una con cargo/área, grupo ocupacional, `estadoResultados` (`CALCULADO`/`PENDIENTE`) y `resultados` (mismo formato que `GET /aplicaciones/{id}/resultados`, `null` si pendiente). Sin `anio` = historial completo; año sin aplicaciones → 404.
-- `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe/anios` → años con aplicaciones, descendente.
-- 404 si no existe el cliente, el evaluado o la relación entre ambos.
-
-**Informe de empresa — pendiente (diseño propuesto):** `GET /clientes/{id}/informe/anios` y `GET /clientes/{id}/informe?anio=` (por forma: distribución por nivel y promedio en total/dominios/dimensiones; total general A+C y B+C por separado; si un trabajador tiene varias aplicaciones en el año, la más reciente; carga en bloque con `findByFkAplicacionIn`). Por confirmar: "la más reciente" y N = 5. Para la vista de empleados del front, proponer `GET /clientes/{id}/evaluados` (nombre, cédula, cargo, última aplicación), porque `GET /evaluado-clientes?fkCliente=` no trae nombres.
-
-**Archivo PDF/Word del informe individual — en curso (plan acordado 2026-10-08):**
-- Formatos oficiales: Anexos 4 (A) y 5 (B) de `2.-Bateria-riesgo-psicosocial-2.pdf`, Anexo 2 (C) del manual extralaboral. El Anexo 3 (D) del manual de estrés **falta** en el PDF local (está cortado en la pág. 37): usar la misma estructura hasta conseguirlo. Contenido: datos del trabajador (nombre, ID, cargo, área, edad, sexo, fecha de aplicación, empresa), datos del evaluador (nombre, c.c., profesión, posgrado, tarjeta profesional, licencia SO y fecha — "todo informe que carezca de estos datos no será válido"), tabla de resultados, interpretación genérica de niveles, observaciones, recomendaciones, fecha de elaboración y firma.
-- Decisiones: **PDF y Word** (mismo modelo, dos renderizadores: Thymeleaf + OpenHTMLtoPDF y Apache POI); **un archivo por aplicación con una sección por forma**; **tabla `evaluador` primero**.
-- Pasos: (1) V10 `evaluador` (CRUD sin DELETE, `activo`, firma por `PUT/GET /evaluadores/{id}/firma`) + `aplicacion.fk_evaluador` y `aplicacion.recomendaciones` (un juego de observaciones/recomendaciones por aplicación); (2) completar `InformeEvaluado` (edad, sexo, área, evaluador, textos); (3) PDF `GET .../informe/archivo?anio=&formato=pdf`; (4) Word `formato=docx`. Reglas: sin evaluador → 409; resultados pendientes → 409; varias aplicaciones en el año → una sección por cada una.
-
-**Decisiones originales (referencia):**
-1. **Período del informe de empresa**: rango de fechas en la consulta (sin cambiar el modelo, sugerido para empezar) o una tabla de "medición"/campaña a la que pertenezca cada aplicación.
-2. **Confidencialidad**: según la Resolución 2404 de 2019 (a confirmar con el psicólogo responsable), los resultados individuales son confidenciales y la empresa recibe solo agregados → el informe de empresa no debe permitir identificar personas (cuidado con grupos pequeños) y el individual debe quedar restringido.
-3. **Contenido**: pedir al usuario un modelo o informe anterior para replicar.
-4. **Librería**: un modelo de datos por informe y dos renderizadores (p. ej. Apache POI para Word y plantilla HTML → PDF); elegir al diseñar.
-
-**Ya decidido para los informes:** la forma D se muestra con las etiquetas del manual de estrés (1 Muy bajo, 2 Bajo, 3 Medio, 4 Alto, 5 Muy alto) y el título "Nivel de síntomas de estrés" (ver sección 2).
-
-**Plan sugerido:** (1) endpoints JSON con las consultas agregadas (empresa e individual); (2) generación de PDF/Word a partir de esos mismos datos.
+- Período: **por año** (evaluaciones anuales o cada 2 años según el nivel de riesgo); se ofrecen solo los años con aplicaciones.
+- Confidencialidad: manual intralaboral pág. 1349 — el informe individual es del trabajador (historia clínica ocupacional); la empresa solo lo conoce con autorización escrita y vía el médico de SO → el individual es para el psicólogo/firma evaluadora, no para el cliente. El de empresa, solo agregados con mínimo N. **No hay autenticación en la API**: pendiente antes de producción (roles).
+- La forma D se muestra con las etiquetas del manual de estrés (1 Muy bajo … 5 Muy alto) y el título "Nivel de síntomas de estrés".
 
 ### Otros pendientes menores
 - `aplicacion.estado`: definir si es catálogo cerrado (sección 8).
-- Migración de datos maestros (`V10__datos_maestros.sql` o la siguiente libre) para que el repo arranque solo sobre una BD vacía (sección 0).
+- Migración de datos maestros (`V12__datos_maestros.sql` o la siguiente libre) para que el repo arranque solo sobre una BD vacía (sección 0).
 - El `PUT /aplicaciones` no permite volver `atiendeClientes`/`esJefe` a `NULL` (solo por SQL); ajustar si hiciera falta.
+- Mensajes de validación de bean validation salen en inglés ("must not be blank"); traducir con mensajes en las anotaciones o `messages.properties`.
