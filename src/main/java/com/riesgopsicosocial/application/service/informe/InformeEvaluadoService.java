@@ -43,7 +43,8 @@ public class InformeEvaluadoService implements ConsultarInformeEvaluadoUseCase {
 
         // Para un solo trabajador son pocas aplicaciones: se reutiliza la consulta de resultados de cada una.
         List<AplicacionEvaluado> aplicaciones = delPeriodo.stream()
-                .map(datos -> new AplicacionEvaluado(datos, buscarResultado(datos)))
+                .map(datos -> new AplicacionEvaluado(datos, evaluado.edadEn(datos.fechaAplicacion().getYear()),
+                        buscarResultado(datos)))
                 .toList();
         return new InformeEvaluado(cliente, evaluado, aplicaciones);
     }

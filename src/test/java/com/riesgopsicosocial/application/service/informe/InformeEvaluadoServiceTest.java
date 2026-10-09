@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class InformeEvaluadoServiceTest {
 
     private static final DatosCliente CLIENTE = new DatosCliente(1L, "900", "Empresa X");
-    private static final DatosEvaluado EVALUADO = new DatosEvaluado(7L, "123", "Ana", "Pérez");
+    private static final DatosEvaluado EVALUADO = new DatosEvaluado(7L, "123", "Ana", "Pérez", "Femenino", 1990);
 
     private final PuertoFalso puerto = new PuertoFalso();
     private final ResultadosFalsos resultados = new ResultadosFalsos();
@@ -37,6 +37,21 @@ class InformeEvaluadoServiceTest {
         assertEquals(EVALUADO, informe.evaluado());
         assertEquals(List.of(1L, 2L, 3L), informe.aplicaciones().stream().map(a -> a.datos().idAplicacion()).toList());
         assertEquals(List.of(true, false, true), informe.aplicaciones().stream().map(AplicacionEvaluado::tieneResultados).toList());
+    }
+
+    @Test
+    void edadSeCalculaConElAnioDeCadaAplicacion() {
+        puerto.aplicaciones.add(aplicacion(1L, "2024-03-01T08:00"));
+        puerto.aplicaciones.add(aplicacion(2L, "2026-03-01T08:00"));
+
+        InformeEvaluado informe = service.consultar(1L, 7L, null);
+
+        assertEquals(List.of(34, 36), informe.aplicaciones().stream().map(AplicacionEvaluado::edad).toList());
+    }
+
+    @Test
+    void edadSinAnioDeNacimiento_esNula() {
+        assertNull(new DatosEvaluado(7L, "123", "Ana", "Pérez", null, null).edadEn(2026));
     }
 
     @Test
@@ -99,7 +114,8 @@ class InformeEvaluadoServiceTest {
     }
 
     private static DatosAplicacion aplicacion(Long id, String fecha) {
-        return new DatosAplicacion(id, LocalDateTime.parse(fecha), "Analista", "Talento humano", 1L, "Grupo 1");
+        return new DatosAplicacion(id, LocalDateTime.parse(fecha), "Analista", "Talento humano", 1L, "Grupo 1",
+                null, null, null);
     }
 
     private static class PuertoFalso implements InformeEvaluadoPort {

@@ -5,7 +5,9 @@ public record EvaluadoInformeResponse(
         Long id,
         String numeroIdentificacion,
         String nombre,
-        String apellido
+        String apellido,
+        String sexo,
+        Integer anioNacimiento
 
 ) {
 }
