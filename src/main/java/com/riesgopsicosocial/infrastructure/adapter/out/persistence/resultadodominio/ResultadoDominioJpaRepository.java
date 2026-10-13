@@ -5,11 +5,14 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface ResultadoDominioJpaRepository extends JpaRepository<ResultadoDominioEntity, Long> {
 
     List<ResultadoDominioEntity> findByFkAplicacion(Long fkAplicacion);
+
+    List<ResultadoDominioEntity> findByFkAplicacionIn(Collection<Long> fksAplicacion);
 
     /** Borrado directo en BD (no carga entidades) para poder reinsertar sin chocar con el UNIQUE. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

@@ -23,7 +23,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Arrays;
 import java.util.List;
 
 @RestController
@@ -71,9 +70,7 @@ public class InformeController {
     }
 
     private FormatoDocumento toFormato(String formato) {
-        return Arrays.stream(FormatoDocumento.values())
-                .filter(f -> f.extension().equalsIgnoreCase(formato.trim()))
-                .findFirst()
+        return FormatoDocumento.deExtension(formato)
                 .orElseThrow(() -> new ValidationException("Formato de informe no válido: " + formato,
                         List.of("Formatos permitidos: pdf, docx")));
     }

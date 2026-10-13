@@ -23,8 +23,6 @@ public class InformeVistaMapper {
     private static final Locale ES_CO = Locale.forLanguageTag("es-CO");
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final String SIN_DATO = "—";
-    private static final Map<Long, String> NIVELES_ESTRES = Map.of(
-            1L, "Muy bajo", 2L, "Bajo", 3L, "Medio", 4L, "Alto", 5L, "Muy alto");
 
     /** Interpretación genérica de los niveles de riesgo (formatos modelo, Anexos 4 y 5 intralaboral). */
     private static final List<ParrafoVista> INTERPRETACION_RIESGO = List.of(
@@ -103,7 +101,7 @@ public class InformeVistaMapper {
                     List.of(),
                     List.of(),
                     new FilaVista("Puntaje total de síntomas de estrés", puntaje(rc.puntajeTransformado()),
-                            NIVELES_ESTRES.get(rc.nivelRiesgo().id()), rc.nivelRiesgo().id()),
+                            NivelEstres.etiqueta(rc.nivelRiesgo().id()), rc.nivelRiesgo().id()),
                     "Nivel de síntomas de estrés");
             default -> throw new IllegalStateException("Forma de cuestionario no soportada en el informe: " + rc.forma());
         };

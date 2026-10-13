@@ -1,0 +1,266 @@
+package com.riesgopsicosocial.domain.service.informe;
+
+import com.riesgopsicosocial.domain.exception.ReglaNegocioException;
+import com.riesgopsicosocial.domain.model.informe.empresa.*;
+import com.riesgopsicosocial.domain.model.resultado.*;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.CondicionAplicacion;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.FiltrosAplicacion;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.MetodoCalculo;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class AnalizadorInformeEmpresaTest {
+
+    private static final NivelRiesgo SIN_RIESGO = new NivelRiesgo(1L, "Sin riesgo o riesgo despreciable");
+    private static final NivelRiesgo BAJO = new NivelRiesgo(2L, "Riesgo bajo");
+    private static final NivelRiesgo MEDIO = new NivelRiesgo(3L, "Riesgo medio");
+    private static final NivelRiesgo ALTO = new NivelRiesgo(4L, "Riesgo alto");
+    private static final NivelRiesgo MUY_ALTO = new NivelRiesgo(5L, "Riesgo muy alto");
+    private static final List<NivelRiesgo> NIVELES = List.of(SIN_RIESGO, BAJO, MEDIO, ALTO, MUY_ALTO);
+
+    private static final CuestionarioInforme FORMA_A = new CuestionarioInforme(1L, "A", MetodoCalculo.SUMA_POR_DOMINIOS,
+            List.of(new DominioInforme(10L, "Liderazgo", List.of()), new DominioInforme(11L, "Control", List.of())));
+    private static final CuestionarioInforme FORMA_B = new CuestionarioInforme(2L, "B", MetodoCalculo.SUMA_POR_DOMINIOS,
+            List.of(new DominioInforme(20L, "Liderazgo", List.of()), new DominioInforme(21L, "Control", List.of())));
+    private static final CuestionarioInforme FORMA_C = new CuestionarioInforme(3L, "C", MetodoCalculo.SUMA_DIRECTA, List.of());
+    private static final CuestionarioInforme FORMA_D = new CuestionarioInforme(4L, "D", MetodoCalculo.PROMEDIO_PONDERADO, List.of());
+
+    private final AnalizadorInformeEmpresa analizador =
+            new AnalizadorInformeEmpresa(List.of(FORMA_A, FORMA_B, FORMA_C, FORMA_D), NIVELES);
+
+    @Test
+    void cobertura_cuentaEsperadosEvaluadosYPendientes() {
+        List<ParticipanteEmpresa> participantes = List.of(
+                participante(1L, "Comercial", resultado(intra(FORMA_A, ALTO, BAJO, MEDIO))),
+                new ParticipanteEmpresa(2L, "Comercial", null, true, null, FiltrosAplicacion.SIN_REGISTRO),   // respondió, sin calcular
+                new ParticipanteEmpresa(3L, "Comercial", null, false, null, FiltrosAplicacion.SIN_REGISTRO)); // no se ha evaluado
+
+        AnalisisGrupo analisis = analizador.analizar(participantes);
+
+        assertEquals(new Cobertura(3, 2, bd("66.7")), analisis.cobertura());
+        assertEquals(1, analisis.pendientesCalculo());
+        assertEquals(1, analisis.intralaboral().total());
+    }
+
+    @Test
+    void globales_distribuyenCadaCuestionarioSobreSuPropioTotal() {
+        List<ParticipanteEmpresa> participantes = List.of(
+                participante(1L, null, resultado(intra(FORMA_A, ALTO, ALTO, ALTO), total(FORMA_C, BAJO), total(FORMA_D, MUY_ALTO))),
+                participante(2L, null, resultado(intra(FORMA_B, ALTO, ALTO, ALTO), total(FORMA_C, MEDIO))),
+                participante(3L, null, resultado(intra(FORMA_A, SIN_RIESGO, SIN_RIESGO, SIN_RIESGO))));
+
+        AnalisisGrupo analisis = analizador.analizar(participantes);
+
+        // Intralaboral junta A y B
+        assertEquals(3, analisis.intralaboral().total());
+        assertEquals(List.of(1, 0, 0, 2, 0), cantidades(analisis.intralaboral()));
+        assertEquals(List.of(bd("33.3"), bd("0.0"), bd("0.0"), bd("66.7"), bd("0.0")), porcentajes(analisis.intralaboral()));
+
+        assertEquals(2, analisis.extralaboral().total());
+        assertEquals(List.of(0, 1, 1, 0, 0), cantidades(analisis.extralaboral()));
+        assertEquals(List.of(bd("0.0"), bd("50.0"), bd("50.0"), bd("0.0"), bd("0.0")), porcentajes(analisis.extralaboral()));
+
+        assertEquals(1, analisis.estres().total());
+        assertEquals(List.of(0, 0, 0, 0, 1), cantidades(analisis.estres()));
+        assertEquals(bd("100.0"), analisis.estres().niveles().get(4).porcentaje());
+    }
+
+    @Test
+    void dominios_porFormaYSoloLasFormasPresentadas() {
+        List<ParticipanteEmpresa> participantes = List.of(
+                participante(1L, null, resultado(intra(FORMA_A, ALTO, ALTO, BAJO))),
+                participante(2L, null, resultado(intra(FORMA_A, MEDIO, MUY_ALTO, BAJO))));
+
+        List<DominiosForma> dominios = analizador.analizar(participantes).dominios();
+
+        assertEquals(1, dominios.size(), "B no se presentó: no debe aparecer");
+        DominiosForma formaA = dominios.get(0);
+        assertEquals("A", formaA.forma());
+        assertEquals(2, formaA.total());
+        assertEquals(List.of("Liderazgo", "Control"), formaA.dominios().stream().map(DistribucionDominio::nombre).toList());
+        assertEquals(List.of(0, 0, 0, 1, 1), cantidades(formaA.dominios().get(0).distribucion()));
+        assertEquals(List.of(0, 2, 0, 0, 0), cantidades(formaA.dominios().get(1).distribucion()));
+    }
+
+    @Test
+    void dominios_rankingPorMuyAltoLuegoAltoYAsiHaciaAbajo_empateEnOrdenDelCuestionario() {
+        CuestionarioInforme forma = new CuestionarioInforme(1L, "A", MetodoCalculo.SUMA_POR_DOMINIOS,
+                List.of(new DominioInforme(10L, "Liderazgo", List.of()), new DominioInforme(11L, "Control", List.of()),
+                        new DominioInforme(12L, "Demandas", List.of()), new DominioInforme(13L, "Recompensas", List.of())));
+        AnalizadorInformeEmpresa conCuatroDominios = new AnalizadorInformeEmpresa(List.of(forma), NIVELES);
+        List<ParticipanteEmpresa> participantes = List.of(
+                participante(1L, null, resultado(intra(forma, MEDIO, BAJO, ALTO, BAJO, MUY_ALTO))),
+                participante(2L, null, resultado(intra(forma, MEDIO, BAJO, MEDIO, BAJO, ALTO))),
+                participante(3L, null, resultado(intra(forma, MEDIO, SIN_RIESGO, BAJO, SIN_RIESGO, MEDIO))));
+
+        DominiosForma ranking = conCuatroDominios.analizar(participantes).dominios().get(0);
+
+        // Recompensas tiene muy alto; Control no, pero sí alto; Liderazgo y Demandas empatan en todo.
+        assertEquals(List.of("Recompensas", "Control", "Liderazgo", "Demandas"),
+                ranking.dominios().stream().map(DistribucionDominio::nombre).toList());
+    }
+
+    @Test
+    void dimensiones_rankingDentroDelDominioYSinContarAQuienNoLeAplicaLaPreguntaFiltro() {
+        DimensionInforme caracteristicas = new DimensionInforme(100L, "Características del liderazgo", null);
+        DimensionInforme colaboradores = new DimensionInforme(101L, "Relación con los colaboradores",
+                CondicionAplicacion.ES_JEFE);
+        CuestionarioInforme forma = new CuestionarioInforme(1L, "A", MetodoCalculo.SUMA_POR_DOMINIOS,
+                List.of(new DominioInforme(10L, "Liderazgo", List.of(caracteristicas, colaboradores))));
+        AnalizadorInformeEmpresa conDimensiones = new AnalizadorInformeEmpresa(List.of(forma), NIVELES);
+        List<ParticipanteEmpresa> participantes = List.of(
+                conFiltros(1L, new FiltrosAplicacion(null, true), conDimension(forma, BAJO, MUY_ALTO)),
+                conFiltros(2L, new FiltrosAplicacion(null, false), conDimension(forma, ALTO, SIN_RIESGO)), // no es jefe
+                conFiltros(3L, FiltrosAplicacion.SIN_REGISTRO, conDimension(forma, BAJO, ALTO)));          // no registrado
+
+        DistribucionDominio liderazgo = conDimensiones.analizar(participantes).dominios().get(0).dominios().get(0);
+
+        assertEquals(List.of("Relación con los colaboradores", "Características del liderazgo"),
+                liderazgo.dimensiones().stream().map(DistribucionDimension::nombre).toList());
+        DistribucionDimension relacion = liderazgo.dimensiones().get(0);
+        assertEquals(2, relacion.distribucion().total(), "el que no es jefe no cuenta");
+        assertEquals(List.of(0, 0, 0, 1, 1), cantidades(relacion.distribucion()));
+        assertEquals(3, liderazgo.dimensiones().get(1).distribucion().total());
+    }
+
+    @Test
+    void masCriticaPrimero_comparaDesdeMuyAltoHaciaAbajoSinSumar() {
+        // A: 40 % alto + 0 % muy alto; B: 10 % muy alto. Sumando, A iría primero (40 > 10); sin sumar, B.
+        DistribucionNiveles a = distribucion("60.0", "0.0", "0.0", "40.0", "0.0");
+        DistribucionNiveles b = distribucion("90.0", "0.0", "0.0", "0.0", "10.0");
+        DistribucionNiveles c = distribucion("50.0", "0.0", "10.0", "40.0", "0.0");
+
+        assertEquals(List.of(b, c, a), Stream.of(a, b, c)
+                .sorted(DistribucionNiveles.masCriticaPrimero()).toList());
+    }
+
+    @Test
+    void grupoSinResultados_tablasEnCeroSinDividirPorCero() {
+        AnalisisGrupo analisis = analizador.analizar(List.of(new ParticipanteEmpresa(1L, "X", null, false, null, FiltrosAplicacion.SIN_REGISTRO)));
+
+        assertEquals(new Cobertura(1, 0, bd("0.0")), analisis.cobertura());
+        assertEquals(0, analisis.intralaboral().total());
+        assertEquals(5, analisis.intralaboral().niveles().size());
+        assertTrue(analisis.intralaboral().niveles().stream().allMatch(c -> c.cantidad() == 0 && c.porcentaje().equals(bd("0.0"))));
+        assertTrue(analisis.dominios().isEmpty());
+    }
+
+    @Test
+    void areas_seAgrupanSinMayusculasTildesNiEspaciosYSeOrdenanPorEsperados() {
+        List<ParticipanteEmpresa> participantes = List.of(
+                new ParticipanteEmpresa(1L, "VENTAS", null, false, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(2L, " Ventas ", null, false, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(3L, "Ventas", null, true, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(4L, "Dirección", null, false, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(5L, "direccion", null, false, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(6L, null, null, false, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(7L, "  ", null, false, null, FiltrosAplicacion.SIN_REGISTRO));
+
+        List<AnalisisArea> areas = analizador.analizarPorArea(participantes);
+
+        assertEquals(List.of("Ventas", "Dirección", "Sin área"), areas.stream().map(AnalisisArea::area).toList());
+        assertEquals(new Cobertura(3, 1, bd("33.3")), areas.get(0).analisis().cobertura());
+        assertEquals(2, areas.get(1).analisis().cobertura().esperados());
+        assertEquals(2, areas.get(2).analisis().cobertura().esperados());
+    }
+
+    @Test
+    void coberturaPorCiudad_agrupaPorIdYOrdenaPorEsperados() {
+        CiudadTrabajo bogota = new CiudadTrabajo(1L, "BOGOTA, D.C.");
+        CiudadTrabajo albanCundinamarca = new CiudadTrabajo(2L, "ALBAN");
+        CiudadTrabajo albanNarino = new CiudadTrabajo(3L, "ALBAN");
+        List<ParticipanteEmpresa> participantes = List.of(
+                new ParticipanteEmpresa(1L, null, bogota, true, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(2L, null, bogota, false, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(3L, null, bogota, true, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(4L, null, albanCundinamarca, true, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(5L, null, albanNarino, false, null, FiltrosAplicacion.SIN_REGISTRO),
+                new ParticipanteEmpresa(6L, null, null, false, null, FiltrosAplicacion.SIN_REGISTRO));
+
+        List<CoberturaCiudad> ciudades = analizador.analizar(participantes).coberturaPorCiudad();
+
+        assertEquals(4, ciudades.size(), "municipios homónimos de distinto departamento no se juntan");
+        assertEquals(new CoberturaCiudad(1L, "BOGOTA, D.C.", new Cobertura(3, 2, bd("66.7"))), ciudades.get(0));
+        assertEquals(new CoberturaCiudad(2L, "ALBAN", new Cobertura(1, 1, bd("100.0"))), ciudades.get(1));
+        assertEquals(new CoberturaCiudad(3L, "ALBAN", new Cobertura(1, 0, bd("0.0"))), ciudades.get(2));
+        assertEquals(new CoberturaCiudad(null, "Sin ciudad", new Cobertura(1, 0, bd("0.0"))), ciudades.get(3));
+    }
+
+    @Test
+    void cuestionarioSinConfiguracion_lanzaReglaNegocio() {
+        CuestionarioInforme desconocido = new CuestionarioInforme(99L, "Z", MetodoCalculo.SUMA_DIRECTA, List.of());
+        List<ParticipanteEmpresa> participantes = List.of(participante(1L, null, resultado(total(desconocido, BAJO))));
+
+        assertThrows(ReglaNegocioException.class, () -> analizador.analizar(participantes));
+    }
+
+    private static ParticipanteEmpresa participante(Long id, String area, ResultadoAplicacion resultado) {
+        return new ParticipanteEmpresa(id, area, null, true, resultado, FiltrosAplicacion.SIN_REGISTRO);
+    }
+
+    private static ResultadoAplicacion resultado(ResultadoCuestionario... cuestionarios) {
+        return new ResultadoAplicacion(1L, 1L, null, List.of(cuestionarios), null);
+    }
+
+    /** Resultado intralaboral con su total y el nivel de cada dominio, en el orden del cuestionario. */
+    private static ResultadoCuestionario intra(CuestionarioInforme forma, NivelRiesgo total,
+                                               NivelRiesgo... nivelesDominios) {
+        List<ResultadoDominio> dominios = new ArrayList<>();
+        for (int i = 0; i < nivelesDominios.length; i++) {
+            dominios.add(dominio(forma.dominios().get(i), nivelesDominios[i]));
+        }
+        return new ResultadoCuestionario(forma.idCuestionario(), forma.forma(), bd("0"), bd("0"), total, dominios, List.of());
+    }
+
+    private static ParticipanteEmpresa conFiltros(Long id, FiltrosAplicacion filtros, ResultadoCuestionario intra) {
+        return new ParticipanteEmpresa(id, null, null, true, resultado(intra), filtros);
+    }
+
+    /** Resultado con un solo dominio (nivel medio) y el nivel de cada una de sus dimensiones. */
+    private static ResultadoCuestionario conDimension(CuestionarioInforme forma, NivelRiesgo... nivelesDimensiones) {
+        DominioInforme dominio = forma.dominios().get(0);
+        List<ResultadoDimension> dimensiones = new ArrayList<>();
+        for (int i = 0; i < nivelesDimensiones.length; i++) {
+            DimensionInforme dimension = dominio.dimensiones().get(i);
+            dimensiones.add(new ResultadoDimension(dimension.idDimensionCuestionario(), dominio.idDominioCuestionario(),
+                    dimension.nombre(), bd("0"), bd("0"), nivelesDimensiones[i]));
+        }
+        return new ResultadoCuestionario(forma.idCuestionario(), forma.forma(), bd("0"), bd("0"), MEDIO,
+                List.of(dominio(dominio, MEDIO)), dimensiones);
+    }
+
+    private static ResultadoDominio dominio(DominioInforme dominio, NivelRiesgo nivel) {
+        return new ResultadoDominio(dominio.idDominioCuestionario(), dominio.nombre(), bd("0"), bd("0"), nivel);
+    }
+
+    private static ResultadoCuestionario total(CuestionarioInforme forma, NivelRiesgo nivel) {
+        return new ResultadoCuestionario(forma.idCuestionario(), forma.forma(), bd("0"), bd("0"), nivel, List.of(), List.of());
+    }
+
+    private static List<Integer> cantidades(DistribucionNiveles distribucion) {
+        return distribucion.niveles().stream().map(ConteoNivel::cantidad).toList();
+    }
+
+    private static List<BigDecimal> porcentajes(DistribucionNiveles distribucion) {
+        return distribucion.niveles().stream().map(ConteoNivel::porcentaje).toList();
+    }
+
+    private static DistribucionNiveles distribucion(String... porcentajes) {
+        List<ConteoNivel> conteos = new ArrayList<>();
+        for (int i = 0; i < porcentajes.length; i++) {
+            conteos.add(new ConteoNivel(NIVELES.get(i), 0, bd(porcentajes[i])));
+        }
+        return new DistribucionNiveles(10, conteos);
+    }
+
+    private static BigDecimal bd(String valor) {
+        return new BigDecimal(valor);
+    }
+
+}
