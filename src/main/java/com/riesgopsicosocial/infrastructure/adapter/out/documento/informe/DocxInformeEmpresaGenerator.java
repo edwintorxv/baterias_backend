@@ -8,7 +8,10 @@ import com.riesgopsicosocial.domain.model.informe.empresa.CoberturaCiudad;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConteoFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConcentracionRiesgo;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConteoNivel;
+import com.riesgopsicosocial.domain.model.informe.empresa.ConteoCategoria;
+import com.riesgopsicosocial.domain.model.informe.empresa.DescripcionPoblacion;
 import com.riesgopsicosocial.domain.model.informe.empresa.DesgloseGrupos;
+import com.riesgopsicosocial.domain.model.informe.empresa.VariablePoblacion;
 import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionDimension;
 import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionDominio;
 import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionGrupo;
@@ -31,6 +34,8 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTabStop;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcBorders;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTabJc;
 import org.springframework.stereotype.Component;
 
@@ -72,6 +77,8 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
     private static final int[] ANCHOS_RESUMEN = {2700, 2000, 900, 920, 920, 920, 920, 920};
     /** Ficha de una dimensión: los cinco niveles. */
     private static final int[] ANCHOS_FICHA = {2040, 2040, 2040, 2040, 2040};
+    /** Dos variables de la población lado a lado: categoría, personas y % de cada una, con una columna de separación. */
+    private static final int[] ANCHOS_VARIABLES = {2750, 950, 950, 900, 2750, 950, 950};
     /** Interpretación de los niveles: nivel e interpretación. */
     private static final int[] ANCHOS_INTERPRETACION = {2600, 7600};
     /** Alto mínimo de los recuadros para escribir, en twips: unos 9 cm las conclusiones y 4 cm cada plazo. */
@@ -116,6 +123,8 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                         ? "1 persona respondió las pruebas pero sus resultados aún no se han calculado; no se incluye en las tablas de resultados."
                         : general.pendientesCalculo() + " personas respondieron las pruebas pero sus resultados aún no se han calculado; no se incluyen en las tablas de resultados.");
             }
+
+            descripcionPoblacion(doc, informe.poblacion());
 
             seccion(doc, "3. RESULTADOS GLOBALES");
             subtitulo(doc, "Factores de riesgo psicosocial intralaborales");
@@ -186,6 +195,71 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
             celda(fila.getCell(1), filas[i][1], false, ParagraphAlignment.LEFT, null, ANCHOS_DATOS[1]);
         }
         espacio(doc);
+    }
+
+    /** Variables de la población evaluada en tablas de dos en dos (categoría, cantidad y %). */
+    private void descripcionPoblacion(XWPFDocument doc, DescripcionPoblacion poblacion) {
+        if (poblacion.personas() == 0) {
+            return;
+        }
+        subtitulo(doc, "Características de la población evaluada");
+        nota(doc, "Personas evaluadas (" + poblacion.personas() + ") por forma aplicada y datos generales. La edad se "
+                + "calcula con el año de nacimiento; el tipo de cargo y de contrato son los registrados actualmente "
+                + "para la persona en la empresa.");
+        List<VariablePoblacion> variables = poblacion.variables();
+        for (int i = 0; i < variables.size(); i += 2) {
+            tablaVariables(doc, variables.get(i), i + 1 < variables.size() ? variables.get(i + 1) : null,
+                    poblacion.personas());
+        }
+    }
+
+    /**
+     * Dos variables lado a lado en una sola tabla, separadas por una columna sin bordes; la fila
+     * TOTAL de las dos queda alineada al final.
+     */
+    private void tablaVariables(XWPFDocument doc, VariablePoblacion izquierda, VariablePoblacion derecha, int total) {
+        int filasDatos = Math.max(izquierda.categorias().size(), derecha == null ? 0 : derecha.categorias().size());
+        XWPFTable tabla = tabla(doc, filasDatos + 2, ANCHOS_VARIABLES);
+        lado(tabla, 0, izquierda, filasDatos, total);
+        if (derecha != null) {
+            lado(tabla, 4, derecha, filasDatos, total);
+        }
+        for (XWPFTableRow fila : tabla.getRows()) {
+            fila.setCantSplitRow(true);
+            XWPFTableCell separador = fila.getCell(3);
+            celda(separador, null, false, ParagraphAlignment.LEFT, null, ANCHOS_VARIABLES[3]);
+            CTTcBorders bordes = propiedades(separador).addNewTcBorders();
+            bordes.addNewTop().setVal(STBorder.NIL);
+            bordes.addNewBottom().setVal(STBorder.NIL);
+        }
+        espacio(doc);
+    }
+
+    /** Una variable en tres columnas desde {@code columna}: encabezado, categorías y TOTAL en la última fila. */
+    private static void lado(XWPFTable tabla, int columna, VariablePoblacion variable, int filasDatos, int total) {
+        XWPFTableRow encabezado = tabla.getRow(0);
+        celda(encabezado.getCell(columna), variable.nombre(), true, ParagraphAlignment.LEFT, GRIS_ENCABEZADO,
+                ANCHOS_VARIABLES[columna]);
+        celda(encabezado.getCell(columna + 1), "Personas", true, ParagraphAlignment.CENTER, GRIS_ENCABEZADO,
+                ANCHOS_VARIABLES[columna + 1]);
+        celda(encabezado.getCell(columna + 2), "%", true, ParagraphAlignment.CENTER, GRIS_ENCABEZADO,
+                ANCHOS_VARIABLES[columna + 2]);
+        for (int i = 0; i < filasDatos; i++) {
+            XWPFTableRow fila = tabla.getRow(i + 1);
+            ConteoCategoria conteo = i < variable.categorias().size() ? variable.categorias().get(i) : null;
+            celda(fila.getCell(columna), conteo == null ? null : conteo.categoria(), false, ParagraphAlignment.LEFT,
+                    null, ANCHOS_VARIABLES[columna]);
+            celda(fila.getCell(columna + 1), conteo == null ? null : String.valueOf(conteo.cantidad()), false,
+                    ParagraphAlignment.CENTER, null, ANCHOS_VARIABLES[columna + 1]);
+            celda(fila.getCell(columna + 2), conteo == null ? null : porcentaje(conteo.porcentaje()), false,
+                    ParagraphAlignment.CENTER, null, ANCHOS_VARIABLES[columna + 2]);
+        }
+        XWPFTableRow fila = tabla.getRow(filasDatos + 1);
+        celda(fila.getCell(columna), "TOTAL", true, ParagraphAlignment.LEFT, GRIS_TOTAL_GENERAL, ANCHOS_VARIABLES[columna]);
+        celda(fila.getCell(columna + 1), String.valueOf(total), true, ParagraphAlignment.CENTER, GRIS_TOTAL_GENERAL,
+                ANCHOS_VARIABLES[columna + 1]);
+        celda(fila.getCell(columna + 2), "100 %", true, ParagraphAlignment.CENTER, GRIS_TOTAL_GENERAL,
+                ANCHOS_VARIABLES[columna + 2]);
     }
 
     /** Una fila por ciudad de trabajo y el total de la empresa. */

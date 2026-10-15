@@ -29,8 +29,8 @@ class InformeEmpresaServiceTest {
 
     @Test
     void esperadosSonLasPersonasCargadasAunqueNoTenganAplicacion() {
-        puerto.personas.addAll(List.of(new PersonaCargada(10L, "A", null), new PersonaCargada(11L, "A", null),
-                new PersonaCargada(12L, "A", null)));
+        puerto.personas.addAll(List.of(new PersonaCargada(10L, "A", null, FichaPersona.SIN_DATOS), new PersonaCargada(11L, "A", null, FichaPersona.SIN_DATOS),
+                new PersonaCargada(12L, "A", null, FichaPersona.SIN_DATOS)));
         puerto.aplicaciones.add(aplicacion(1L, 10L, "2026-03-01T08:00", true, intralaboral(ALTO)));
         puerto.aplicaciones.add(aplicacion(2L, 11L, "2026-03-01T08:00", true, null));
 
@@ -45,7 +45,7 @@ class InformeEmpresaServiceTest {
 
     @Test
     void variasAplicacionesEnElAnio_cuentaUnaPersonaConSuResultadoMasReciente() {
-        puerto.personas.add(new PersonaCargada(10L, "A", null));
+        puerto.personas.add(new PersonaCargada(10L, "A", null, FichaPersona.SIN_DATOS));
         puerto.aplicaciones.add(aplicacion(1L, 10L, "2026-03-01T08:00", true, intralaboral(BAJO)));
         puerto.aplicaciones.add(aplicacion(2L, 10L, "2026-09-01T08:00", true, intralaboral(ALTO)));
         puerto.aplicaciones.add(aplicacion(3L, 10L, "2026-11-01T08:00", true, null)); // sin calcular: no reemplaza
@@ -60,7 +60,7 @@ class InformeEmpresaServiceTest {
 
     @Test
     void aplicacionesDeRelacionesInactivas_noCuentan() {
-        puerto.personas.add(new PersonaCargada(10L, "A", null));
+        puerto.personas.add(new PersonaCargada(10L, "A", null, FichaPersona.SIN_DATOS));
         puerto.aplicaciones.add(aplicacion(1L, 99L, "2026-03-01T08:00", true, intralaboral(ALTO)));
 
         AnalisisGrupo general = service.consultar(1L, 2026).general();
@@ -84,7 +84,7 @@ class InformeEmpresaServiceTest {
 
     @Test
     void anioSinAplicaciones_404() {
-        puerto.personas.add(new PersonaCargada(10L, "A", null));
+        puerto.personas.add(new PersonaCargada(10L, "A", null, FichaPersona.SIN_DATOS));
         assertThrows(ResourceNotFoundException.class, () -> service.consultar(1L, 2026));
     }
 

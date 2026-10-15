@@ -157,6 +157,76 @@ public class AnalizadorInformeEmpresa {
                 desglose(porArea, AnalizadorInformeEmpresa::nombreArea, MetodoCalculo.SUMA_DIRECTA, OTRAS_AREAS));
     }
 
+    /**
+     * Describe a las personas evaluadas (las que respondieron alguna prueba): forma intralaboral
+     * presentada, sexo, rango de edad (año del informe − año de nacimiento), nivel académico, tipo
+     * de cargo y tipo de contrato. Porcentajes sobre las personas evaluadas.
+     *
+     * @param fichas datos generales por {@code idEvaluadoCliente}; sin ficha = todo "Sin dato"
+     */
+    public DescripcionPoblacion describirPoblacion(List<ParticipanteEmpresa> participantes,
+                                                   Map<Long, FichaPersona> fichas, int anio) {
+        List<ParticipanteEmpresa> evaluados = participantes.stream().filter(ParticipanteEmpresa::tieneRespuestas).toList();
+        Function<ParticipanteEmpresa, FichaPersona> ficha = p -> fichas.getOrDefault(p.idEvaluadoCliente(), FichaPersona.SIN_DATOS);
+        int total = evaluados.size();
+        return new DescripcionPoblacion(total, List.of(
+                variable("Forma intralaboral aplicada", evaluados, this::formaIntralaboral, total),
+                variable("Sexo", evaluados, p -> ficha.apply(p).sexo(), total),
+                variable("Rango de edad", evaluados, p -> rangoEdad(ficha.apply(p).anioNacimiento(), anio), total),
+                variable("Nivel académico", evaluados, p -> ficha.apply(p).nivelAcademico(), total),
+                variable("Tipo de cargo", evaluados, p -> ficha.apply(p).tipoCargo(), total),
+                variable("Tipo de contrato", evaluados, p -> ficha.apply(p).tipoContrato(), total)));
+    }
+
+    private static final Categoria SIN_DATO = new Categoria(Long.MAX_VALUE, "Sin dato");
+
+    /** Cuenta por categoría, en el orden de su id ("Sin dato" al final); solo las que tienen personas. */
+    private static VariablePoblacion variable(String nombre, List<ParticipanteEmpresa> evaluados,
+                                              Function<ParticipanteEmpresa, Categoria> categoria, int total) {
+        Map<Categoria, Long> conteo = evaluados.stream()
+                .collect(Collectors.groupingBy(p -> Optional.ofNullable(categoria.apply(p)).orElse(SIN_DATO),
+                        Collectors.counting()));
+        return new VariablePoblacion(nombre, conteo.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.comparing(Categoria::id)))
+                .map(e -> new ConteoCategoria(e.getKey().nombre(), e.getValue().intValue(),
+                        porcentaje(e.getValue().intValue(), total)))
+                .toList());
+    }
+
+    /** Forma intralaboral del resultado de la persona (A antes que B); sin resultado intralaboral, su propia categoría. */
+    private Categoria formaIntralaboral(ParticipanteEmpresa participante) {
+        if (participante.resultado() == null) {
+            return new Categoria(Long.MAX_VALUE - 1, "Sin resultado intralaboral");
+        }
+        return participante.resultado().cuestionarios().stream()
+                .filter(rc -> cuestionario(rc.idCuestionario()).metodoCalculo() == MetodoCalculo.SUMA_POR_DOMINIOS)
+                .findFirst()
+                .map(rc -> new Categoria((long) cuestionarios.indexOf(cuestionario(rc.idCuestionario())),
+                        "Forma " + rc.forma()))
+                .orElse(new Categoria(Long.MAX_VALUE - 1, "Sin resultado intralaboral"));
+    }
+
+    /** Rangos de edad del informe; sin año de nacimiento = "Sin dato". */
+    static Categoria rangoEdad(Integer anioNacimiento, int anio) {
+        if (anioNacimiento == null) {
+            return SIN_DATO;
+        }
+        int edad = anio - anioNacimiento;
+        if (edad < 25) {
+            return new Categoria(1L, "Menor de 25 años");
+        }
+        if (edad < 35) {
+            return new Categoria(2L, "25 a 34 años");
+        }
+        if (edad < 45) {
+            return new Categoria(3L, "35 a 44 años");
+        }
+        if (edad < 55) {
+            return new Categoria(4L, "45 a 54 años");
+        }
+        return new Categoria(5L, "55 años o más");
+    }
+
     /** Personas agrupadas por ciudad de trabajo (por id: hay municipios homónimos); sin ciudad = un grupo. */
     private static Collection<List<ParticipanteEmpresa>> porCiudad(List<ParticipanteEmpresa> participantes) {
         return participantes.stream()

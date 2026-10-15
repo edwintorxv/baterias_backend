@@ -59,7 +59,12 @@ class DocxInformeEmpresaGeneratorTest {
                 new DistribucionGrupo("CALI", distribucion), new DistribucionGrupo("Otras ciudades", distribucion)), 4, 0);
         DesgloseGrupos areas = new DesgloseGrupos(List.of(new DistribucionGrupo("Ventas", distribucion),
                 new DistribucionGrupo("Operaciones", distribucion), new DistribucionGrupo("Dirección", distribucion)), 0, 1);
-        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general,
+        DescripcionPoblacion poblacion = new DescripcionPoblacion(3, List.of(
+                new VariablePoblacion("Forma intralaboral aplicada", List.of(new ConteoCategoria("Forma A", 3, new BigDecimal("100.0")))),
+                new VariablePoblacion("Sexo", List.of(new ConteoCategoria("Femenino", 2, new BigDecimal("66.7")),
+                        new ConteoCategoria("Masculino", 1, new BigDecimal("33.3")))),
+                new VariablePoblacion("Rango de edad", List.of(new ConteoCategoria("25 a 34 años", 3, new BigDecimal("100.0"))))));
+        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general, poblacion,
                 new ConcentracionRiesgo(List.of(new DominioConsolidado(1L, "Liderazgo", distribucion)),
                         ciudades, areas, ciudades, new DesgloseGrupos(List.of(), 0, 1)),
                 new ResultadosExtralaborales(List.of(
@@ -197,6 +202,25 @@ class DocxInformeEmpresaGeneratorTest {
         assertTrue(texto.indexOf("6. FACTORES DE RIESGO EXTRALABORALES") > texto.indexOf("5. CONCENTRACIÓN DEL RIESGO INTRALABORAL")
                 && texto.indexOf("6. FACTORES DE RIESGO EXTRALABORALES") < texto.indexOf("7. SÍNTOMAS DE ESTRÉS"),
                 "el extralaboral va antes del estrés");
+        assertTrue(texto.contains("CARACTERÍSTICAS DE LA POBLACIÓN EVALUADA") && texto.contains("Personas evaluadas (3)"));
+        assertTrue(texto.indexOf("CARACTERÍSTICAS DE LA POBLACIÓN EVALUADA") > texto.indexOf("2. POBLACIÓN EVALUADA")
+                && texto.indexOf("CARACTERÍSTICAS DE LA POBLACIÓN EVALUADA") < texto.indexOf("3. RESULTADOS GLOBALES"),
+                "dentro de la sección de población");
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(word))) {
+            List<XWPFTable> variables = doc.getTables().stream()
+                    .filter(t -> t.getRow(0).getTableCells().size() == 7 && t.getRow(0).getCell(2).getText().equals("%"))
+                    .toList();
+            assertEquals(2, variables.size(), "tres variables: dos en la primera tabla y una en la segunda");
+            XWPFTable primera = variables.get(0);
+            assertEquals(List.of("Forma intralaboral aplicada", "Personas", "%", "", "Sexo", "Personas", "%"),
+                    primera.getRow(0).getTableCells().stream().map(c -> c.getText()).toList());
+            assertEquals(List.of("Forma A", "3", "100,0 %", "", "Femenino", "2", "66,7 %"),
+                    primera.getRow(1).getTableCells().stream().map(c -> c.getText()).toList());
+            assertEquals(List.of("", "", "", "", "Masculino", "1", "33,3 %"),
+                    primera.getRow(2).getTableCells().stream().map(c -> c.getText()).toList(), "la variable más corta deja celdas vacías");
+            assertEquals(List.of("TOTAL", "3", "100 %", "", "TOTAL", "3", "100 %"),
+                    primera.getRow(3).getTableCells().stream().map(c -> c.getText()).toList(), "TOTAL alineado al final");
+        }
         assertTrue(texto.indexOf("1. INTRODUCCIÓN") < texto.indexOf("2. POBLACIÓN EVALUADA"), "la introducción va al inicio");
         assertTrue(texto.indexOf("8. INTERPRETACIÓN DE LOS NIVELES") > texto.indexOf("7. SÍNTOMAS DE ESTRÉS")
                 && texto.indexOf("8. INTERPRETACIÓN DE LOS NIVELES") < texto.indexOf("9. CONCLUSIONES DEL PROFESIONAL"),

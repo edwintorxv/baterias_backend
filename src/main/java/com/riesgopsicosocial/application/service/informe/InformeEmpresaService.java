@@ -50,7 +50,10 @@ public class InformeEmpresaService implements ConsultarInformeEmpresaUseCase {
         // Frecuencia de síntomas: solo las respuestas de las aplicaciones que dan el resultado de estrés.
         List<RespuestaSintoma> respuestasEstres = informeEmpresaPort.buscarRespuestasEstres(
                 analizador.aplicacionesConEstres(participantes));
+        Map<Long, FichaPersona> fichas = personas.stream()
+                .collect(Collectors.toMap(PersonaCargada::idEvaluadoCliente, PersonaCargada::ficha));
         return new InformeEmpresa(cliente, anio, analizador.analizar(participantes),
+                analizador.describirPoblacion(participantes, fichas, anio),
                 analizador.concentracionRiesgo(participantes),
                 analizador.extralaboral(participantes),
                 analizador.sintomasEstres(participantes, respuestasEstres, informeEmpresaPort.buscarOpcionesEstres()));

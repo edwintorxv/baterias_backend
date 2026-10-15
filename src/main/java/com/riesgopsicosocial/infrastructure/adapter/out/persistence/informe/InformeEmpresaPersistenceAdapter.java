@@ -7,6 +7,7 @@ import com.riesgopsicosocial.domain.model.informe.empresa.CiudadTrabajo;
 import com.riesgopsicosocial.domain.model.informe.empresa.CuestionarioInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.DimensionInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.DominioInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.FichaPersona;
 import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.PersonaCargada;
 import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
@@ -70,6 +71,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
     private final DimensionJpaRespository dimensionRepository;
     private final CiudadMunicipioJpaResository ciudadRepository;
     private final OpcionRespuestaJpaRepository opcionRespuestaRepository;
+    private final FichasPersonaLoader fichasPersona;
     private final CatalogoCalculoLoader catalogo;
 
     public InformeEmpresaPersistenceAdapter(ClienteJpaRepository clienteRepository,
@@ -86,6 +88,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                                             DimensionJpaRespository dimensionRepository,
                                             CiudadMunicipioJpaResository ciudadRepository,
                                             OpcionRespuestaJpaRepository opcionRespuestaRepository,
+                                            FichasPersonaLoader fichasPersona,
                                             CatalogoCalculoLoader catalogo) {
         this.clienteRepository = clienteRepository;
         this.evaluadoClienteRepository = evaluadoClienteRepository;
@@ -101,6 +104,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         this.dimensionRepository = dimensionRepository;
         this.ciudadRepository = ciudadRepository;
         this.opcionRespuestaRepository = opcionRespuestaRepository;
+        this.fichasPersona = fichasPersona;
         this.catalogo = catalogo;
     }
 
@@ -117,9 +121,11 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                         .map(EvaluadoClienteEntity::getFkCiudadTrabajo).filter(Objects::nonNull).collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(CiudadMunicipioEntity::getId, CiudadMunicipioEntity::getNombre));
+        Map<Long, FichaPersona> fichas = fichasPersona.cargar(relaciones);
         return relaciones.stream()
                 .map(ec -> new PersonaCargada(ec.getId(), ec.getNombreArea(), ec.getFkCiudadTrabajo() == null ? null
-                        : new CiudadTrabajo(ec.getFkCiudadTrabajo(), ciudades.get(ec.getFkCiudadTrabajo()))))
+                        : new CiudadTrabajo(ec.getFkCiudadTrabajo(), ciudades.get(ec.getFkCiudadTrabajo())),
+                        fichas.get(ec.getId())))
                 .toList();
     }
 

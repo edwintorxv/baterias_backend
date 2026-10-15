@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -365,6 +366,49 @@ class AnalizadorInformeEmpresaTest {
         }
         return new ResultadoCuestionario(forma.idCuestionario(), forma.forma(), bd("0"), bd("0"), total, List.of(),
                 dimensiones);
+    }
+
+    @Test
+    void poblacion_describeSoloALosEvaluadosConCategoriasEnOrdenYSinDatoAlFinal() {
+        Categoria femenino = new Categoria(1L, "Femenino");
+        Categoria masculino = new Categoria(2L, "Masculino");
+        Categoria profesional = new Categoria(2L, "Profesional");
+        List<ParticipanteEmpresa> participantes = List.of(
+                participante(1L, null, resultado(intra(FORMA_B, ALTO))),
+                participante(2L, null, resultado(intra(FORMA_A, ALTO))),
+                participante(3L, null, resultado(intra(FORMA_A, BAJO))),
+                new ParticipanteEmpresa(4L, null, null, true, null, FiltrosAplicacion.SIN_REGISTRO),   // pendiente de cálculo
+                new ParticipanteEmpresa(5L, null, null, false, null, FiltrosAplicacion.SIN_REGISTRO)); // no evaluado
+        Map<Long, FichaPersona> fichas = Map.of(
+                1L, new FichaPersona(masculino, 2000, null, profesional, null),
+                2L, new FichaPersona(femenino, 1980, null, profesional, null),
+                3L, new FichaPersona(femenino, 1971, null, null, null),
+                5L, new FichaPersona(masculino, 1990, null, profesional, null));   // 4 sin ficha
+
+        DescripcionPoblacion poblacion = analizador.describirPoblacion(participantes, fichas, 2026);
+
+        assertEquals(4, poblacion.personas(), "el no evaluado no cuenta");
+        assertEquals(List.of("Forma intralaboral aplicada", "Sexo", "Rango de edad", "Nivel académico", "Tipo de cargo",
+                "Tipo de contrato"), poblacion.variables().stream().map(VariablePoblacion::nombre).toList());
+        assertEquals(List.of(new ConteoCategoria("Forma A", 2, bd("50.0")), new ConteoCategoria("Forma B", 1, bd("25.0")),
+                new ConteoCategoria("Sin resultado intralaboral", 1, bd("25.0"))), poblacion.variables().get(0).categorias());
+        assertEquals(List.of(new ConteoCategoria("Femenino", 2, bd("50.0")), new ConteoCategoria("Masculino", 1, bd("25.0")),
+                new ConteoCategoria("Sin dato", 1, bd("25.0"))), poblacion.variables().get(1).categorias());
+        // 2026 − 2000 = 26; − 1980 = 46; − 1971 = 55
+        assertEquals(List.of("25 a 34 años", "45 a 54 años", "55 años o más", "Sin dato"),
+                poblacion.variables().get(2).categorias().stream().map(ConteoCategoria::categoria).toList());
+        assertEquals(List.of(new ConteoCategoria("Sin dato", 4, bd("100.0"))), poblacion.variables().get(3).categorias());
+    }
+
+    @Test
+    void rangoEdad_limitesDeCadaRango() {
+        assertEquals("Menor de 25 años", AnalizadorInformeEmpresa.rangoEdad(2002, 2026).nombre());
+        assertEquals("25 a 34 años", AnalizadorInformeEmpresa.rangoEdad(2001, 2026).nombre());
+        assertEquals("25 a 34 años", AnalizadorInformeEmpresa.rangoEdad(1992, 2026).nombre());
+        assertEquals("35 a 44 años", AnalizadorInformeEmpresa.rangoEdad(1991, 2026).nombre());
+        assertEquals("45 a 54 años", AnalizadorInformeEmpresa.rangoEdad(1972, 2026).nombre());
+        assertEquals("55 años o más", AnalizadorInformeEmpresa.rangoEdad(1971, 2026).nombre());
+        assertEquals("Sin dato", AnalizadorInformeEmpresa.rangoEdad(null, 2026).nombre());
     }
 
     @Test
