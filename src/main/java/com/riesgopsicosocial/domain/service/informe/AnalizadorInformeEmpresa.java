@@ -37,13 +37,22 @@ import java.util.stream.Collectors;
  *   <li>Áreas: se agrupan sin distinguir mayúsculas, tildes ni espacios repetidos; se muestran
  *       con la escritura más frecuente. Sin área = "Sin área".</li>
  *   <li>Concentración del riesgo: dominios con A y B juntas, cada uno identificado por su dominio
- *       común; por ciudad y por área, la distribución por nivel del total intralaboral y del estrés.</li>
+ *       común; por ciudad y por área, la distribución por nivel del total intralaboral y del estrés.
+ *       Los grupos con menos de {@link #MINIMO_PERSONAS_GRUPO} personas se juntan en "Otras ciudades" /
+ *       "Otras áreas" (o se omiten si aun juntos no llegan), para no exponer resultados individuales.</li>
  * </ul>
  */
 public class AnalizadorInformeEmpresa {
 
     public static final String SIN_AREA = "Sin área";
     public static final String SIN_CIUDAD = "Sin ciudad";
+    public static final String OTRAS_CIUDADES = "Otras ciudades";
+    public static final String OTRAS_AREAS = "Otras áreas";
+    /**
+     * Confidencialidad: un grupo (ciudad o área) con menos personas no se muestra solo, porque su
+     * resultado sería el de una persona identificable. Valor provisional del usuario (2026-10-15).
+     */
+    public static final int MINIMO_PERSONAS_GRUPO = 2;
 
     private static final BigDecimal CIEN = BigDecimal.valueOf(100);
 
@@ -91,8 +100,8 @@ public class AnalizadorInformeEmpresa {
     /**
      * Concentración del riesgo: distribución por nivel de cada dominio intralaboral con A y B juntas
      * (ranking del más crítico al menos crítico) y, por ciudad de trabajo y por área, del total
-     * intralaboral y del estrés. Solo aparecen los dominios de las formas presentadas y los grupos
-     * con al menos un resultado intralaboral o de estrés.
+     * intralaboral y del estrés, cada uno con su propio desglose ({@link #desglose}). Solo aparecen
+     * los dominios de las formas presentadas.
      */
     public ConcentracionRiesgo concentracionRiesgo(List<ParticipanteEmpresa> participantes) {
         Map<Long, Long> dominioPorDominioCuestionario = new HashMap<>();
@@ -121,21 +130,41 @@ public class AnalizadorInformeEmpresa {
                 .collect(Collectors.groupingBy(p -> claveArea(p.area()), LinkedHashMap::new, Collectors.toList()));
 
         return new ConcentracionRiesgo(dominios,
-                distribucionPorGrupo(porCiudad.values(), AnalizadorInformeEmpresa::nombreCiudad),
-                distribucionPorGrupo(porArea.values(), AnalizadorInformeEmpresa::nombreArea));
+                desglose(porCiudad.values(), AnalizadorInformeEmpresa::nombreCiudad, MetodoCalculo.SUMA_POR_DOMINIOS, OTRAS_CIUDADES),
+                desglose(porArea.values(), AnalizadorInformeEmpresa::nombreArea, MetodoCalculo.SUMA_POR_DOMINIOS, OTRAS_AREAS),
+                desglose(porCiudad.values(), AnalizadorInformeEmpresa::nombreCiudad, MetodoCalculo.PROMEDIO_PONDERADO, OTRAS_CIUDADES),
+                desglose(porArea.values(), AnalizadorInformeEmpresa::nombreArea, MetodoCalculo.PROMEDIO_PONDERADO, OTRAS_AREAS));
     }
 
-    /** Intralaboral y estrés de cada grupo, del de más personas al de menos (empate: por nombre). */
-    private List<DistribucionGrupo> distribucionPorGrupo(Collection<List<ParticipanteEmpresa>> grupos,
-                                                         Function<List<ParticipanteEmpresa>, String> nombre) {
-        return grupos.stream()
-                .map(grupo -> new DistribucionGrupo(nombre.apply(grupo),
-                        distribuir(nivelesDe(resultadosPorMetodo(grupo, MetodoCalculo.SUMA_POR_DOMINIOS))),
-                        distribuir(nivelesDe(resultadosPorMetodo(grupo, MetodoCalculo.PROMEDIO_PONDERADO)))))
-                .filter(g -> g.personas() > 0)
-                .sorted(Comparator.comparingInt(DistribucionGrupo::personas).reversed()
+    /** Niveles que obtuvo cada persona de un grupo en una prueba. */
+    private record NivelesGrupo(String grupo, List<NivelRiesgo> niveles) {
+    }
+
+    /**
+     * Una prueba por grupo, de el de más personas al de menos (empate: por nombre). Los grupos con
+     * menos de {@link #MINIMO_PERSONAS_GRUPO} personas se juntan al final en {@code nombreOtros}; si
+     * aun juntos no llegan al mínimo, se omiten. Los grupos sin resultados de la prueba no aparecen.
+     */
+    private DesgloseGrupos desglose(Collection<List<ParticipanteEmpresa>> grupos,
+                                    Function<List<ParticipanteEmpresa>, String> nombre, MetodoCalculo metodo,
+                                    String nombreOtros) {
+        Map<Boolean, List<NivelesGrupo>> porTamano = grupos.stream()
+                .map(grupo -> new NivelesGrupo(nombre.apply(grupo), nivelesDe(resultadosPorMetodo(grupo, metodo))))
+                .filter(g -> !g.niveles().isEmpty())
+                .collect(Collectors.partitioningBy(g -> g.niveles().size() >= MINIMO_PERSONAS_GRUPO));
+
+        List<DistribucionGrupo> visibles = new ArrayList<>(porTamano.get(true).stream()
+                .map(g -> new DistribucionGrupo(g.grupo(), distribuir(g.niveles())))
+                .sorted(Comparator.comparingInt((DistribucionGrupo g) -> g.distribucion().total()).reversed()
                         .thenComparing(DistribucionGrupo::grupo))
-                .toList();
+                .toList());
+        List<NivelesGrupo> pequenos = porTamano.get(false);
+        List<NivelRiesgo> nivelesPequenos = pequenos.stream().flatMap(g -> g.niveles().stream()).toList();
+        if (nivelesPequenos.size() >= MINIMO_PERSONAS_GRUPO) {
+            visibles.add(new DistribucionGrupo(nombreOtros, distribuir(nivelesPequenos)));
+            return new DesgloseGrupos(List.copyOf(visibles), pequenos.size(), 0);
+        }
+        return new DesgloseGrupos(List.copyOf(visibles), 0, nivelesPequenos.size());
     }
 
     /**

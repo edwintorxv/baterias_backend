@@ -211,7 +211,7 @@ class AnalizadorInformeEmpresaTest {
     }
 
     @Test
-    void concentracion_intralaboralYEstresPorCiudadYArea() {
+    void concentracion_porCiudadYArea_cadaPruebaConSuDesgloseYGruposPequenosProtegidos() {
         CiudadTrabajo bogota = new CiudadTrabajo(1L, "BOGOTA, D.C.");
         CiudadTrabajo cali = new CiudadTrabajo(2L, "CALI");
         List<ParticipanteEmpresa> participantes = List.of(
@@ -219,30 +219,54 @@ class AnalizadorInformeEmpresaTest {
                 enGrupo(2L, "ventas", bogota, resultado(intra(FORMA_B, MEDIO, ALTO, SIN_RIESGO))),
                 enGrupo(3L, "Operaciones", bogota, resultado(intra(FORMA_B, MUY_ALTO, MEDIO, ALTO))),
                 enGrupo(4L, "Operaciones", cali, resultado(intra(FORMA_A, BAJO, BAJO, BAJO), total(FORMA_D, MUY_ALTO))),
-                enGrupo(5L, "Gerencia", null, resultado(total(FORMA_D, ALTO))),   // solo estrés: su grupo sí aparece
-                enGrupo(6L, "Dirección", null, null));   // sin resultados: su grupo no aparece
+                enGrupo(5L, "Gerencia", null, resultado(total(FORMA_D, ALTO))),
+                enGrupo(6L, "Dirección", null, null));   // sin resultados: no aparece en ninguna prueba
 
         ConcentracionRiesgo concentracion = analizador.concentracionRiesgo(participantes);
 
-        assertEquals(List.of("BOGOTA, D.C.", "CALI", "Sin ciudad"),
-                concentracion.porCiudad().stream().map(DistribucionGrupo::grupo).toList());
-        DistribucionNiveles enBogota = concentracion.porCiudad().get(0).intralaboral();
-        assertEquals(3, enBogota.total());
-        assertEquals(List.of(0, 0, 1, 1, 1), cantidades(enBogota));
-        assertEquals(List.of(bd("0.0"), bd("0.0"), bd("33.3"), bd("33.3"), bd("33.3")), porcentajes(enBogota));
-        assertEquals(0, concentracion.porCiudad().get(0).estres().total());
-        DistribucionGrupo enCali = concentracion.porCiudad().get(1);
-        assertEquals(List.of(0, 1, 0, 0, 0), cantidades(enCali.intralaboral()));
-        assertEquals(List.of(0, 0, 0, 0, 1), cantidades(enCali.estres()));
-        DistribucionGrupo sinCiudad = concentracion.porCiudad().get(2);
-        assertEquals(0, sinCiudad.intralaboral().total());
-        assertEquals(List.of(0, 0, 0, 1, 0), cantidades(sinCiudad.estres()));
+        // Intralaboral por ciudad: Cali tiene 1 persona y es el único grupo pequeño: se omite.
+        DesgloseGrupos intraCiudad = concentracion.intralaboralPorCiudad();
+        assertEquals(List.of("BOGOTA, D.C."), intraCiudad.grupos().stream().map(DistribucionGrupo::grupo).toList());
+        assertEquals(List.of(0, 0, 1, 1, 1), cantidades(intraCiudad.grupos().get(0).distribucion()));
+        assertEquals(List.of(bd("0.0"), bd("0.0"), bd("33.3"), bd("33.3"), bd("33.3")),
+                porcentajes(intraCiudad.grupos().get(0).distribucion()));
+        assertEquals(0, intraCiudad.agrupados());
+        assertEquals(1, intraCiudad.omitidos());
 
-        // Empate en personas: por nombre
-        assertEquals(List.of("Operaciones", "Ventas", "Gerencia"),
-                concentracion.porArea().stream().map(DistribucionGrupo::grupo).toList());
-        assertEquals(List.of(0, 1, 0, 0, 1), cantidades(concentracion.porArea().get(0).intralaboral()));
-        assertEquals(1, concentracion.porArea().get(0).estres().total());
+        // Estrés por ciudad: Cali (1) y Sin ciudad (1) juntos llegan al mínimo: "Otras ciudades".
+        DesgloseGrupos estresCiudad = concentracion.estresPorCiudad();
+        assertEquals(List.of("Otras ciudades"), estresCiudad.grupos().stream().map(DistribucionGrupo::grupo).toList());
+        assertEquals(List.of(0, 0, 0, 1, 1), cantidades(estresCiudad.grupos().get(0).distribucion()));
+        assertEquals(2, estresCiudad.agrupados());
+        assertEquals(0, estresCiudad.omitidos());
+
+        // Intralaboral por área: empate en personas, por nombre; ninguna es pequeña.
+        DesgloseGrupos intraArea = concentracion.intralaboralPorArea();
+        assertEquals(List.of("Operaciones", "Ventas"), intraArea.grupos().stream().map(DistribucionGrupo::grupo).toList());
+        assertEquals(List.of(0, 1, 0, 0, 1), cantidades(intraArea.grupos().get(0).distribucion()));
+        assertEquals(new DesgloseGrupos(intraArea.grupos(), 0, 0), intraArea);
+
+        assertEquals(List.of("Otras áreas"),
+                concentracion.estresPorArea().grupos().stream().map(DistribucionGrupo::grupo).toList());
+    }
+
+    @Test
+    void concentracion_otrasVaAlFinalDespuesDeLosGruposVisibles() {
+        CiudadTrabajo bogota = new CiudadTrabajo(1L, "BOGOTA, D.C.");
+        List<ParticipanteEmpresa> participantes = List.of(
+                enGrupo(1L, "X", bogota, resultado(intra(FORMA_A, ALTO, ALTO, ALTO))),
+                enGrupo(2L, "X", bogota, resultado(intra(FORMA_A, ALTO, ALTO, ALTO))),
+                enGrupo(3L, "X", new CiudadTrabajo(2L, "CALI"), resultado(intra(FORMA_A, BAJO, BAJO, BAJO))),
+                enGrupo(4L, "X", new CiudadTrabajo(3L, "PASTO"), resultado(intra(FORMA_A, BAJO, BAJO, BAJO))),
+                enGrupo(5L, "X", new CiudadTrabajo(4L, "TULUA"), resultado(intra(FORMA_A, BAJO, BAJO, BAJO))));
+
+        DesgloseGrupos porCiudad = analizador.concentracionRiesgo(participantes).intralaboralPorCiudad();
+
+        // "Otras ciudades" tiene más personas (3) que Bogotá (2), pero va al final.
+        assertEquals(List.of("BOGOTA, D.C.", "Otras ciudades"),
+                porCiudad.grupos().stream().map(DistribucionGrupo::grupo).toList());
+        assertEquals(3, porCiudad.grupos().get(1).distribucion().total());
+        assertEquals(3, porCiudad.agrupados());
     }
 
     @Test
@@ -251,8 +275,8 @@ class AnalizadorInformeEmpresaTest {
                 participante(1L, "X", resultado(total(FORMA_C, ALTO)))));
 
         assertTrue(concentracion.dominios().isEmpty());
-        assertTrue(concentracion.porCiudad().isEmpty());
-        assertTrue(concentracion.porArea().isEmpty());
+        assertTrue(concentracion.intralaboralPorCiudad().grupos().isEmpty());
+        assertTrue(concentracion.intralaboralPorArea().grupos().isEmpty());
     }
 
     @Test

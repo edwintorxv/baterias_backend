@@ -8,6 +8,7 @@ import com.riesgopsicosocial.domain.model.informe.empresa.CoberturaCiudad;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConteoFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConcentracionRiesgo;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConteoNivel;
+import com.riesgopsicosocial.domain.model.informe.empresa.DesgloseGrupos;
 import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionDimension;
 import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionDominio;
 import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionGrupo;
@@ -19,6 +20,7 @@ import com.riesgopsicosocial.domain.model.informe.empresa.InformeEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.SintomasEstres;
 import com.riesgopsicosocial.domain.model.resultado.NivelEstres;
+import com.riesgopsicosocial.domain.service.informe.AnalizadorInformeEmpresa;
 import com.riesgopsicosocial.domain.model.resultado.NivelRiesgo;
 import org.apache.poi.xwpf.usermodel.Borders;
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
@@ -267,10 +269,10 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                 concentracion.dominios().stream().map(DominioConsolidado::distribucion).toList());
 
         String descripcion = "Nivel de riesgo intralaboral total";
-        distribucionPorGrupo(doc, "Por ciudad de trabajo (regionales)", descripcion, "Ciudad de trabajo",
-                concentracion.porCiudad(), DistribucionGrupo::intralaboral, NivelRiesgo::nombre);
-        distribucionPorGrupo(doc, "Por área", descripcion, "Área",
-                concentracion.porArea(), DistribucionGrupo::intralaboral, NivelRiesgo::nombre);
+        distribucionPorGrupo(doc, "Por ciudad de trabajo (regionales)", descripcion, "Ciudad de trabajo", "ciudades",
+                concentracion.intralaboralPorCiudad(), NivelRiesgo::nombre);
+        distribucionPorGrupo(doc, "Por área", descripcion, "Área", "áreas",
+                concentracion.intralaboralPorArea(), NivelRiesgo::nombre);
     }
 
     /**
@@ -294,10 +296,10 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
 
         Function<NivelRiesgo, String> etiqueta = n -> NivelEstres.etiqueta(n.id());
         String descripcion = "Nivel de síntomas de estrés";
-        distribucionPorGrupo(doc, "Por ciudad de trabajo (regionales)", descripcion, "Ciudad de trabajo",
-                concentracion.porCiudad(), DistribucionGrupo::estres, etiqueta);
-        distribucionPorGrupo(doc, "Por área", descripcion, "Área",
-                concentracion.porArea(), DistribucionGrupo::estres, etiqueta);
+        distribucionPorGrupo(doc, "Por ciudad de trabajo (regionales)", descripcion, "Ciudad de trabajo", "ciudades",
+                concentracion.estresPorCiudad(), etiqueta);
+        distribucionPorGrupo(doc, "Por área", descripcion, "Área", "áreas",
+                concentracion.estresPorArea(), etiqueta);
     }
 
     /** Dimensión, respuestas y el porcentaje de cada frecuencia, con el encabezado en su color. */
@@ -365,36 +367,45 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
     }
 
     /**
-     * Tabla con todos los grupos que tienen esa prueba y gráficos de a {@link #GRUPOS_POR_GRAFICO}
-     * grupos, para que las barras no queden apiñadas. Cada gráfico lleva su título ("Gráfico 2 de 5 –
-     * Cali y Medellín", armado con los datos) y cada grupo su número de personas.
+     * Tabla con los grupos del desglose y gráficos de a {@link #GRUPOS_POR_GRAFICO} grupos, para que
+     * las barras no queden apiñadas. Cada gráfico lleva su título ("Gráfico 2 de 5 – Cali y Medellín",
+     * armado con los datos) y cada grupo su número de personas. Notas de los grupos pequeños que se
+     * juntaron en "Otras…" o que se omitieron por confidencialidad.
+     *
+     * @param plural "ciudades" o "áreas", para las notas
      */
     private void distribucionPorGrupo(XWPFDocument doc, String titulo, String descripcion, String tituloGrupo,
-                                      List<DistribucionGrupo> todos,
-                                      Function<DistribucionGrupo, DistribucionNiveles> prueba,
-                                      Function<NivelRiesgo, String> etiqueta) {
-        List<DistribucionGrupo> grupos = todos.stream()
-                .filter(g -> prueba.apply(g).total() > 0)
-                .sorted(Comparator.comparingInt((DistribucionGrupo g) -> prueba.apply(g).total()).reversed())
-                .toList();
-        if (grupos.isEmpty()) {
+                                      String plural, DesgloseGrupos desglose, Function<NivelRiesgo, String> etiqueta) {
+        List<DistribucionGrupo> grupos = desglose.grupos();
+        if (grupos.isEmpty() && desglose.omitidos() == 0) {
             return;
         }
         subtitulo(doc, titulo);
-        nota(doc, descripcion + ", ordenado de mayor a menor número de personas. Los grupos con pocas personas "
-                + "deben leerse con cautela.").setKeepNext(true);
+        String minimo = personas(AnalizadorInformeEmpresa.MINIMO_PERSONAS_GRUPO);
+        if (desglose.omitidos() > 0) {
+            nota(doc, (desglose.omitidos() == 1 ? "1 persona no se muestra" : desglose.omitidos() + " personas no se muestran")
+                    + " para proteger la confidencialidad: pertenecen a " + plural + " con menos de " + minimo
+                    + " evaluadas que, aun juntas, no alcanzan ese mínimo.");
+        }
+        if (grupos.isEmpty()) {
+            return;
+        }
+        String otras = desglose.agrupados() == 0 ? "" : " \"Otras " + plural + "\" reúne " + desglose.agrupados() + " "
+                + plural + " con menos de " + minimo + " evaluadas, para proteger la confidencialidad.";
+        nota(doc, descripcion + ", ordenado de mayor a menor número de personas." + otras
+                + " Los grupos con pocas personas deben leerse con cautela.").setKeepNext(true);
         unirConElGrafico(doc, tablaPorNivel(doc, ANCHOS_DOMINIOS, new String[]{tituloGrupo, "Personas"},
                 grupos.stream()
-                        .map(g -> new FilaPorNivel(new String[]{g.grupo(), String.valueOf(prueba.apply(g).total())},
-                                prueba.apply(g)))
+                        .map(g -> new FilaPorNivel(new String[]{g.grupo(), String.valueOf(g.distribucion().total())},
+                                g.distribucion()))
                         .toList(), etiqueta));
         int graficos = (grupos.size() + GRUPOS_POR_GRAFICO - 1) / GRUPOS_POR_GRAFICO;
         for (int i = 0; i < graficos; i++) {
             List<DistribucionGrupo> parte = grupos.subList(i * GRUPOS_POR_GRAFICO,
                     Math.min(grupos.size(), (i + 1) * GRUPOS_POR_GRAFICO));
             graficoPorNivel(doc,
-                    parte.stream().map(g -> g.grupo() + " (" + prueba.apply(g).total() + ")").toList(),
-                    parte.stream().map(prueba).toList(), etiqueta,
+                    parte.stream().map(g -> g.grupo() + " (" + g.distribucion().total() + ")").toList(),
+                    parte.stream().map(DistribucionGrupo::distribucion).toList(), etiqueta,
                     tituloGrafico(i + 1, graficos, parte), DocxGraficos.ALTO_COMPACTO);
         }
     }
