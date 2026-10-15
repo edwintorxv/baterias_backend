@@ -18,6 +18,7 @@ import com.riesgopsicosocial.domain.model.informe.empresa.DominiosForma;
 import com.riesgopsicosocial.domain.model.informe.empresa.FrecuenciaDimension;
 import com.riesgopsicosocial.domain.model.informe.empresa.InformeEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
+import com.riesgopsicosocial.domain.model.informe.empresa.ResultadosExtralaborales;
 import com.riesgopsicosocial.domain.model.informe.empresa.SintomasEstres;
 import com.riesgopsicosocial.domain.model.resultado.NivelEstres;
 import com.riesgopsicosocial.domain.service.informe.AnalizadorInformeEmpresa;
@@ -54,7 +55,7 @@ import static com.riesgopsicosocial.infrastructure.adapter.out.documento.informe
  * Informe de empresa en Word: introducción, población evaluada, resultados globales (intralaboral,
  * extralaboral y estrés), por cada forma intralaboral ranking de dominios y de dimensiones
  * y una ficha por dimensión; luego la concentración del riesgo intralaboral con A y B juntas
- * (dominios, ciudad y área), los síntomas de estrés (frecuencia por dimensión, ciudad y área), la
+ * (dominios, ciudad y área), los factores extralaborales (dimensiones, ciudad y área), los síntomas de estrés (frecuencia por dimensión, ciudad y área), la
  * interpretación de los niveles y, para llenar en Word, las conclusiones del profesional, el plan de
  * acción y su firma. Solo trae resultados agregados, nunca datos individuales.
  */
@@ -137,12 +138,17 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                 }
             }
 
-            // Cada sección nueva va al final: primero el intralaboral con A y B juntas, luego el estrés.
+            // Secciones nuevas al final (el extralaboral, por pedido del usuario, antes del estrés).
             ConcentracionRiesgo concentracion = informe.concentracion();
             if (!concentracion.dominios().isEmpty()) {
                 saltoDePagina(doc);
                 seccion(doc, numero++ + ". CONCENTRACIÓN DEL RIESGO INTRALABORAL (FORMAS A Y B)");
                 concentracionIntralaboral(doc, concentracion);
+            }
+            if (general.extralaboral().total() > 0) {
+                saltoDePagina(doc);
+                seccion(doc, numero++ + ". FACTORES DE RIESGO EXTRALABORALES");
+                extralaboral(doc, informe.extralaboral());
             }
             if (general.estres().total() > 0) {
                 saltoDePagina(doc);
@@ -374,6 +380,30 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
     }
 
     /**
+     * Ranking de las dimensiones extralaborales (tabla y gráficos de a 2) y nivel total extralaboral
+     * por ciudad de trabajo y por área.
+     */
+    private void extralaboral(XWPFDocument doc, ResultadosExtralaborales extralaboral) {
+        if (!extralaboral.dimensiones().isEmpty()) {
+            subtitulo(doc, "Dimensiones extralaborales");
+            nota(doc, "Dimensiones " + CRITERIO_RANKING).setKeepNext(true);
+            unirConElGrafico(doc, tablaPorNivel(doc, ANCHOS_DOMINIOS, new String[]{"Dimensión", "Personas"},
+                    extralaboral.dimensiones().stream()
+                            .map(d -> new FilaPorNivel(new String[]{d.nombre(), String.valueOf(d.distribucion().total())},
+                                    d.distribucion()))
+                            .toList(), NivelRiesgo::nombre));
+            graficosDeADos(doc, extralaboral.dimensiones().stream().map(DistribucionDimension::nombre).toList(),
+                    extralaboral.dimensiones().stream().map(DistribucionDimension::distribucion).toList(),
+                    NivelRiesgo::nombre);
+        }
+
+        String descripcion = "Nivel de riesgo extralaboral total";
+        distribucionPorGrupo(doc, "Por ciudad de trabajo (regionales)", descripcion, "Ciudad de trabajo", "ciudades",
+                extralaboral.porCiudad(), NivelRiesgo::nombre);
+        distribucionPorGrupo(doc, "Por área", descripcion, "Área", "áreas", extralaboral.porArea(), NivelRiesgo::nombre);
+    }
+
+    /**
      * Frecuencia de síntomas por dimensión (el manual no da niveles por dimensión) y nivel total de
      * síntomas de estrés por ciudad de trabajo y por área.
      */
@@ -497,22 +527,34 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                         .map(g -> new FilaPorNivel(new String[]{g.grupo(), String.valueOf(g.distribucion().total())},
                                 g.distribucion()))
                         .toList(), etiqueta));
-        int graficos = (grupos.size() + GRUPOS_POR_GRAFICO - 1) / GRUPOS_POR_GRAFICO;
+        graficosDeADos(doc, grupos.stream().map(DistribucionGrupo::grupo).toList(),
+                grupos.stream().map(DistribucionGrupo::distribucion).toList(), etiqueta);
+    }
+
+    /**
+     * Gráficos de a {@link #GRUPOS_POR_GRAFICO} categorías (grupos o dimensiones), cada uno con su
+     * título ("Gráfico 2 de 5 – Cali y Medellín") y cada categoría con su número de personas.
+     */
+    private void graficosDeADos(XWPFDocument doc, List<String> nombres, List<DistribucionNiveles> distribuciones,
+                                Function<NivelRiesgo, String> etiqueta) {
+        int graficos = (nombres.size() + GRUPOS_POR_GRAFICO - 1) / GRUPOS_POR_GRAFICO;
         for (int i = 0; i < graficos; i++) {
-            List<DistribucionGrupo> parte = grupos.subList(i * GRUPOS_POR_GRAFICO,
-                    Math.min(grupos.size(), (i + 1) * GRUPOS_POR_GRAFICO));
-            graficoPorNivel(doc,
-                    parte.stream().map(g -> g.grupo() + " (" + g.distribucion().total() + ")").toList(),
-                    parte.stream().map(DistribucionGrupo::distribucion).toList(), etiqueta,
-                    tituloGrafico(i + 1, graficos, parte), DocxGraficos.ALTO_COMPACTO);
+            int desde = i * GRUPOS_POR_GRAFICO;
+            int hasta = Math.min(nombres.size(), desde + GRUPOS_POR_GRAFICO);
+            List<String> parte = nombres.subList(desde, hasta);
+            List<DistribucionNiveles> distribucionesParte = distribuciones.subList(desde, hasta);
+            List<String> categorias = new ArrayList<>();
+            for (int j = 0; j < parte.size(); j++) {
+                categorias.add(parte.get(j) + " (" + distribucionesParte.get(j).total() + ")");
+            }
+            graficoPorNivel(doc, categorias, distribucionesParte, etiqueta, tituloGrafico(i + 1, graficos, parte),
+                    DocxGraficos.ALTO_COMPACTO);
         }
     }
 
     /** "Gráfico 2 de 5 – Cali y Medellín"; con un solo gráfico, solo los nombres. */
-    private static String tituloGrafico(int numero, int total, List<DistribucionGrupo> grupos) {
-        List<String> nombres = grupos.stream().map(DistribucionGrupo::grupo).toList();
-        String nombresUnidos = nombres.size() == 1 ? nombres.get(0)
-                : String.join(", ", nombres.subList(0, nombres.size() - 1)) + " y " + nombres.get(nombres.size() - 1);
+    private static String tituloGrafico(int numero, int total, List<String> nombres) {
+        String nombresUnidos = enumerar(nombres);
         return total == 1 ? nombresUnidos : "Gráfico " + numero + " de " + total + " – " + nombresUnidos;
     }
 

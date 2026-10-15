@@ -62,6 +62,11 @@ class DocxInformeEmpresaGeneratorTest {
         InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general,
                 new ConcentracionRiesgo(List.of(new DominioConsolidado(1L, "Liderazgo", distribucion)),
                         ciudades, areas, ciudades, new DesgloseGrupos(List.of(), 0, 1)),
+                new ResultadosExtralaborales(List.of(
+                        new DistribucionDimension(36L, "Tiempo fuera del trabajo", distribucion),
+                        new DistribucionDimension(37L, "Relaciones familiares", distribucion),
+                        new DistribucionDimension(38L, "Desplazamiento vivienda – trabajo – vivienda", distribucion)),
+                        ciudades, areas),
                 new SintomasEstres(3, List.of(
                         frecuencia("Síntomas psicoemocionales", "40.0", "60.0"),
                         frecuencia("Síntomas fisiológicos", "10.0", "90.0"))));
@@ -76,9 +81,10 @@ class DocxInformeEmpresaGeneratorTest {
             // Al final, la sección intralaboral con A y B juntas: dominios (1), por ciudad (2) y por área (2),
             // de a 2 grupos por gráfico; y la de estrés: frecuencia por dimensión (1) y por ciudad (2). El estrés
             // por área no tiene grupos visibles (1 persona omitida): sin tabla ni gráfico, solo la nota.
+            // Entre las dos, la extralaboral: dimensiones (2), por ciudad (2) y por área (2), de a 2.
             // La población por ciudad y el resumen de dimensiones no llevan gráfico.
             // getCharts() no garantiza el orden del documento: se identifican por sus categorías.
-            assertEquals(18, doc.getCharts().size());
+            assertEquals(24, doc.getCharts().size());
             List<List<String>> categorias = doc.getCharts().stream().map(DocxInformeEmpresaGeneratorTest::categorias).toList();
             assertEquals(8, categorias.stream().filter(List.of("Riesgo bajo", "Riesgo alto")::equals).count(),
                     "intralaboral, extralaboral y las 6 fichas usan el gráfico de barras por nivel");
@@ -96,8 +102,8 @@ class DocxInformeEmpresaGeneratorTest {
             assertEquals(6, fichas);
 
             assertTrue(categorias.contains(List.of("Liderazgo")), "dominios con A y B juntas");
-            assertEquals(2, categorias.stream().filter(List.of("BOGOTA, D.C. (3)", "CALI (3)")::equals).count(),
-                    "por ciudad, de a 2 y con su N: intralaboral y estrés");
+            assertEquals(3, categorias.stream().filter(List.of("BOGOTA, D.C. (3)", "CALI (3)")::equals).count(),
+                    "por ciudad, de a 2 y con su N: intralaboral, extralaboral y estrés");
             assertTrue(categorias.contains(List.of("Otras ciudades (3)")), "la ciudad que sobra va en su propio gráfico");
             assertTrue(categorias.contains(List.of("Ventas (3)", "Operaciones (3)")), "por área, de a 2 y con su N");
             assertTrue(categorias.contains(List.of("Dirección (3)")), "el área que sobra va en su propio gráfico");
@@ -117,7 +123,9 @@ class DocxInformeEmpresaGeneratorTest {
                     .filter(g -> g.getTitle() != null)
                     .map(g -> g.getTitle().getBody().getParagraph(0).getText())
                     .toList();
-            assertEquals(6, titulos.size(), "solo los gráficos por ciudad y por área llevan título");
+            assertEquals(12, titulos.size(), "los gráficos de a 2 (ciudad, área, dimensiones extralaborales) llevan título");
+            assertTrue(titulos.containsAll(List.of("Gráfico 1 de 2 – Tiempo fuera del trabajo y Relaciones familiares",
+                    "Gráfico 2 de 2 – Desplazamiento vivienda – trabajo – vivienda")), titulos.toString());
             assertTrue(titulos.containsAll(List.of("Gráfico 1 de 2 – BOGOTA, D.C. y CALI", "Gráfico 2 de 2 – Otras ciudades",
                     "Gráfico 1 de 2 – Ventas y Operaciones", "Gráfico 2 de 2 – Dirección")), titulos.toString());
             XWPFChart dominios = doc.getCharts().stream()
@@ -134,11 +142,11 @@ class DocxInformeEmpresaGeneratorTest {
                     .filter(t -> t.getRow(0).getCell(0).getText().equals("Ciudad de trabajo")
                             && t.getRow(0).getTableCells().size() == 7)
                     .toList();
-            assertEquals(2, tablasCiudad.size(), "intralaboral y estrés por ciudad");
+            assertEquals(3, tablasCiudad.size(), "intralaboral, extralaboral y estrés por ciudad");
             assertEquals(List.of("Riesgo bajo", "Riesgo alto"), List.of(tablasCiudad.get(0).getRow(0).getCell(2).getText(),
                     tablasCiudad.get(0).getRow(0).getCell(3).getText()));
-            assertEquals(List.of("Bajo", "Alto"), List.of(tablasCiudad.get(1).getRow(0).getCell(2).getText(),
-                    tablasCiudad.get(1).getRow(0).getCell(3).getText()), "estrés con las etiquetas del manual");
+            assertEquals(List.of("Bajo", "Alto"), List.of(tablasCiudad.get(2).getRow(0).getCell(2).getText(),
+                    tablasCiudad.get(2).getRow(0).getCell(3).getText()), "estrés con las etiquetas del manual");
             List<Double> riesgoAlto = doc.getCharts().stream()
                     .filter(g -> categorias(g).equals(List.of("Riesgo bajo", "Riesgo alto")))
                     .map(g -> g.getChartSeries().get(0).getSeries(0).getValuesData().getPointAt(1).doubleValue())
@@ -153,7 +161,7 @@ class DocxInformeEmpresaGeneratorTest {
                 "Riesgo alto", "66,7 %", "Nivel de síntomas de estrés", "Alto", "TOTAL", "100 %",
                 "5. CONCENTRACIÓN DEL RIESGO INTRALABORAL (FORMAS A Y B)", "DOMINIOS INTRALABORALES",
                 "POR CIUDAD DE TRABAJO (REGIONALES)", "POR ÁREA", "Nivel de riesgo intralaboral total, ordenado",
-                "6. SÍNTOMAS DE ESTRÉS", "FRECUENCIA DE SÍNTOMAS POR DIMENSIÓN", "no trae baremos por dimensión", "no sobre las personas",
+                "7. SÍNTOMAS DE ESTRÉS", "FRECUENCIA DE SÍNTOMAS POR DIMENSIÓN", "no trae baremos por dimensión", "no sobre las personas",
                 "\"Otras ciudades\" reúne 4 ciudades con menos de 2 personas evaluadas",
                 "1 persona no se muestra para proteger la confidencialidad: pertenecen a áreas con menos de 2 personas",
                 "Nivel de síntomas de estrés, ordenado", "4. RESULTADOS INTRALABORALES – FORMA A (3 PERSONAS)", "RANKING DE DOMINIOS", "Recompensas",
@@ -164,10 +172,10 @@ class DocxInformeEmpresaGeneratorTest {
         }
         assertTrue(texto.indexOf("CONCENTRACIÓN DEL RIESGO") > texto.indexOf("FORMA A – LIDERAZGO"),
                 "las secciones nuevas van al final, después de las fichas");
-        assertTrue(texto.indexOf("6. SÍNTOMAS DE ESTRÉS") > texto.indexOf("5. CONCENTRACIÓN DEL RIESGO INTRALABORAL"),
+        assertTrue(texto.indexOf("7. SÍNTOMAS DE ESTRÉS") > texto.indexOf("5. CONCENTRACIÓN DEL RIESGO INTRALABORAL"),
                 "estrés va en su propia sección, después de la intralaboral");
-        assertTrue(texto.indexOf("8. CONCLUSIONES DEL PROFESIONAL") > texto.indexOf("6. SÍNTOMAS DE ESTRÉS")
-                && texto.indexOf("9. PLAN DE ACCIÓN") > texto.indexOf("8. CONCLUSIONES DEL PROFESIONAL"),
+        assertTrue(texto.indexOf("9. CONCLUSIONES DEL PROFESIONAL") > texto.indexOf("7. SÍNTOMAS DE ESTRÉS")
+                && texto.indexOf("10. PLAN DE ACCIÓN") > texto.indexOf("9. CONCLUSIONES DEL PROFESIONAL"),
                 "conclusiones y plan de acción al final");
         for (String esperado : List.of("Escriba aquí las conclusiones del profesional.", "ACCIONES A CORTO PLAZO",
                 "ACCIONES A MEDIANO PLAZO", "ACCIONES A LARGO PLAZO", "Escriba aquí las acciones a largo plazo.",
@@ -179,14 +187,19 @@ class DocxInformeEmpresaGeneratorTest {
                 "intralaboral forma A (jefes, profesionales y técnicos)", "cuestionario de factores de riesgo psicosocial extralaboral y "
                         + "cuestionario para la evaluación del estrés, tercera versión.",
                 "4 personas esperadas, 3 evaluadas (75,0 %)", "menos de 2 personas evaluadas no se muestran por separado",
-                "2. POBLACIÓN EVALUADA", "3. RESULTADOS GLOBALES", "7. INTERPRETACIÓN DE LOS NIVELES",
+                "2. POBLACIÓN EVALUADA", "3. RESULTADOS GLOBALES", "8. INTERPRETACIÓN DE LOS NIVELES",
                 "NIVELES DE RIESGO PSICOSOCIAL (INTRALABORAL Y EXTRALABORAL)", "requieren intervención inmediata", "Nivel de riesgo con amplia posibilidad",
                 "NIVELES DE SÍNTOMAS DE ESTRÉS", "Muy bajo")) {
             assertTrue(texto.contains(esperado), "falta: " + esperado);
         }
+        assertTrue(texto.contains("6. FACTORES DE RIESGO EXTRALABORALES") && texto.contains("DIMENSIONES EXTRALABORALES")
+                && texto.contains("Nivel de riesgo extralaboral total, ordenado"), "sección extralaboral");
+        assertTrue(texto.indexOf("6. FACTORES DE RIESGO EXTRALABORALES") > texto.indexOf("5. CONCENTRACIÓN DEL RIESGO INTRALABORAL")
+                && texto.indexOf("6. FACTORES DE RIESGO EXTRALABORALES") < texto.indexOf("7. SÍNTOMAS DE ESTRÉS"),
+                "el extralaboral va antes del estrés");
         assertTrue(texto.indexOf("1. INTRODUCCIÓN") < texto.indexOf("2. POBLACIÓN EVALUADA"), "la introducción va al inicio");
-        assertTrue(texto.indexOf("7. INTERPRETACIÓN DE LOS NIVELES") > texto.indexOf("6. SÍNTOMAS DE ESTRÉS")
-                && texto.indexOf("7. INTERPRETACIÓN DE LOS NIVELES") < texto.indexOf("8. CONCLUSIONES DEL PROFESIONAL"),
+        assertTrue(texto.indexOf("8. INTERPRETACIÓN DE LOS NIVELES") > texto.indexOf("7. SÍNTOMAS DE ESTRÉS")
+                && texto.indexOf("8. INTERPRETACIÓN DE LOS NIVELES") < texto.indexOf("9. CONCLUSIONES DEL PROFESIONAL"),
                 "la interpretación va antes de las conclusiones");
         assertFalse(texto.contains("muy alto +") || texto.contains("Alto + muy alto"), "no se suman niveles");
     }

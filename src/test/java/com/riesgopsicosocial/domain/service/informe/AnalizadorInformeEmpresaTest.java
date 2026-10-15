@@ -325,6 +325,49 @@ class AnalizadorInformeEmpresaTest {
     }
 
     @Test
+    void extralaboral_rankingDeDimensionesYTotalPorCiudadYArea() {
+        DimensionInforme vivienda = new DimensionInforme(40L, "Características de la vivienda", null);
+        DimensionInforme desplazamiento = new DimensionInforme(42L, "Desplazamiento", null);
+        CuestionarioInforme extra = new CuestionarioInforme(3L, "C", MetodoCalculo.SUMA_DIRECTA,
+                List.of(new DominioInforme(9L, 5L, "Condiciones extralaborales", List.of(vivienda, desplazamiento))));
+        AnalizadorInformeEmpresa conExtra = new AnalizadorInformeEmpresa(List.of(FORMA_A, extra), NIVELES);
+        CiudadTrabajo bogota = new CiudadTrabajo(1L, "BOGOTA, D.C.");
+        List<ParticipanteEmpresa> participantes = List.of(
+                enGrupo(1L, "Ventas", bogota, resultado(extralaboral(extra, MEDIO, BAJO, MUY_ALTO))),
+                enGrupo(2L, "Ventas", bogota, resultado(extralaboral(extra, ALTO, ALTO, BAJO))),
+                enGrupo(3L, "Ventas", new CiudadTrabajo(2L, "CALI"), resultado(extralaboral(extra, BAJO, BAJO, SIN_RIESGO))),
+                enGrupo(4L, "Ventas", bogota, resultado(intra(FORMA_A, ALTO, ALTO, ALTO))));   // sin extralaboral
+
+        ResultadosExtralaborales resultados = conExtra.extralaboral(participantes);
+
+        // Desplazamiento tiene muy alto: va primero aunque en el cuestionario esté después.
+        assertEquals(List.of("Desplazamiento", "Características de la vivienda"),
+                resultados.dimensiones().stream().map(DistribucionDimension::nombre).toList());
+        assertEquals(List.of(1, 1, 0, 0, 1), cantidades(resultados.dimensiones().get(0).distribucion()));
+        assertEquals(List.of(0, 2, 0, 1, 0), cantidades(resultados.dimensiones().get(1).distribucion()));
+
+        // Cali (1) es el único grupo pequeño: se omite.
+        assertEquals(List.of("BOGOTA, D.C."), resultados.porCiudad().grupos().stream().map(DistribucionGrupo::grupo).toList());
+        assertEquals(List.of(0, 0, 1, 1, 0), cantidades(resultados.porCiudad().grupos().get(0).distribucion()));
+        assertEquals(1, resultados.porCiudad().omitidos());
+        assertEquals(3, resultados.porArea().grupos().get(0).distribucion().total());
+    }
+
+    /** Resultado extralaboral con su total y el nivel de cada dimensión, en el orden del cuestionario. */
+    private static ResultadoCuestionario extralaboral(CuestionarioInforme forma, NivelRiesgo total,
+                                                      NivelRiesgo... nivelesDimensiones) {
+        DominioInforme dominio = forma.dominios().get(0);
+        List<ResultadoDimension> dimensiones = new ArrayList<>();
+        for (int i = 0; i < nivelesDimensiones.length; i++) {
+            DimensionInforme dimension = dominio.dimensiones().get(i);
+            dimensiones.add(new ResultadoDimension(dimension.idDimensionCuestionario(), dominio.idDominioCuestionario(),
+                    dimension.nombre(), bd("0"), bd("0"), nivelesDimensiones[i]));
+        }
+        return new ResultadoCuestionario(forma.idCuestionario(), forma.forma(), bd("0"), bd("0"), total, List.of(),
+                dimensiones);
+    }
+
+    @Test
     void cuestionarioSinConfiguracion_lanzaReglaNegocio() {
         CuestionarioInforme desconocido = new CuestionarioInforme(99L, "Z", MetodoCalculo.SUMA_DIRECTA, List.of());
         List<ParticipanteEmpresa> participantes = List.of(participante(1L, null, resultado(total(desconocido, BAJO))));

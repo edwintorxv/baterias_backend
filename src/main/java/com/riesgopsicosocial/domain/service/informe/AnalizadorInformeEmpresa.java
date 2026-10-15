@@ -87,10 +87,7 @@ public class AnalizadorInformeEmpresa {
      * Un análisis por área, de la de más personas esperadas a la de menos (empate: por nombre).
      */
     public List<AnalisisArea> analizarPorArea(List<ParticipanteEmpresa> participantes) {
-        Map<String, List<ParticipanteEmpresa>> porArea = participantes.stream()
-                .collect(Collectors.groupingBy(p -> claveArea(p.area()), LinkedHashMap::new, Collectors.toList()));
-
-        return porArea.values().stream()
+        return porArea(participantes).stream()
                 .map(grupo -> new AnalisisArea(nombreArea(grupo), analizar(grupo)))
                 .sorted(Comparator.comparingInt((AnalisisArea a) -> a.analisis().cobertura().esperados()).reversed()
                         .thenComparing(AnalisisArea::area))
@@ -123,17 +120,56 @@ public class AnalizadorInformeEmpresa {
                 .sorted(Comparator.comparing(DominioConsolidado::distribucion, DistribucionNiveles.masCriticaPrimero()))
                 .toList();
 
-        Map<Optional<Long>, List<ParticipanteEmpresa>> porCiudad = participantes.stream()
-                .collect(Collectors.groupingBy(p -> Optional.ofNullable(p.ciudad()).map(CiudadTrabajo::id),
-                        LinkedHashMap::new, Collectors.toList()));
-        Map<String, List<ParticipanteEmpresa>> porArea = participantes.stream()
-                .collect(Collectors.groupingBy(p -> claveArea(p.area()), LinkedHashMap::new, Collectors.toList()));
+        Collection<List<ParticipanteEmpresa>> porCiudad = porCiudad(participantes);
+        Collection<List<ParticipanteEmpresa>> porArea = porArea(participantes);
 
         return new ConcentracionRiesgo(dominios,
-                desglose(porCiudad.values(), AnalizadorInformeEmpresa::nombreCiudad, MetodoCalculo.SUMA_POR_DOMINIOS, OTRAS_CIUDADES),
-                desglose(porArea.values(), AnalizadorInformeEmpresa::nombreArea, MetodoCalculo.SUMA_POR_DOMINIOS, OTRAS_AREAS),
-                desglose(porCiudad.values(), AnalizadorInformeEmpresa::nombreCiudad, MetodoCalculo.PROMEDIO_PONDERADO, OTRAS_CIUDADES),
-                desglose(porArea.values(), AnalizadorInformeEmpresa::nombreArea, MetodoCalculo.PROMEDIO_PONDERADO, OTRAS_AREAS));
+                desglose(porCiudad, AnalizadorInformeEmpresa::nombreCiudad, MetodoCalculo.SUMA_POR_DOMINIOS, OTRAS_CIUDADES),
+                desglose(porArea, AnalizadorInformeEmpresa::nombreArea, MetodoCalculo.SUMA_POR_DOMINIOS, OTRAS_AREAS),
+                desglose(porCiudad, AnalizadorInformeEmpresa::nombreCiudad, MetodoCalculo.PROMEDIO_PONDERADO, OTRAS_CIUDADES),
+                desglose(porArea, AnalizadorInformeEmpresa::nombreArea, MetodoCalculo.PROMEDIO_PONDERADO, OTRAS_AREAS));
+    }
+
+    /**
+     * Factores extralaborales: ranking de las dimensiones del cuestionario extralaboral y nivel total
+     * por ciudad de trabajo y por área (con los grupos pequeños protegidos).
+     */
+    public ResultadosExtralaborales extralaboral(List<ParticipanteEmpresa> participantes) {
+        List<ResultadoCuestionario> resultados = resultadosPorMetodo(participantes, MetodoCalculo.SUMA_DIRECTA);
+        List<DistribucionDimension> dimensiones = cuestionarios.stream()
+                .filter(c -> c.metodoCalculo() == MetodoCalculo.SUMA_DIRECTA)
+                .flatMap(c -> c.dominios().stream())
+                .flatMap(d -> d.dimensiones().stream())
+                .map(d -> new DistribucionDimension(d.idDimensionCuestionario(), d.nombre(), distribuir(
+                        resultados.stream()
+                                .flatMap(rc -> rc.dimensiones().stream())
+                                .filter(rd -> rd.idDimensionCuestionario().equals(d.idDimensionCuestionario()))
+                                .map(ResultadoDimension::nivelRiesgo)
+                                .toList())))
+                .filter(d -> d.distribucion().total() > 0)
+                .sorted(Comparator.comparing(DistribucionDimension::distribucion, DistribucionNiveles.masCriticaPrimero()))
+                .toList();
+
+        Collection<List<ParticipanteEmpresa>> porCiudad = porCiudad(participantes);
+        Collection<List<ParticipanteEmpresa>> porArea = porArea(participantes);
+        return new ResultadosExtralaborales(dimensiones,
+                desglose(porCiudad, AnalizadorInformeEmpresa::nombreCiudad, MetodoCalculo.SUMA_DIRECTA, OTRAS_CIUDADES),
+                desglose(porArea, AnalizadorInformeEmpresa::nombreArea, MetodoCalculo.SUMA_DIRECTA, OTRAS_AREAS));
+    }
+
+    /** Personas agrupadas por ciudad de trabajo (por id: hay municipios homónimos); sin ciudad = un grupo. */
+    private static Collection<List<ParticipanteEmpresa>> porCiudad(List<ParticipanteEmpresa> participantes) {
+        return participantes.stream()
+                .collect(Collectors.groupingBy(p -> Optional.ofNullable(p.ciudad()).map(CiudadTrabajo::id),
+                        LinkedHashMap::new, Collectors.toList()))
+                .values();
+    }
+
+    /** Personas agrupadas por área, sin distinguir mayúsculas, tildes ni espacios repetidos. */
+    private static Collection<List<ParticipanteEmpresa>> porArea(List<ParticipanteEmpresa> participantes) {
+        return participantes.stream()
+                .collect(Collectors.groupingBy(p -> claveArea(p.area()), LinkedHashMap::new, Collectors.toList()))
+                .values();
     }
 
     /** Niveles que obtuvo cada persona de un grupo en una prueba. */
