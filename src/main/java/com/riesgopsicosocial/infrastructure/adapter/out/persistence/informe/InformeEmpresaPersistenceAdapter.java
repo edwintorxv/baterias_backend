@@ -7,13 +7,16 @@ import com.riesgopsicosocial.domain.model.informe.empresa.CiudadTrabajo;
 import com.riesgopsicosocial.domain.model.informe.empresa.CuestionarioInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.DimensionInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.DominioInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.PersonaCargada;
+import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
 import com.riesgopsicosocial.domain.model.resultado.NivelRiesgo;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoCuestionario;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoDimension;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoDominio;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.FiltrosAplicacion;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.MetodoCalculo;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.ciudadmunicipio.CiudadMunicipioEntity;
@@ -31,6 +34,7 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.dominiocuest
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.dominiocuestionario.DominioCuestionarioJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.opcionrespuesta.OpcionRespuestaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.respuesta.RespuestaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultado.CatalogoCalculoLoader;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadocuestionario.ResultadoCuestionarioEntity;
@@ -65,6 +69,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
     private final DimensionCuestionarioJpaRepository dimensionCuestionarioRepository;
     private final DimensionJpaRespository dimensionRepository;
     private final CiudadMunicipioJpaResository ciudadRepository;
+    private final OpcionRespuestaJpaRepository opcionRespuestaRepository;
     private final CatalogoCalculoLoader catalogo;
 
     public InformeEmpresaPersistenceAdapter(ClienteJpaRepository clienteRepository,
@@ -80,6 +85,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                                             DimensionCuestionarioJpaRepository dimensionCuestionarioRepository,
                                             DimensionJpaRespository dimensionRepository,
                                             CiudadMunicipioJpaResository ciudadRepository,
+                                            OpcionRespuestaJpaRepository opcionRespuestaRepository,
                                             CatalogoCalculoLoader catalogo) {
         this.clienteRepository = clienteRepository;
         this.evaluadoClienteRepository = evaluadoClienteRepository;
@@ -94,6 +100,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         this.dimensionCuestionarioRepository = dimensionCuestionarioRepository;
         this.dimensionRepository = dimensionRepository;
         this.ciudadRepository = ciudadRepository;
+        this.opcionRespuestaRepository = opcionRespuestaRepository;
         this.catalogo = catalogo;
     }
 
@@ -173,7 +180,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         Map<Long, List<DominioInforme>> dominiosPorCuestionario = dominioCuestionarioRepository.findAll().stream()
                 .sorted(Comparator.comparing(DominioCuestionarioEntity::getId))
                 .collect(Collectors.groupingBy(DominioCuestionarioEntity::getFkCuestionario,
-                        Collectors.mapping(dc -> new DominioInforme(dc.getId(), nombresDominio.get(dc.getFkDominio()),
+                        Collectors.mapping(dc -> new DominioInforme(dc.getId(), dc.getFkDominio(), nombresDominio.get(dc.getFkDominio()),
                                         dimensionesPorDominio.getOrDefault(
                                                 List.of(dc.getFkCuestionario(), dc.getFkDominio()), List.of())),
                                 Collectors.toList())));
@@ -189,6 +196,24 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
     public List<NivelRiesgo> buscarNiveles() {
         return catalogo.cargarNiveles().values().stream()
                 .sorted(Comparator.comparing(NivelRiesgo::id))
+                .toList();
+    }
+
+    @Override
+    public List<RespuestaSintoma> buscarRespuestasEstres(Collection<Long> idsAplicacion) {
+        if (idsAplicacion.isEmpty()) {
+            return List.of();
+        }
+        return respuestaRepository.buscarPorMetodoCalculo(idsAplicacion, MetodoCalculo.PROMEDIO_PONDERADO).stream()
+                .map(r -> new RespuestaSintoma(r.getFkAplicacion(), r.getFkPregunta(), r.getFkDimensionCuestionario(),
+                        r.getFkOpcionRespuesta()))
+                .toList();
+    }
+
+    @Override
+    public List<OpcionFrecuencia> buscarOpcionesEstres() {
+        return opcionRespuestaRepository.buscarPorMetodoCalculo(MetodoCalculo.PROMEDIO_PONDERADO).stream()
+                .map(o -> new OpcionFrecuencia(o.getId(), o.getNombre()))
                 .toList();
     }
 

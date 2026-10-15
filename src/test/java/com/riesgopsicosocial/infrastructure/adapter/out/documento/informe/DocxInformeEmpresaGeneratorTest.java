@@ -34,6 +34,13 @@ class DocxInformeEmpresaGeneratorTest {
         return new DistribucionDimension((long) numero, "Dimensión " + numero, dos);
     }
 
+    /** Dimensión de estrés con 10 respuestas entre Siempre y Nunca. */
+    private static FrecuenciaDimension frecuencia(String nombre, String siempre, String nunca) {
+        return new FrecuenciaDimension(1L, nombre, 5, 2, 10, List.of(
+                new ConteoFrecuencia(new OpcionFrecuencia(1L, "Siempre"), 0, new BigDecimal(siempre)),
+                new ConteoFrecuencia(new OpcionFrecuencia(5L, "Nunca"), 0, new BigDecimal(nunca))));
+    }
+
     @Test
     void generaWordConCoberturaResultadosGlobalesDominiosYFichasDeDimensiones() throws Exception {
         DistribucionNiveles distribucion = new DistribucionNiveles(3, List.of(
@@ -48,7 +55,15 @@ class DocxInformeEmpresaGeneratorTest {
                                 new DistribucionDimension(100L, "Reconocimiento y compensación", distribucion))),
                         new DistribucionDominio(11L, "Liderazgo", distribucion, List.of(
                                 dimension(5), dimension(4), dimension(3), dimension(2), dimension(1)))))));
-        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general);
+        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general,
+                new ConcentracionRiesgo(List.of(new DominioConsolidado(1L, "Liderazgo", distribucion)),
+                        List.of(new DistribucionGrupo("BOGOTA, D.C.", distribucion, distribucion), new DistribucionGrupo("CALI", distribucion, distribucion),
+                                new DistribucionGrupo("MEDELLIN", distribucion, distribucion)),
+                        List.of(new DistribucionGrupo("Ventas", distribucion, distribucion), new DistribucionGrupo("Operaciones", distribucion, distribucion),
+                                new DistribucionGrupo("Dirección", distribucion, distribucion))),
+                new SintomasEstres(3, List.of(
+                        frecuencia("Síntomas psicoemocionales", "40.0", "60.0"),
+                        frecuencia("Síntomas fisiológicos", "10.0", "90.0"))));
 
         byte[] word = new DocxInformeEmpresaGenerator().generar(informe, LocalDate.of(2026, 10, 13));
 
@@ -57,9 +72,11 @@ class DocxInformeEmpresaGeneratorTest {
              XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
             texto = extractor.getText();
             // Intralaboral, extralaboral, estrés, ranking de dominios y una ficha por dimensión (6).
+            // Al final, la sección intralaboral con A y B juntas: dominios (1), por ciudad (2) y por área (2),
+            // de a 2 grupos por gráfico; y la de estrés: frecuencia por dimensión (1), por ciudad (2) y por área (2).
             // La población por ciudad y el resumen de dimensiones no llevan gráfico.
             // getCharts() no garantiza el orden del documento: se identifican por sus categorías.
-            assertEquals(10, doc.getCharts().size());
+            assertEquals(20, doc.getCharts().size());
             List<List<String>> categorias = doc.getCharts().stream().map(DocxInformeEmpresaGeneratorTest::categorias).toList();
             assertEquals(8, categorias.stream().filter(List.of("Riesgo bajo", "Riesgo alto")::equals).count(),
                     "intralaboral, extralaboral y las 6 fichas usan el gráfico de barras por nivel");
@@ -75,6 +92,51 @@ class DocxInformeEmpresaGeneratorTest {
             long fichas = doc.getTables().stream()
                     .filter(t -> t.getNumberOfRows() == 2 && t.getRow(0).getTableCells().size() == 5).count();
             assertEquals(6, fichas);
+
+            assertTrue(categorias.contains(List.of("Liderazgo")), "dominios con A y B juntas");
+            assertEquals(2, categorias.stream().filter(List.of("BOGOTA, D.C. (3)", "CALI (3)")::equals).count(),
+                    "por ciudad, de a 2 y con su N: intralaboral y estrés");
+            assertTrue(categorias.contains(List.of("MEDELLIN (3)")), "la ciudad que sobra va en su propio gráfico");
+            assertTrue(categorias.contains(List.of("Ventas (3)", "Operaciones (3)")), "por área, de a 2 y con su N");
+            assertTrue(categorias.contains(List.of("Dirección (3)")), "el área que sobra va en su propio gráfico");
+            XWPFChart frecuencias = doc.getCharts().stream()
+                    .filter(g -> categorias(g).equals(List.of("Síntomas psicoemocionales", "Síntomas fisiológicos")))
+                    .findFirst().orElseThrow();
+            assertEquals("Siempre", frecuencias.getCTChart().getPlotArea().getBarChartArray(0).getSerArray(0)
+                    .getTx().getStrRef().getStrCache().getPtArray(0).getV(), "una barra por frecuencia");
+            XWPFTable tablaFrecuencias = doc.getTables().stream()
+                    .filter(t -> t.getRow(0).getCell(0).getText().equals("Dimensión")
+                            && t.getRow(0).getCell(1).getText().equals("Respuestas (personas × ítems)"))
+                    .findFirst().orElseThrow();
+            assertEquals("10 (5 × 2)", tablaFrecuencias.getRow(1).getCell(1).getText(), "muestra de dónde sale la base");
+            assertEquals("E53935", tablaFrecuencias.getRow(0).getCell(2).getColor(), "Siempre en rojo");
+            assertEquals("00B050", tablaFrecuencias.getRow(0).getCell(3).getColor(), "Nunca en verde");
+            List<String> titulos = doc.getCharts().stream()
+                    .filter(g -> g.getTitle() != null)
+                    .map(g -> g.getTitle().getBody().getParagraph(0).getText())
+                    .toList();
+            assertEquals(8, titulos.size(), "solo los gráficos por ciudad y por área llevan título");
+            assertTrue(titulos.containsAll(List.of("Gráfico 1 de 2 – BOGOTA, D.C. y CALI", "Gráfico 2 de 2 – MEDELLIN",
+                    "Gráfico 1 de 2 – Ventas y Operaciones", "Gráfico 2 de 2 – Dirección")), titulos.toString());
+            XWPFChart dominios = doc.getCharts().stream()
+                    .filter(g -> categorias(g).equals(List.of("Recompensas", "Liderazgo"))).findFirst().orElseThrow();
+            assertEquals("0\" %\";;", dominios.getCTChart().getPlotArea().getBarChartArray(0).getSerArray(0)
+                    .getDLbls().getNumFmt().getFormatCode(), "los 0 % no llevan etiqueta");
+            XWPFTable porCiudad = doc.getTables().stream()
+                    .filter(t -> t.getRow(0).getCell(0).getText().equals("Ciudad de trabajo")
+                            && t.getRow(0).getTableCells().size() == 7)
+                    .findFirst().orElseThrow();
+            assertEquals(List.of("BOGOTA, D.C.", "3", "33,3 %", "66,7 %", "", "", ""),
+                    porCiudad.getRow(1).getTableCells().stream().map(c -> c.getText()).toList());
+            List<XWPFTable> tablasCiudad = doc.getTables().stream()
+                    .filter(t -> t.getRow(0).getCell(0).getText().equals("Ciudad de trabajo")
+                            && t.getRow(0).getTableCells().size() == 7)
+                    .toList();
+            assertEquals(2, tablasCiudad.size(), "intralaboral y estrés por ciudad");
+            assertEquals(List.of("Riesgo bajo", "Riesgo alto"), List.of(tablasCiudad.get(0).getRow(0).getCell(2).getText(),
+                    tablasCiudad.get(0).getRow(0).getCell(3).getText()));
+            assertEquals(List.of("Bajo", "Alto"), List.of(tablasCiudad.get(1).getRow(0).getCell(2).getText(),
+                    tablasCiudad.get(1).getRow(0).getCell(3).getText()), "estrés con las etiquetas del manual");
             List<Double> riesgoAlto = doc.getCharts().stream()
                     .filter(g -> categorias(g).equals(List.of("Riesgo bajo", "Riesgo alto")))
                     .map(g -> g.getChartSeries().get(0).getSeries(0).getValuesData().getPointAt(1).doubleValue())
@@ -87,12 +149,28 @@ class DocxInformeEmpresaGeneratorTest {
                 "2 personas respondieron", "FACTORES DE RIESGO PSICOSOCIAL INTRALABORALES",
                 "FACTORES DE RIESGO PSICOSOCIAL EXTRALABORALES", "VALORACIÓN DEL ESTRÉS",
                 "Riesgo alto", "66,7 %", "Nivel de síntomas de estrés", "Alto", "TOTAL", "100 %",
-                "3. RESULTADOS INTRALABORALES – FORMA A (3 PERSONAS)", "RANKING DE DOMINIOS", "Recompensas",
+                "4. CONCENTRACIÓN DEL RIESGO INTRALABORAL (FORMAS A Y B)", "DOMINIOS INTRALABORALES",
+                "POR CIUDAD DE TRABAJO (REGIONALES)", "POR ÁREA", "Nivel de riesgo intralaboral total, ordenado",
+                "5. SÍNTOMAS DE ESTRÉS", "FRECUENCIA DE SÍNTOMAS POR DIMENSIÓN", "no trae baremos por dimensión", "no sobre las personas",
+                "Nivel de síntomas de estrés, ordenado", "3. RESULTADOS INTRALABORALES – FORMA A (3 PERSONAS)", "RANKING DE DOMINIOS", "Recompensas",
                 "RANKING DE DIMENSIONES", "primero el de mayor porcentaje de personas en riesgo muy alto", "FORMA A – LIDERAZGO",
                 "RECONOCIMIENTO Y COMPENSACIÓN", "Forma A · 3 personas", "DIMENSIÓN 5", "Forma A · 2 personas",
                 "1 (50,0 %)", "Depende de una pregunta filtro")) {
             assertTrue(texto.contains(esperado), "falta: " + esperado);
         }
+        assertTrue(texto.indexOf("CONCENTRACIÓN DEL RIESGO") > texto.indexOf("FORMA A – LIDERAZGO"),
+                "las secciones nuevas van al final, después de las fichas");
+        assertTrue(texto.indexOf("5. SÍNTOMAS DE ESTRÉS") > texto.indexOf("4. CONCENTRACIÓN DEL RIESGO INTRALABORAL"),
+                "estrés va en su propia sección, después de la intralaboral");
+        assertTrue(texto.indexOf("6. CONCLUSIONES DEL PROFESIONAL") > texto.indexOf("5. SÍNTOMAS DE ESTRÉS")
+                && texto.indexOf("7. PLAN DE ACCIÓN") > texto.indexOf("6. CONCLUSIONES DEL PROFESIONAL"),
+                "conclusiones y plan de acción al final");
+        for (String esperado : List.of("Escriba aquí las conclusiones del profesional.", "ACCIONES A CORTO PLAZO",
+                "ACCIONES A MEDIANO PLAZO", "ACCIONES A LARGO PLAZO", "Escriba aquí las acciones a largo plazo.",
+                "PROFESIONAL RESPONSABLE", "No. tarjeta profesional", "Firma del profesional")) {
+            assertTrue(texto.contains(esperado), "falta: " + esperado);
+        }
+        assertTrue(texto.lastIndexOf("Firma del profesional") > texto.indexOf("ACCIONES A LARGO PLAZO"));
         assertFalse(texto.contains("muy alto +") || texto.contains("Alto + muy alto"), "no se suman niveles");
     }
 

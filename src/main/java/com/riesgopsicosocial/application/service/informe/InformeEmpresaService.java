@@ -47,7 +47,12 @@ public class InformeEmpresaService implements ConsultarInformeEmpresaUseCase {
 
         AnalizadorInformeEmpresa analizador = new AnalizadorInformeEmpresa(
                 informeEmpresaPort.buscarCuestionarios(), informeEmpresaPort.buscarNiveles());
-        return new InformeEmpresa(cliente, anio, analizador.analizar(participantes));
+        // Frecuencia de síntomas: solo las respuestas de las aplicaciones que dan el resultado de estrés.
+        List<RespuestaSintoma> respuestasEstres = informeEmpresaPort.buscarRespuestasEstres(
+                analizador.aplicacionesConEstres(participantes));
+        return new InformeEmpresa(cliente, anio, analizador.analizar(participantes),
+                analizador.concentracionRiesgo(participantes),
+                analizador.sintomasEstres(participantes, respuestasEstres, informeEmpresaPort.buscarOpcionesEstres()));
     }
 
     @Override

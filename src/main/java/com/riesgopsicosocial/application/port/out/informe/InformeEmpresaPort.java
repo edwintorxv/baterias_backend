@@ -3,9 +3,12 @@ package com.riesgopsicosocial.application.port.out.informe;
 import com.riesgopsicosocial.domain.model.informe.DatosCliente;
 import com.riesgopsicosocial.domain.model.informe.empresa.AplicacionEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.CuestionarioInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.PersonaCargada;
+import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
 import com.riesgopsicosocial.domain.model.resultado.NivelRiesgo;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,5 +33,11 @@ public interface InformeEmpresaPort {
 
     /** Niveles de riesgo en orden (1 a 5). */
     List<NivelRiesgo> buscarNiveles();
+
+    /** Respuestas de esas aplicaciones a los ítems del cuestionario de estrés, cargadas en bloque. */
+    List<RespuestaSintoma> buscarRespuestasEstres(Collection<Long> idsAplicacion);
+
+    /** Opciones de respuesta del cuestionario de estrés, de la más frecuente (Siempre) a la menos (Nunca). */
+    List<OpcionFrecuencia> buscarOpcionesEstres();
 
 }

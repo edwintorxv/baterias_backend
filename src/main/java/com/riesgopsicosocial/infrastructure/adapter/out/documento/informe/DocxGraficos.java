@@ -6,6 +6,9 @@ import org.apache.poi.xddf.usermodel.XDDFColor;
 import org.apache.poi.xddf.usermodel.XDDFLineProperties;
 import org.apache.poi.xddf.usermodel.XDDFSolidFillProperties;
 import org.apache.poi.xddf.usermodel.chart.*;
+import org.apache.poi.xddf.usermodel.text.XDDFRunProperties;
+import org.apache.poi.xddf.usermodel.text.XDDFTextParagraph;
+import org.apache.poi.xddf.usermodel.text.XDDFTextRun;
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
 import org.apache.poi.xwpf.usermodel.XWPFChart;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -30,7 +33,9 @@ final class DocxGraficos {
     /** Unos 6,5 cm de alto. */
     private static final int ALTO = 2_340_000;
     /** Unos 8 cm: los gráficos agrupados llevan leyenda y nombres largos en el eje X. */
-    private static final int ALTO_AGRUPADO = 2_880_000;
+    static final int ALTO_AGRUPADO = 2_880_000;
+    /** Unos 6 cm: gráficos de pocos grupos (ciudades, áreas), que se repiten varios seguidos. */
+    static final int ALTO_COMPACTO = 2_160_000;
 
     private DocxGraficos() {
     }
@@ -54,19 +59,30 @@ final class DocxGraficos {
         grafico.plot(datos);
     }
 
+    static void barrasAgrupadas(XWPFDocument doc, String[] categorias, List<Serie> series) {
+        barrasAgrupadas(doc, categorias, series, null, ALTO_AGRUPADO);
+    }
+
     /**
      * Barras agrupadas: por cada categoría, una barra por serie lado a lado (p. ej. un grupo por
      * dominio con una barra por nivel), con leyenda abajo. Los valores van sin decimales y en letra
-     * pequeña para que quepan; el detalle queda en la tabla.
+     * pequeña para que quepan, y los 0 % no se rotulan; el detalle queda en la tabla.
+     *
+     * @param titulo título dentro del gráfico (editable en Word y se copia con él); null = sin título
+     * @param alto   alto en EMU ({@link #ALTO_AGRUPADO}, {@link #ALTO_COMPACTO})
      */
-    static void barrasAgrupadas(XWPFDocument doc, String[] categorias, List<Serie> series) {
-        XWPFChart grafico = grafico(doc, ALTO_AGRUPADO);
+    static void barrasAgrupadas(XWPFDocument doc, String[] categorias, List<Serie> series, String titulo, int alto) {
+        XWPFChart grafico = grafico(doc, alto);
+        if (titulo != null) {
+            titulo(grafico, titulo);
+        }
         XDDFBarChartData datos = datos(grafico, 80);
         for (int i = 0; i < series.size(); i++) {
             XDDFBarChartData.Series barras = agregarSerie(grafico, datos, categorias, series.get(i), i + 1);
             barras.setFillProperties(relleno(series.get(i).color()));
             barras.setLineProperties(linea(BORDE));
-            etiquetasDeValor(barras, "0\" %\"", 700);
+            // Formato con secciones vacías para cero y negativos: los 0 % no llevan etiqueta.
+            etiquetasDeValor(barras, "0\" %\";;", 700);
         }
         grafico.plot(datos);
         grafico.getOrAddLegend().setPosition(LegendPosition.BOTTOM);
@@ -81,6 +97,21 @@ final class DocxGraficos {
         } catch (IOException | InvalidFormatException e) {
             throw new UncheckedIOException("No se pudo crear el gráfico del informe",
                     e instanceof IOException io ? io : new IOException(e));
+        }
+    }
+
+    /** Título de 10 pt en negrilla, arriba y sin montarse sobre las barras. */
+    private static void titulo(XWPFChart grafico, String titulo) {
+        grafico.setAutoTitleDeleted(false);
+        grafico.setTitleText(titulo);
+        grafico.setTitleOverlay(false);
+        XDDFTextParagraph parrafo = grafico.getTitle().getBody().getParagraph(0);
+        XDDFRunProperties formato = parrafo.addDefaultRunProperties();
+        formato.setFontSize(10.0);
+        formato.setBold(true);
+        for (XDDFTextRun run : parrafo.getTextRuns()) {
+            run.setFontSize(10.0);
+            run.setBold(true);
         }
     }
 

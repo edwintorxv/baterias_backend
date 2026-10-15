@@ -36,6 +36,8 @@ import java.util.stream.Collectors;
  *   <li>Cobertura por ciudad de trabajo: se agrupa por id de ciudad; sin ciudad = "Sin ciudad".</li>
  *   <li>Áreas: se agrupan sin distinguir mayúsculas, tildes ni espacios repetidos; se muestran
  *       con la escritura más frecuente. Sin área = "Sin área".</li>
+ *   <li>Concentración del riesgo: dominios con A y B juntas, cada uno identificado por su dominio
+ *       común; por ciudad y por área, la distribución por nivel del total intralaboral y del estrés.</li>
  * </ul>
  */
 public class AnalizadorInformeEmpresa {
@@ -84,6 +86,123 @@ public class AnalizadorInformeEmpresa {
                 .sorted(Comparator.comparingInt((AnalisisArea a) -> a.analisis().cobertura().esperados()).reversed()
                         .thenComparing(AnalisisArea::area))
                 .toList();
+    }
+
+    /**
+     * Concentración del riesgo: distribución por nivel de cada dominio intralaboral con A y B juntas
+     * (ranking del más crítico al menos crítico) y, por ciudad de trabajo y por área, del total
+     * intralaboral y del estrés. Solo aparecen los dominios de las formas presentadas y los grupos
+     * con al menos un resultado intralaboral o de estrés.
+     */
+    public ConcentracionRiesgo concentracionRiesgo(List<ParticipanteEmpresa> participantes) {
+        Map<Long, Long> dominioPorDominioCuestionario = new HashMap<>();
+        Map<Long, String> nombresDominio = new LinkedHashMap<>();
+        Set<Long> formasPresentadas = resultadosPorMetodo(participantes, MetodoCalculo.SUMA_POR_DOMINIOS).stream()
+                .map(ResultadoCuestionario::idCuestionario)
+                .collect(Collectors.toSet());
+        cuestionarios.stream()
+                .filter(c -> formasPresentadas.contains(c.idCuestionario()))
+                .flatMap(c -> c.dominios().stream())
+                .forEach(d -> {
+                    dominioPorDominioCuestionario.put(d.idDominioCuestionario(), d.idDominio());
+                    nombresDominio.putIfAbsent(d.idDominio(), d.nombre());
+                });
+
+        List<DominioConsolidado> dominios = nombresDominio.entrySet().stream()
+                .map(e -> new DominioConsolidado(e.getKey(), e.getValue(), distribuir(
+                        nivelesDominio(participantes, e.getKey(), dominioPorDominioCuestionario))))
+                .sorted(Comparator.comparing(DominioConsolidado::distribucion, DistribucionNiveles.masCriticaPrimero()))
+                .toList();
+
+        Map<Optional<Long>, List<ParticipanteEmpresa>> porCiudad = participantes.stream()
+                .collect(Collectors.groupingBy(p -> Optional.ofNullable(p.ciudad()).map(CiudadTrabajo::id),
+                        LinkedHashMap::new, Collectors.toList()));
+        Map<String, List<ParticipanteEmpresa>> porArea = participantes.stream()
+                .collect(Collectors.groupingBy(p -> claveArea(p.area()), LinkedHashMap::new, Collectors.toList()));
+
+        return new ConcentracionRiesgo(dominios,
+                distribucionPorGrupo(porCiudad.values(), AnalizadorInformeEmpresa::nombreCiudad),
+                distribucionPorGrupo(porArea.values(), AnalizadorInformeEmpresa::nombreArea));
+    }
+
+    /** Intralaboral y estrés de cada grupo, del de más personas al de menos (empate: por nombre). */
+    private List<DistribucionGrupo> distribucionPorGrupo(Collection<List<ParticipanteEmpresa>> grupos,
+                                                         Function<List<ParticipanteEmpresa>, String> nombre) {
+        return grupos.stream()
+                .map(grupo -> new DistribucionGrupo(nombre.apply(grupo),
+                        distribuir(nivelesDe(resultadosPorMetodo(grupo, MetodoCalculo.SUMA_POR_DOMINIOS))),
+                        distribuir(nivelesDe(resultadosPorMetodo(grupo, MetodoCalculo.PROMEDIO_PONDERADO)))))
+                .filter(g -> g.personas() > 0)
+                .sorted(Comparator.comparingInt(DistribucionGrupo::personas).reversed()
+                        .thenComparing(DistribucionGrupo::grupo))
+                .toList();
+    }
+
+    /**
+     * Frecuencia de síntomas por dimensión de estrés. Solo cuentan las respuestas de la aplicación
+     * de donde sale el resultado de estrés de cada persona, para que coincida con el total.
+     *
+     * @param respuestas respuestas a los ítems de estrés (pueden traer otras aplicaciones: se descartan)
+     * @param opciones   opciones del cuestionario de estrés, de la más frecuente (Siempre) a la menos (Nunca)
+     */
+    public SintomasEstres sintomasEstres(List<ParticipanteEmpresa> participantes, List<RespuestaSintoma> respuestas,
+                                         List<OpcionFrecuencia> opciones) {
+        Set<Long> aplicaciones = aplicacionesConEstres(participantes);
+        Map<Long, List<RespuestaSintoma>> porDimension = respuestas.stream()
+                .filter(r -> aplicaciones.contains(r.idAplicacion()))
+                .collect(Collectors.groupingBy(RespuestaSintoma::idDimensionCuestionario));
+
+        List<FrecuenciaDimension> dimensiones = cuestionarios.stream()
+                .filter(c -> c.metodoCalculo() == MetodoCalculo.PROMEDIO_PONDERADO)
+                .flatMap(c -> c.dominios().stream())
+                .flatMap(d -> d.dimensiones().stream())
+                .map(d -> frecuencia(d, porDimension.getOrDefault(d.idDimensionCuestionario(), List.of()), opciones))
+                .filter(f -> f.respuestas() > 0)
+                .sorted(FrecuenciaDimension.masFrecuentePrimero())
+                .toList();
+        return new SintomasEstres(aplicaciones.size(), dimensiones);
+    }
+
+    /** Aplicación de donde sale el resultado de estrés de cada persona que lo tiene. */
+    public Set<Long> aplicacionesConEstres(List<ParticipanteEmpresa> participantes) {
+        return participantes.stream()
+                .filter(p -> p.resultado() != null)
+                .filter(p -> p.resultado().cuestionarios().stream()
+                        .anyMatch(rc -> cuestionario(rc.idCuestionario()).metodoCalculo() == MetodoCalculo.PROMEDIO_PONDERADO))
+                .map(p -> p.resultado().idAplicacion())
+                .collect(Collectors.toSet());
+    }
+
+    private static FrecuenciaDimension frecuencia(DimensionInforme dimension, List<RespuestaSintoma> respuestas,
+                                                  List<OpcionFrecuencia> opciones) {
+        Map<Long, Long> cantidadPorOpcion = respuestas.stream()
+                .collect(Collectors.groupingBy(RespuestaSintoma::idOpcion, Collectors.counting()));
+        int total = respuestas.size();
+        List<ConteoFrecuencia> frecuencias = opciones.stream()
+                .map(o -> {
+                    int cantidad = cantidadPorOpcion.getOrDefault(o.id(), 0L).intValue();
+                    return new ConteoFrecuencia(o, cantidad, porcentaje(cantidad, total));
+                })
+                .toList();
+        int personas = (int) respuestas.stream().map(RespuestaSintoma::idAplicacion).distinct().count();
+        int items = (int) respuestas.stream().map(RespuestaSintoma::idPregunta).distinct().count();
+        return new FrecuenciaDimension(dimension.idDimensionCuestionario(), dimension.nombre(), personas, items,
+                total, frecuencias);
+    }
+
+    /** Niveles que obtuvieron las personas en un dominio, sea cual sea su forma. */
+    private List<NivelRiesgo> nivelesDominio(List<ParticipanteEmpresa> participantes, Long idDominio,
+                                             Map<Long, Long> dominioPorDominioCuestionario) {
+        return resultadosPorMetodo(participantes, MetodoCalculo.SUMA_POR_DOMINIOS).stream()
+                .flatMap(rc -> rc.dominios().stream())
+                .filter(rd -> idDominio.equals(dominioPorDominioCuestionario.get(rd.idDominioCuestionario())))
+                .map(ResultadoDominio::nivelRiesgo)
+                .toList();
+    }
+
+    private static String nombreCiudad(List<ParticipanteEmpresa> grupo) {
+        CiudadTrabajo ciudad = grupo.get(0).ciudad();
+        return ciudad == null ? SIN_CIUDAD : ciudad.nombre();
     }
 
     private Cobertura cobertura(List<ParticipanteEmpresa> participantes) {

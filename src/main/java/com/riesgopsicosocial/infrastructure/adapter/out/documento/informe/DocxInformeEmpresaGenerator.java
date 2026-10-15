@@ -5,12 +5,19 @@ import com.riesgopsicosocial.domain.model.informe.FormatoDocumento;
 import com.riesgopsicosocial.domain.model.informe.empresa.AnalisisGrupo;
 import com.riesgopsicosocial.domain.model.informe.empresa.Cobertura;
 import com.riesgopsicosocial.domain.model.informe.empresa.CoberturaCiudad;
+import com.riesgopsicosocial.domain.model.informe.empresa.ConteoFrecuencia;
+import com.riesgopsicosocial.domain.model.informe.empresa.ConcentracionRiesgo;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConteoNivel;
 import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionDimension;
 import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionDominio;
+import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionGrupo;
 import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionNiveles;
+import com.riesgopsicosocial.domain.model.informe.empresa.DominioConsolidado;
 import com.riesgopsicosocial.domain.model.informe.empresa.DominiosForma;
+import com.riesgopsicosocial.domain.model.informe.empresa.FrecuenciaDimension;
 import com.riesgopsicosocial.domain.model.informe.empresa.InformeEmpresa;
+import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
+import com.riesgopsicosocial.domain.model.informe.empresa.SintomasEstres;
 import com.riesgopsicosocial.domain.model.resultado.NivelEstres;
 import com.riesgopsicosocial.domain.model.resultado.NivelRiesgo;
 import org.apache.poi.xwpf.usermodel.Borders;
@@ -43,8 +50,10 @@ import static com.riesgopsicosocial.infrastructure.adapter.out.documento.informe
 
 /**
  * Informe de empresa en Word: población evaluada, resultados globales (intralaboral,
- * extralaboral y estrés) y, por cada forma intralaboral, ranking de dominios y de dimensiones
- * y una ficha por dimensión. Solo trae resultados agregados, nunca datos individuales.
+ * extralaboral y estrés), por cada forma intralaboral ranking de dominios y de dimensiones
+ * y una ficha por dimensión; luego la concentración del riesgo intralaboral con A y B juntas
+ * (dominios, ciudad y área), los síntomas de estrés (frecuencia por dimensión, ciudad y área) y,
+ * para llenar en Word, las conclusiones del profesional, el plan de acción y su firma. Solo trae resultados agregados, nunca datos individuales.
  */
 @Component
 public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmpresaPort {
@@ -59,6 +68,11 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
     private static final int[] ANCHOS_RESUMEN = {2700, 2000, 900, 920, 920, 920, 920, 920};
     /** Ficha de una dimensión: los cinco niveles. */
     private static final int[] ANCHOS_FICHA = {2040, 2040, 2040, 2040, 2040};
+    /** Alto mínimo de los recuadros para escribir, en twips: unos 9 cm las conclusiones y 4 cm cada plazo. */
+    private static final int ALTO_CONCLUSIONES = 5100;
+    private static final int ALTO_ACCIONES = 2270;
+    /** Ciudades o áreas por gráfico: con más, las barras quedan apiñadas. */
+    private static final int GRUPOS_POR_GRAFICO = 2;
     private static final String CRITERIO_RANKING = "ordenados del más crítico al menos crítico: primero el de "
             + "mayor porcentaje de personas en riesgo muy alto; si hay empate, el de mayor porcentaje en riesgo "
             + "alto, y así sucesivamente.";
@@ -102,8 +116,8 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
             subtitulo(doc, "Valoración del estrés");
             tablaNiveles(doc, "Nivel de síntomas de estrés", general.estres(), c -> NivelEstres.etiqueta(c.nivel().id()));
 
-            // Una sección por forma intralaboral, con todo lo suyo junto: dominios, dimensiones y fichas.
             int numero = 3;
+            // Una sección por forma intralaboral, con todo lo suyo junto: dominios, dimensiones y fichas.
             for (DominiosForma forma : general.dominios()) {
                 saltoDePagina(doc);
                 seccion(doc, numero++ + ". RESULTADOS INTRALABORALES – FORMA " + forma.forma()
@@ -114,6 +128,30 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                     fichasDimensiones(doc, forma.forma(), dominio);
                 }
             }
+
+            // Cada sección nueva va al final: primero el intralaboral con A y B juntas, luego el estrés.
+            ConcentracionRiesgo concentracion = informe.concentracion();
+            if (!concentracion.dominios().isEmpty()) {
+                saltoDePagina(doc);
+                seccion(doc, numero++ + ". CONCENTRACIÓN DEL RIESGO INTRALABORAL (FORMAS A Y B)");
+                concentracionIntralaboral(doc, concentracion);
+            }
+            if (general.estres().total() > 0) {
+                saltoDePagina(doc);
+                seccion(doc, numero++ + ". SÍNTOMAS DE ESTRÉS");
+                sintomasEstres(doc, informe.sintomas(), concentracion);
+            }
+
+            // Para llenar en Word: el sistema no guarda estos textos.
+            saltoDePagina(doc);
+            seccion(doc, numero++ + ". CONCLUSIONES DEL PROFESIONAL");
+            espacioParaEscribir(doc, "Escriba aquí las conclusiones del profesional.", ALTO_CONCLUSIONES);
+            seccion(doc, numero++ + ". PLAN DE ACCIÓN");
+            for (String plazo : List.of("corto", "mediano", "largo")) {
+                subtitulo(doc, "Acciones a " + plazo + " plazo");
+                espacioParaEscribir(doc, "Escriba aquí las acciones a " + plazo + " plazo.", ALTO_ACCIONES);
+            }
+            firmaProfesional(doc);
 
             doc.write(salida);
             return salida.toByteArray();
@@ -186,6 +224,198 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
         DocxGraficos.barras(doc, niveles, porcentajes, colores);
     }
 
+    /** Recuadro de una celda con un texto guía en gris, para escribir en Word; crece con lo que se escriba. */
+    private static void espacioParaEscribir(XWPFDocument doc, String guia, int alto) {
+        XWPFTable recuadro = tabla(doc, 1, new int[]{ANCHO_TEXTO});
+        XWPFTableRow fila = recuadro.getRow(0);
+        fila.setHeight(alto); // alto mínimo: Word lo agranda si el texto no cabe
+        XWPFTableCell celda = fila.getCell(0);
+        celda(celda, null, false, ParagraphAlignment.LEFT, null, ANCHO_TEXTO);
+        celda.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.TOP);
+        texto(celda.getParagraphs().get(0), guia, 9, false, "808080").setItalic(true);
+        espacio(doc);
+    }
+
+    /** Datos del profesional en blanco y línea de firma, para llenar a mano. */
+    private void firmaProfesional(XWPFDocument doc) {
+        subtitulo(doc, "Profesional responsable");
+        tablaDatos(doc, new String[][]{
+                {"Nombre del profesional", ""},
+                {"Profesión", ""},
+                {"No. tarjeta profesional", ""},
+                {"No. licencia en salud ocupacional", ""},
+                {"Fecha de expedición de la licencia en salud ocupacional", ""}});
+        XWPFParagraph linea = parrafo(doc, ParagraphAlignment.LEFT, 1200, 0);
+        linea.setBorderTop(Borders.SINGLE);
+        linea.setIndentationRight(5500);
+        texto(linea, "Firma del profesional", 9.5, false, null);
+    }
+
+    /** Dominios con A y B juntas (ranking) y total intralaboral por ciudad de trabajo y por área. */
+    private void concentracionIntralaboral(XWPFDocument doc, ConcentracionRiesgo concentracion) {
+        nota(doc, "Las formas A y B se analizan juntas: cada persona cuenta con el nivel que le dio el baremo de "
+                + "su propia forma.");
+
+        subtitulo(doc, "Dominios intralaborales");
+        nota(doc, "Dominios " + CRITERIO_RANKING).setKeepNext(true);
+        unirConElGrafico(doc, tablaPorNivel(doc, ANCHOS_DOMINIOS, new String[]{"Dominio", "Personas"},
+                concentracion.dominios().stream()
+                        .map(d -> new FilaPorNivel(new String[]{d.nombre(), String.valueOf(d.distribucion().total())},
+                                d.distribucion()))
+                        .toList(), NivelRiesgo::nombre));
+        graficoPorNivel(doc, concentracion.dominios().stream().map(DominioConsolidado::nombre).toList(),
+                concentracion.dominios().stream().map(DominioConsolidado::distribucion).toList());
+
+        String descripcion = "Nivel de riesgo intralaboral total";
+        distribucionPorGrupo(doc, "Por ciudad de trabajo (regionales)", descripcion, "Ciudad de trabajo",
+                concentracion.porCiudad(), DistribucionGrupo::intralaboral, NivelRiesgo::nombre);
+        distribucionPorGrupo(doc, "Por área", descripcion, "Área",
+                concentracion.porArea(), DistribucionGrupo::intralaboral, NivelRiesgo::nombre);
+    }
+
+    /**
+     * Frecuencia de síntomas por dimensión (el manual no da niveles por dimensión) y nivel total de
+     * síntomas de estrés por ciudad de trabajo y por área.
+     */
+    private void sintomasEstres(XWPFDocument doc, SintomasEstres sintomas, ConcentracionRiesgo concentracion) {
+        if (!sintomas.dimensiones().isEmpty()) {
+            subtitulo(doc, "Frecuencia de síntomas por dimensión");
+            nota(doc, "El manual del cuestionario de estrés no trae baremos por dimensión, solo para el total; por "
+                    + "eso aquí no se muestran niveles sino el porcentaje de respuestas de cada frecuencia en los "
+                    + "ítems de la dimensión (" + personas(sintomas.personas()) + "). Cada persona responde varios "
+                    + "ítems por dimensión: los porcentajes se calculan sobre todas esas respuestas (personas × "
+                    + "ítems), no sobre las personas. Dimensiones ordenadas de la de "
+                    + "síntomas más frecuentes a la de menos: primero la de mayor porcentaje de respuestas "
+                    + "\"Siempre\"; si hay empate, la de mayor porcentaje en \"Casi siempre\", y así sucesivamente.")
+                    .setKeepNext(true);
+            unirConElGrafico(doc, tablaFrecuencias(doc, sintomas.dimensiones()));
+            graficoFrecuencias(doc, sintomas.dimensiones());
+        }
+
+        Function<NivelRiesgo, String> etiqueta = n -> NivelEstres.etiqueta(n.id());
+        String descripcion = "Nivel de síntomas de estrés";
+        distribucionPorGrupo(doc, "Por ciudad de trabajo (regionales)", descripcion, "Ciudad de trabajo",
+                concentracion.porCiudad(), DistribucionGrupo::estres, etiqueta);
+        distribucionPorGrupo(doc, "Por área", descripcion, "Área",
+                concentracion.porArea(), DistribucionGrupo::estres, etiqueta);
+    }
+
+    /** Dimensión, respuestas y el porcentaje de cada frecuencia, con el encabezado en su color. */
+    private XWPFTable tablaFrecuencias(XWPFDocument doc, List<FrecuenciaDimension> dimensiones) {
+        List<OpcionFrecuencia> opciones = dimensiones.get(0).frecuencias().stream().map(ConteoFrecuencia::opcion).toList();
+        int[] anchos = anchosFrecuencias(opciones.size());
+        XWPFTable tabla = tabla(doc, 1, anchos);
+        XWPFTableRow encabezado = tabla.getRow(0);
+        celda(encabezado.getCell(0), "Dimensión", true, ParagraphAlignment.CENTER, GRIS_ENCABEZADO, anchos[0]);
+        celda(encabezado.getCell(1), "Respuestas (personas × ítems)", true, ParagraphAlignment.CENTER,
+                GRIS_ENCABEZADO, anchos[1]);
+        for (int i = 0; i < opciones.size(); i++) {
+            celda(encabezado.getCell(2 + i), opciones.get(i).nombre(), true, ParagraphAlignment.CENTER,
+                    colorFrecuencia(opciones.get(i)), anchos[2 + i]);
+        }
+        encabezado.setRepeatHeader(true);
+        for (FrecuenciaDimension dimension : dimensiones) {
+            XWPFTableRow fila = tabla.createRow();
+            celda(fila.getCell(0), dimension.nombre(), false, ParagraphAlignment.LEFT, null, anchos[0]);
+            celda(fila.getCell(1), dimension.respuestas() + " (" + dimension.personas() + " × " + dimension.items() + ")",
+                    false, ParagraphAlignment.CENTER, null, anchos[1]);
+            for (int i = 0; i < dimension.frecuencias().size(); i++) {
+                celda(fila.getCell(2 + i), porcentaje(dimension.frecuencias().get(i).porcentaje()), false,
+                        ParagraphAlignment.CENTER, null, anchos[2 + i]);
+            }
+        }
+        espacio(doc);
+        return tabla;
+    }
+
+    /** Dimensión y respuestas fijas; el resto del ancho se reparte entre las frecuencias. */
+    private static int[] anchosFrecuencias(int opciones) {
+        int[] anchos = new int[opciones + 2];
+        anchos[0] = 3000;
+        anchos[1] = 1800;
+        int resto = ANCHO_TEXTO - anchos[0] - anchos[1];
+        for (int i = 2; i < anchos.length; i++) {
+            anchos[i] = resto / opciones;
+        }
+        anchos[anchos.length - 1] += resto % opciones;
+        return anchos;
+    }
+
+    /** Por cada dimensión, una barra por frecuencia. */
+    private void graficoFrecuencias(XWPFDocument doc, List<FrecuenciaDimension> dimensiones) {
+        List<OpcionFrecuencia> opciones = dimensiones.get(0).frecuencias().stream().map(ConteoFrecuencia::opcion).toList();
+        List<DocxGraficos.Serie> series = new ArrayList<>();
+        for (int i = 0; i < opciones.size(); i++) {
+            int indice = i;
+            Double[] porcentajes = dimensiones.stream()
+                    .map(d -> d.frecuencias().get(indice).porcentaje().doubleValue())
+                    .toArray(Double[]::new);
+            series.add(new DocxGraficos.Serie(opciones.get(i).nombre(), porcentajes, colorFrecuencia(opciones.get(i))));
+        }
+        DocxGraficos.barrasAgrupadas(doc, dimensiones.stream().map(FrecuenciaDimension::nombre).toArray(String[]::new),
+                series);
+    }
+
+    /**
+     * Frecuencias con el semáforo: Siempre en rojo … Nunca en verde. Va por id de la opción
+     * (1 Siempre … 5 Nunca), el mismo orden de los niveles de riesgo de mayor a menor.
+     */
+    private static String colorFrecuencia(OpcionFrecuencia opcion) {
+        return COLOR_NIVEL.getOrDefault(6L - opcion.id(), GRIS_ENCABEZADO);
+    }
+
+    /**
+     * Tabla con todos los grupos que tienen esa prueba y gráficos de a {@link #GRUPOS_POR_GRAFICO}
+     * grupos, para que las barras no queden apiñadas. Cada gráfico lleva su título ("Gráfico 2 de 5 –
+     * Cali y Medellín", armado con los datos) y cada grupo su número de personas.
+     */
+    private void distribucionPorGrupo(XWPFDocument doc, String titulo, String descripcion, String tituloGrupo,
+                                      List<DistribucionGrupo> todos,
+                                      Function<DistribucionGrupo, DistribucionNiveles> prueba,
+                                      Function<NivelRiesgo, String> etiqueta) {
+        List<DistribucionGrupo> grupos = todos.stream()
+                .filter(g -> prueba.apply(g).total() > 0)
+                .sorted(Comparator.comparingInt((DistribucionGrupo g) -> prueba.apply(g).total()).reversed())
+                .toList();
+        if (grupos.isEmpty()) {
+            return;
+        }
+        subtitulo(doc, titulo);
+        nota(doc, descripcion + ", ordenado de mayor a menor número de personas. Los grupos con pocas personas "
+                + "deben leerse con cautela.").setKeepNext(true);
+        unirConElGrafico(doc, tablaPorNivel(doc, ANCHOS_DOMINIOS, new String[]{tituloGrupo, "Personas"},
+                grupos.stream()
+                        .map(g -> new FilaPorNivel(new String[]{g.grupo(), String.valueOf(prueba.apply(g).total())},
+                                prueba.apply(g)))
+                        .toList(), etiqueta));
+        int graficos = (grupos.size() + GRUPOS_POR_GRAFICO - 1) / GRUPOS_POR_GRAFICO;
+        for (int i = 0; i < graficos; i++) {
+            List<DistribucionGrupo> parte = grupos.subList(i * GRUPOS_POR_GRAFICO,
+                    Math.min(grupos.size(), (i + 1) * GRUPOS_POR_GRAFICO));
+            graficoPorNivel(doc,
+                    parte.stream().map(g -> g.grupo() + " (" + prueba.apply(g).total() + ")").toList(),
+                    parte.stream().map(prueba).toList(), etiqueta,
+                    tituloGrafico(i + 1, graficos, parte), DocxGraficos.ALTO_COMPACTO);
+        }
+    }
+
+    /** "Gráfico 2 de 5 – Cali y Medellín"; con un solo gráfico, solo los nombres. */
+    private static String tituloGrafico(int numero, int total, List<DistribucionGrupo> grupos) {
+        List<String> nombres = grupos.stream().map(DistribucionGrupo::grupo).toList();
+        String nombresUnidos = nombres.size() == 1 ? nombres.get(0)
+                : String.join(", ", nombres.subList(0, nombres.size() - 1)) + " y " + nombres.get(nombres.size() - 1);
+        return total == 1 ? nombresUnidos : "Gráfico " + numero + " de " + total + " – " + nombresUnidos;
+    }
+
+    /**
+     * Mantiene la tabla y el párrafo de espacio que la sigue en la misma página que el gráfico
+     * siguiente: Word no deja la tabla al final de una página y su gráfico en la otra.
+     */
+    private static void unirConElGrafico(XWPFDocument doc, XWPFTable tabla) {
+        mantenerConLoSiguiente(tabla);
+        doc.getParagraphs().get(doc.getParagraphs().size() - 1).setKeepNext(true);
+    }
+
     /** Tabla y gráfico de los dominios de una forma, del más crítico al menos crítico. */
     private void rankingDominios(XWPFDocument doc, DominiosForma forma) {
         subtitulo(doc, "Ranking de dominios");
@@ -195,7 +425,8 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                         .map(d -> new FilaPorNivel(new String[]{d.nombre(), String.valueOf(d.distribucion().total())},
                                 d.distribucion()))
                         .toList());
-        graficoDominios(doc, forma.dominios());
+        graficoPorNivel(doc, forma.dominios().stream().map(DistribucionDominio::nombre).toList(),
+                forma.dominios().stream().map(DistribucionDominio::distribucion).toList());
     }
 
     /** Fila de una tabla por nivel: sus textos iniciales y la distribución que da los porcentajes. */
@@ -206,7 +437,12 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
      * Tabla con columnas descriptivas (las primeras; la última de ellas, personas) y el porcentaje
      * de cada nivel, con el encabezado de cada nivel en su color.
      */
-    private void tablaPorNivel(XWPFDocument doc, int[] anchos, String[] titulos, List<FilaPorNivel> filas) {
+    private XWPFTable tablaPorNivel(XWPFDocument doc, int[] anchos, String[] titulos, List<FilaPorNivel> filas) {
+        return tablaPorNivel(doc, anchos, titulos, filas, NivelRiesgo::nombre);
+    }
+
+    private XWPFTable tablaPorNivel(XWPFDocument doc, int[] anchos, String[] titulos, List<FilaPorNivel> filas,
+                                    Function<NivelRiesgo, String> etiqueta) {
         List<NivelRiesgo> niveles = filas.get(0).distribucion().niveles().stream().map(ConteoNivel::nivel).toList();
         int primerNivel = titulos.length;
         XWPFTable tabla = tabla(doc, 1, anchos);
@@ -215,7 +451,7 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
             celda(encabezado.getCell(i), titulos[i], true, ParagraphAlignment.CENTER, GRIS_ENCABEZADO, anchos[i]);
         }
         for (int i = 0; i < niveles.size(); i++) {
-            celda(encabezado.getCell(primerNivel + i), niveles.get(i).nombre(), true, ParagraphAlignment.CENTER,
+            celda(encabezado.getCell(primerNivel + i), etiqueta.apply(niveles.get(i)), true, ParagraphAlignment.CENTER,
                     COLOR_NIVEL.get(niveles.get(i).id()), anchos[primerNivel + i]);
         }
         encabezado.setRepeatHeader(true);
@@ -233,21 +469,27 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
             }
         }
         espacio(doc);
+        return tabla;
     }
 
-    /** Por cada dominio, una barra por nivel lado a lado. */
-    private void graficoDominios(XWPFDocument doc, List<DistribucionDominio> dominios) {
-        List<NivelRiesgo> niveles = dominios.get(0).distribucion().niveles().stream().map(ConteoNivel::nivel).toList();
-        String[] nombres = dominios.stream().map(DistribucionDominio::nombre).toArray(String[]::new);
+    /** Por cada categoría (dominio, ciudad, área), una barra por nivel lado a lado. */
+    private void graficoPorNivel(XWPFDocument doc, List<String> categorias, List<DistribucionNiveles> distribuciones) {
+        graficoPorNivel(doc, categorias, distribuciones, NivelRiesgo::nombre, null, DocxGraficos.ALTO_AGRUPADO);
+    }
+
+    private void graficoPorNivel(XWPFDocument doc, List<String> categorias, List<DistribucionNiveles> distribuciones,
+                                 Function<NivelRiesgo, String> etiqueta, String titulo, int alto) {
+        List<NivelRiesgo> niveles = distribuciones.get(0).niveles().stream().map(ConteoNivel::nivel).toList();
         List<DocxGraficos.Serie> series = new ArrayList<>();
         for (int i = 0; i < niveles.size(); i++) {
             int indice = i;
-            Double[] porcentajes = dominios.stream()
-                    .map(d -> d.distribucion().niveles().get(indice).porcentaje().doubleValue())
+            Double[] porcentajes = distribuciones.stream()
+                    .map(d -> d.niveles().get(indice).porcentaje().doubleValue())
                     .toArray(Double[]::new);
-            series.add(new DocxGraficos.Serie(niveles.get(i).nombre(), porcentajes, COLOR_NIVEL.get(niveles.get(i).id())));
+            series.add(new DocxGraficos.Serie(etiqueta.apply(niveles.get(i)), porcentajes,
+                    COLOR_NIVEL.get(niveles.get(i).id())));
         }
-        DocxGraficos.barrasAgrupadas(doc, nombres, series);
+        DocxGraficos.barrasAgrupadas(doc, categorias.toArray(String[]::new), series, titulo, alto);
     }
 
     /** Dimensión con el nombre de su dominio, para el resumen. */

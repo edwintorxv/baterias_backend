@@ -142,6 +142,16 @@ class InformeEmpresaServiceTest {
             return List.of(BAJO, ALTO);
         }
 
+        @Override
+        public List<RespuestaSintoma> buscarRespuestasEstres(Collection<Long> idsAplicacion) {
+            return List.of();
+        }
+
+        @Override
+        public List<OpcionFrecuencia> buscarOpcionesEstres() {
+            return List.of();
+        }
+
     }
 
 }

@@ -2,7 +2,7 @@
 
 > Documento de contexto para continuar el desarrollo desde IntelliJ (Claude Pro / Claude Code).
 > Generado a partir de una sesión de diseño e implementación del backend.
-> Última actualización: 2026-10-13 (informe de empresa en curso: JSON con cobertura y resultados globales, Word con población por ciudad, resultados globales y, por forma, ranking de dominios, de dimensiones y fichas; **sin commitear** — ver sección 10).
+> Última actualización: 2026-10-15 (informe de empresa en curso, todo commiteado: Word con población, resultados globales, secciones por forma, concentración intralaboral A+B por dominio/ciudad/área, síntomas de estrés y espacios para conclusiones, plan de acción y firma — ver sección 10).
 
 ---
 
@@ -359,8 +359,12 @@ El script de creación de las ~34 tablas (`cuestionario`, `dominio`, `dimension`
 
 ## 10. Siguiente paso acordado (retomar el 2026-10-14)
 
+### Estado al cierre del 2026-10-15
+- Informe de empresa: lo del 13 quedó en `4b11109`; lo del 15 (secciones 4 a 7 del Word, abajo) en el commit siguiente. Tests: 60 (a los 55 se suman 5 de `AnalizadorInformeEmpresaTest`).
+- Plan acordado al cierre, **paso a paso**: (1) commit ✅; (2) mínimo N por confidencialidad (propuesta provisional: 5; grupos menores a "Otras ciudades/áreas" u omitidos con nota) — hay ciudades y el área "EAF" con 1 persona, que exponen resultados individuales; (3) interpretación de niveles e introducción/metodología (Res. 2764 de 2022); luego extralaboral (C) por dimensión, ciudad y área, descripción de la población (forma A/B, grupo ocupacional, sexo, edad), total general de la empresa y el JSON de todo lo nuevo.
+- "EAF" es texto libre de `evaluado_cliente` 1 (evaluado 1, dato de prueba inicial); nadie sabe qué significa.
+
 ### Estado al cierre del 2026-10-13
-- **Informe de empresa en curso, todo sin commitear** (último commit: `7f82b37`, informe individual en Word). Revisar el diff con el usuario y commitear cuando lo apruebe. Detalle en "Informe de empresa" más abajo.
 - Tests: 55 (`sh mvnw test`): a los 37 de abajo se suman 10 `AnalizadorInformeEmpresaTest`, 7 `InformeEmpresaServiceTest` y 1 `DocxInformeEmpresaGeneratorTest`.
 - **La app la arranca el usuario desde IntelliJ (puerto 8080)**: no levantar ni detener instancias desde la terminal sin avisar (una instancia propia le bloqueó el despliegue). Para probar, pedirle que reinicie y descargue el Word desde Swagger.
 - Datos de prueba del informe de empresa (solo BD local; respaldo previo en el scratchpad de la sesión, `respaldo_antes_datos_prueba.dump`): de las 200 personas del cliente 1, **162 evaluadas** (160 aplicaciones nuevas con fechas 2026-08-01…2026-10-11, estado FINALIZADA, A para grupo 1 y B para grupo 2, C y D para todos; `atiende_clientes` true en Comercial/VENTAS y 30 % del resto, `es_jefe` 25 % del grupo 1). 157 calculadas por `POST /aplicaciones/{id}/resultados`; las aplicaciones **196, 197 y 200** se dejaron sin calcular a propósito (pendientes de cálculo). Cifras 2026: 200 esperados, 162 evaluados (81 %), 3 pendientes; intralaboral (159) 34/25/35/30/35, extralaboral (158) 22/34/41/43/18, estrés (158) 9/40/62/41/6. `/informe/anios` da [2027, 2026] porque los no evaluados conservan fechas 2027.
@@ -385,14 +389,18 @@ El script de creación de las ~34 tablas (`cuestionario`, `dominio`, `dimension`
 - `ResultadoDimension` lleva `idDominioCuestionario` (para agrupar por dominio en los informes).
 - Pendiente para el psicólogo: la dimensión de C se llama "Tiempo fuera del trabajo" en la BD (como en el manual extralaboral), pero el Anexo 2 la lista como "Balance entre la vida laboral y familiar"; cambiar con migración si lo prefiere.
 
-### Informe de empresa — 🚧 en curso (2026-10-13, sin commitear)
+### Informe de empresa — 🚧 en curso (commiteado; última sesión 2026-10-15)
 Referencia: ejemplo del usuario `/Users/edwingacha/proyectos/Documentacion/baterias/Informe total CENTRO GEOLOGIA AC VERSION GERENCIAL.pptx` (informe gerencial de una empresa hecho con Power BI; **datos reales: no subirlo a git**). Se usa como guía de contenido, no se copia su diseño (el usuario prefirió barras separadas a las barras 100 % apiladas del ejemplo).
 
 **Estructura acordada con el usuario** (se arma paso a paso, mostrando el resultado en Word antes de seguir):
 1. Población evaluada: **esperados** = personas cargadas en `evaluado_cliente` (relaciones activas del cliente; siempre existen) vs **evaluados** = personas con filas en `respuesta` en el año. Agrupada **por ciudad de trabajo** (`evaluado_cliente.fk_ciudad_trabajo`, agrupada por id porque hay municipios con el mismo nombre en distintos departamentos; sin ciudad = "Sin ciudad"), con fila TOTAL. Sin gráfico (con muchas sedes quedaría apiñado).
 2. Resultados globales: tres tablas (intralaboral, extralaboral, estrés) con cantidad y % por nivel + gráfico de barras por nivel.
 3. Por cada forma intralaboral (A, luego B; solo las que alguien presentó), **todo junto en su propia sección**: ranking de dominios (tabla + gráfico), ranking de todas las dimensiones de la forma (tabla resumen) y fichas por dimensión (un dominio por página).
-4. **Por área** (`evaluado_cliente.nombre_area`): pendiente; el usuario la quiere "para un análisis más a profundidad" (cobertura, tablas y dominios por área). La lógica ya existe (`AnalizadorInformeEmpresa.analizarPorArea`), falta exponerla.
+4. **Concentración del riesgo intralaboral (formas A y B)** (2026-10-15): A y B juntas por dominio común (`DominioInforme.idDominio` = `dominio_cuestionario.fk_dominio`; cada persona con el nivel del baremo de su forma). Dominios (ranking, tabla + barras agrupadas), y total intralaboral **por ciudad de trabajo (regionales)** y **por área**: tabla con todos los grupos + gráficos **de a 2 grupos** (`GRUPOS_POR_GRAFICO`), 6 cm de alto, título dinámico dentro del gráfico ("Gráfico 2 de 5 – CALI y MEDELLIN", editable en Word), N en la categoría ("BOGOTA, D.C. (142)"), sin etiquetas en 0 % (formato `0" %";;`, en todas las barras agrupadas), tabla unida a su primer gráfico (`keepNext`). Grupos ordenados por personas de esa prueba. El usuario **descartó los mapas de calor** (tablas coloreadas con % alto+muy alto): se quedan las barras separadas por nivel.
+5. **Síntomas de estrés** (2026-10-15): frecuencia por dimensión de D (el manual **no trae baremos por dimensión**, el motor solo guarda el total): % de respuestas Siempre / Casi siempre / Algunas veces / Nunca en los ítems de cada dimensión, solo de la aplicación que da el resultado de estrés de cada persona; columna "Respuestas (personas × ítems)" con el cálculo ("632 (158 × 4)") porque el usuario pensó que los datos estaban inflados; colores Siempre rojo … Nunca verde (`COLOR_NIVEL` por 6 − id de la opción); orden `FrecuenciaDimension.masFrecuentePrimero()` (más "Siempre", luego "Casi siempre"…). Luego nivel total de estrés por ciudad y por área (etiquetas del manual de estrés), igual que el punto 4.
+6. **Conclusiones del profesional** y 7. **Plan de acción** (corto, mediano y largo plazo) + bloque "Profesional responsable" (datos en blanco y línea de firma): recuadros en blanco con texto guía gris para llenar en Word (decisión del usuario; el sistema no los guarda, al volver a descargar salen vacíos).
+- **Regla del usuario**: cada análisis nuevo va como **sección propia al final** del informe; no se mezcla con las existentes.
+- `AnalizadorInformeEmpresa.analizarPorArea` (análisis completo por área) sigue sin exponerse.
 
 **Reglas de negocio implementadas**
 - Persona con varias aplicaciones en el año: cuenta **una vez**, con la más reciente que tenga resultados (y las preguntas filtro de esa misma aplicación). Las aplicaciones de relaciones inactivas no cuentan.
@@ -408,22 +416,18 @@ Referencia: ejemplo del usuario `/Users/edwingacha/proyectos/Documentacion/bater
 **Diseño**
 - Dominio: `domain/model/informe/empresa/` (`ParticipanteEmpresa`, `AnalisisGrupo`, `Cobertura`, `CoberturaCiudad`, `DistribucionNiveles`, `DominiosForma`, `DistribucionDominio`, `DistribucionDimension`, `CuestionarioInforme`/`DominioInforme`/`DimensionInforme`, `AnalisisArea`…) y `domain/service/informe/AnalizadorInformeEmpresa` (lógica pura). `domain/model/resultado/NivelEstres` (etiquetas Muy bajo…Muy alto, compartidas con el informe individual).
 - Aplicación: `ConsultarInformeEmpresaUseCase` → `InformeEmpresaService`; `GenerarDocumentoInformeEmpresaUseCase` → `DocumentoInformeEmpresaService` → `GeneradorDocumentoInformeEmpresaPort` (por formato). Puerto de salida `InformeEmpresaPort`.
-- Persistencia: `persistence/informe/InformeEmpresaPersistenceAdapter`, carga en bloque (~10 consultas por informe) con los nuevos `findByFkAplicacionIn` de `resultado_cuestionario`/`resultado_dominio`/`resultado_dimension`, `RespuestaJpaRepository.buscarAplicacionesConRespuestas`, `AplicacionJpaRepository.buscarPorRelacionesYPeriodo` y `EvaluadoClienteJpaRepository.findByFkClienteAndActivoTrue`. Dimensión → dominio: el `dominio_cuestionario` del mismo cuestionario con `dimension.fk_dominio`. Las dimensiones de C aún no se cargan.
-- REST (`rest/informe/InformeEmpresaController`): `GET /clientes/{idCliente}/informe?anio=` (JSON: cliente, cobertura, `coberturaPorCiudad`, pendientes, intralaboral, extralaboral, estrés — **aún sin dominios ni dimensiones**), `GET .../informe/anios`, `GET .../informe/archivo?anio=&formato=docx` (por defecto docx; nombre `informe_empresa_{nit}_{anio}.docx`).
+- Persistencia: `persistence/informe/InformeEmpresaPersistenceAdapter`, carga en bloque (~10 consultas por informe) con los nuevos `findByFkAplicacionIn` de `resultado_cuestionario`/`resultado_dominio`/`resultado_dimension`, `RespuestaJpaRepository.buscarAplicacionesConRespuestas`, `AplicacionJpaRepository.buscarPorRelacionesYPeriodo` y `EvaluadoClienteJpaRepository.findByFkClienteAndActivoTrue`. Dimensión → dominio: el `dominio_cuestionario` del mismo cuestionario con `dimension.fk_dominio`. Las dimensiones de C aún no se cargan. Estrés: `RespuestaJpaRepository.buscarPorMetodoCalculo` (respuestas de D con su pregunta y dimensión, en bloque) y `OpcionRespuestaJpaRepository.buscarPorMetodoCalculo` (opciones de las escalas de D).
+- REST (`rest/informe/InformeEmpresaController`): `GET /clientes/{idCliente}/informe?anio=` (JSON: cliente, cobertura, `coberturaPorCiudad`, pendientes, intralaboral, extralaboral, estrés — **aún sin dominios, dimensiones, concentración ni síntomas**; `InformeEmpresa` ya los trae), `GET .../informe/anios`, `GET .../informe/archivo?anio=&formato=docx` (por defecto docx; nombre `informe_empresa_{nit}_{anio}.docx`).
 - Word: `DocxInformeEmpresaGenerator` + `DocxSoporte` (piezas comunes copiadas del informe individual; `DocxInformeEvaluadoGenerator` aún tiene su propia copia: unificar) + `DocxGraficos` (**gráficos nativos de Word** con XDDF, editables, datos en Excel incrustado: `barras` = una barra por nivel; `barrasAgrupadas` = por categoría una barra por nivel, con leyenda). Detalles: eje Y con `crossBetween = between` (si no, la primera barra queda montada sobre el eje), colores de nivel del semáforo en tablas y gráficos del informe de empresa (`COLOR_NIVEL` 00B050, 92D050, FFD700, FF8C00, E53935; el individual conserva sus tonos pastel), fichas con `keepNext`/`cantSplit` para no partirse entre páginas, `getCharts()` de POI no respeta el orden del documento (los tests identifican los gráficos por sus categorías).
 - Encabezado del Word: "CONFIDENCIAL – Resultados agregados de la empresa; no contiene información individual".
 - Los gráficos no se ven en Quick Look (macOS): el usuario los revisa en Word.
 
-**Siguiente (cuando el usuario lo indique)**
-1. Revisar el diff y commitear lo hecho.
-2. Parte 4: análisis por área.
-3. Exponer dominios y dimensiones en el JSON.
-4. Posibles: dimensiones extralaborales (C) por dimensión, puntaje promedio del grupo con su nivel por baremo y total general (como el ejemplo), PDF del informe de empresa, unificar `DocxInformeEvaluadoGenerator` con `DocxSoporte`.
+**Siguiente (cuando el usuario lo indique)**: ver el plan en "Estado al cierre del 2026-10-15". Otros posibles: dimensiones extralaborales (C) por dimensión, puntaje promedio del grupo con su nivel por baremo y total general (como el ejemplo), PDF del informe de empresa, unificar `DocxInformeEvaluadoGenerator` con `DocxSoporte`.
 
 **Preguntas que siguen abiertas para el área usuaria**
 - Clasificación **factor protector / factor de riesgo** del ejemplo: falta la regla.
 - Mínimo N de personas por grupo (área, ciudad) para mostrar su desglose, y quién recibe el informe (define cuánto proteger los grupos pequeños).
-- Conclusiones y plan de intervención: ¿los escribe el psicólogo en el sistema o se agregan a mano?
+- Conclusiones y plan de acción: por ahora se llenan a mano en el Word; si quieren que queden registrados, tabla por cliente y año + GET/PUT.
 - Consolidado de **varias empresas** por ciudad/departamento/industria: no se ha pedido; el informe actual es de una empresa.
 - Áreas en texto libre ("Secreatrias", "VENTAS"/"Comercial"…): considerar un catálogo de áreas por cliente.
 
