@@ -24,16 +24,16 @@ public class InformeVistaMapper {
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final String SIN_DATO = "—";
 
-    /** Interpretación genérica de los niveles de riesgo (formatos modelo, Anexos 4 y 5 intralaboral). */
-    private static final List<ParrafoVista> INTERPRETACION_RIESGO = List.of(
+    /** Interpretación genérica de los niveles de riesgo (formatos modelo, Anexos 4 y 5 intralaboral). También la usa el informe de empresa. */
+    static final List<ParrafoVista> INTERPRETACION_RIESGO = List.of(
             new ParrafoVista("Sin riesgo o riesgo despreciable", "ausencia de riesgo o riesgo tan bajo que no amerita desarrollar actividades de intervención. Las dimensiones y dominios que se encuentren bajo esta categoría serán objeto de acciones o programas de promoción."),
             new ParrafoVista("Riesgo bajo", "no se espera que los factores psicosociales que obtengan puntuaciones de este nivel estén relacionados con síntomas o respuestas de estrés significativas. Las dimensiones y dominios que se encuentren bajo esta categoría serán objeto de acciones o programas de intervención, a fin de mantenerlos en los niveles de riesgo más bajos posibles."),
             new ParrafoVista("Riesgo medio", "nivel de riesgo en el que se esperaría una respuesta de estrés moderada. Las dimensiones y dominios que se encuentren bajo esta categoría ameritan observación y acciones sistemáticas de intervención para prevenir efectos perjudiciales en la salud."),
             new ParrafoVista("Riesgo alto", "nivel de riesgo que tiene una importante posibilidad de asociación con respuestas de estrés alto y por tanto, las dimensiones y dominios que se encuentren bajo esta categoría requieren intervención en el marco de un sistema de vigilancia epidemiológica."),
             new ParrafoVista("Riesgo muy alto", "nivel de riesgo con amplia posibilidad de asociarse a respuestas muy altas de estrés. Por consiguiente las dimensiones y dominios que se encuentren bajo esta categoría requieren intervención inmediata en el marco de un sistema de vigilancia epidemiológica."));
 
-    /** Interpretación de los niveles de estrés (manual del cuestionario de estrés, paso 5). */
-    private static final List<ParrafoVista> INTERPRETACION_ESTRES = List.of(
+    /** Interpretación de los niveles de estrés (manual del cuestionario de estrés, paso 5). También la usa el informe de empresa. */
+    static final List<ParrafoVista> INTERPRETACION_ESTRES = List.of(
             new ParrafoVista("Muy bajo", "ausencia de síntomas de estrés u ocurrencia muy rara que no amerita desarrollar actividades de intervención específicas, salvo acciones o programas de promoción en salud."),
             new ParrafoVista("Bajo", "es indicativo de baja frecuencia de síntomas de estrés y por tanto escasa afectación del estado general de salud. Es pertinente desarrollar acciones o programas de intervención, a fin de mantener la baja frecuencia de síntomas."),
             new ParrafoVista("Medio", "la presentación de síntomas es indicativa de una respuesta de estrés moderada. Los síntomas más frecuentes y críticos ameritan observación y acciones sistemáticas de intervención para prevenir efectos perjudiciales en la salud. Además, se sugiere identificar los factores de riesgo psicosocial intra y extralaboral que pudieran tener alguna relación con los efectos identificados."),

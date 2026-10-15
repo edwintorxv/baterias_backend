@@ -51,11 +51,12 @@ import java.util.function.Function;
 import static com.riesgopsicosocial.infrastructure.adapter.out.documento.informe.DocxSoporte.*;
 
 /**
- * Informe de empresa en Word: población evaluada, resultados globales (intralaboral,
+ * Informe de empresa en Word: introducción, población evaluada, resultados globales (intralaboral,
  * extralaboral y estrés), por cada forma intralaboral ranking de dominios y de dimensiones
  * y una ficha por dimensión; luego la concentración del riesgo intralaboral con A y B juntas
- * (dominios, ciudad y área), los síntomas de estrés (frecuencia por dimensión, ciudad y área) y,
- * para llenar en Word, las conclusiones del profesional, el plan de acción y su firma. Solo trae resultados agregados, nunca datos individuales.
+ * (dominios, ciudad y área), los síntomas de estrés (frecuencia por dimensión, ciudad y área), la
+ * interpretación de los niveles y, para llenar en Word, las conclusiones del profesional, el plan de
+ * acción y su firma. Solo trae resultados agregados, nunca datos individuales.
  */
 @Component
 public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmpresaPort {
@@ -70,6 +71,8 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
     private static final int[] ANCHOS_RESUMEN = {2700, 2000, 900, 920, 920, 920, 920, 920};
     /** Ficha de una dimensión: los cinco niveles. */
     private static final int[] ANCHOS_FICHA = {2040, 2040, 2040, 2040, 2040};
+    /** Interpretación de los niveles: nivel e interpretación. */
+    private static final int[] ANCHOS_INTERPRETACION = {2600, 7600};
     /** Alto mínimo de los recuadros para escribir, en twips: unos 9 cm las conclusiones y 4 cm cada plazo. */
     private static final int ALTO_CONCLUSIONES = 5100;
     private static final int ALTO_ACCIONES = 2270;
@@ -102,7 +105,10 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                     {"Año evaluado", String.valueOf(informe.anio())},
                     {"Fecha de elaboración del informe", fechaElaboracion.format(FECHA)}});
 
-            seccion(doc, "1. POBLACIÓN EVALUADA");
+            seccion(doc, "1. INTRODUCCIÓN");
+            introduccion(doc, informe);
+
+            seccion(doc, "2. POBLACIÓN EVALUADA");
             tablaCobertura(doc, general);
             if (general.pendientesCalculo() > 0) {
                 nota(doc, general.pendientesCalculo() == 1
@@ -110,7 +116,7 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                         : general.pendientesCalculo() + " personas respondieron las pruebas pero sus resultados aún no se han calculado; no se incluyen en las tablas de resultados.");
             }
 
-            seccion(doc, "2. RESULTADOS GLOBALES");
+            seccion(doc, "3. RESULTADOS GLOBALES");
             subtitulo(doc, "Factores de riesgo psicosocial intralaborales");
             tablaNiveles(doc, "Nivel de riesgo", general.intralaboral(), c -> c.nivel().nombre());
             subtitulo(doc, "Factores de riesgo psicosocial extralaborales");
@@ -118,7 +124,7 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
             subtitulo(doc, "Valoración del estrés");
             tablaNiveles(doc, "Nivel de síntomas de estrés", general.estres(), c -> NivelEstres.etiqueta(c.nivel().id()));
 
-            int numero = 3;
+            int numero = 4;
             // Una sección por forma intralaboral, con todo lo suyo junto: dominios, dimensiones y fichas.
             for (DominiosForma forma : general.dominios()) {
                 saltoDePagina(doc);
@@ -143,6 +149,10 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                 seccion(doc, numero++ + ". SÍNTOMAS DE ESTRÉS");
                 sintomasEstres(doc, informe.sintomas(), concentracion);
             }
+
+            saltoDePagina(doc);
+            seccion(doc, numero++ + ". INTERPRETACIÓN DE LOS NIVELES");
+            interpretacionNiveles(doc, general.estres().total() > 0);
 
             // Para llenar en Word: el sistema no guarda estos textos.
             saltoDePagina(doc);
@@ -224,6 +234,94 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                 .map(c -> c.porcentaje().doubleValue()).toArray(Double[]::new);
         List<String> colores = distribucion.niveles().stream().map(c -> COLOR_NIVEL.get(c.nivel().id())).toList();
         DocxGraficos.barras(doc, niveles, porcentajes, colores);
+    }
+
+    /**
+     * Marco normativo, objetivo, instrumentos aplicados (solo los que alguien presentó), población y
+     * confidencialidad. Textos fijos con los datos de la empresa; se pueden ajustar en Word.
+     */
+    private void introduccion(XWPFDocument doc, InformeEmpresa informe) {
+        AnalisisGrupo general = informe.general();
+        parrafoIntroduccion(doc, null, "En cumplimiento de la Resolución 2764 de 2022 del Ministerio del Trabajo, "
+                + "que adopta la Batería de instrumentos para la evaluación de factores de riesgo psicosocial, "
+                + informe.cliente().nombre() + " realizó en " + informe.anio() + " la evaluación de los factores de "
+                + "riesgo psicosocial de su población trabajadora.");
+        parrafoIntroduccion(doc, "Objetivo", "identificar los factores de riesgo psicosocial intralaborales y "
+                + "extralaborales y los síntomas de estrés de la población trabajadora, para priorizar las acciones "
+                + "de intervención en el marco del sistema de vigilancia epidemiológica.");
+
+        List<String> instrumentos = new ArrayList<>();
+        for (DominiosForma forma : general.dominios()) {
+            instrumentos.add("cuestionario de factores de riesgo psicosocial intralaboral forma " + forma.forma()
+                    + ("A".equals(forma.forma()) ? " (jefes, profesionales y técnicos)"
+                    : "B".equals(forma.forma()) ? " (auxiliares y operarios)" : ""));
+        }
+        if (general.extralaboral().total() > 0) {
+            instrumentos.add("cuestionario de factores de riesgo psicosocial extralaboral");
+        }
+        if (general.estres().total() > 0) {
+            instrumentos.add("cuestionario para la evaluación del estrés, tercera versión");
+        }
+        if (!instrumentos.isEmpty()) {
+            parrafoIntroduccion(doc, "Instrumentos", enumerar(instrumentos) + ".");
+        }
+
+        Cobertura cobertura = general.cobertura();
+        parrafoIntroduccion(doc, "Población", cobertura.esperados() + " personas esperadas, " + cobertura.evaluados()
+                + " evaluadas (" + porcentaje(cobertura.porcentaje()) + "). El detalle por ciudad de trabajo está en "
+                + "la sección siguiente.");
+        parrafoIntroduccion(doc, "Confidencialidad", "este informe presenta únicamente resultados agregados de la "
+                + "empresa. Las ciudades y áreas con menos de " + personas(AnalizadorInformeEmpresa.MINIMO_PERSONAS_GRUPO)
+                + " evaluadas no se muestran por separado. Los resultados individuales hacen parte de la historia "
+                + "clínica ocupacional de cada trabajador.");
+        espacio(doc);
+    }
+
+    /** Párrafo justificado con una etiqueta en negrilla al inicio ("Objetivo: …"); sin etiqueta, solo el texto. */
+    private static void parrafoIntroduccion(XWPFDocument doc, String etiqueta, String contenido) {
+        XWPFParagraph parrafo = parrafo(doc, ParagraphAlignment.BOTH, 0, 100);
+        if (etiqueta != null) {
+            texto(parrafo, etiqueta + ": ", 9.5, true, null);
+        }
+        texto(parrafo, contenido, 9.5, false, null);
+    }
+
+    /** "a", "a y b", "a, b y c". */
+    private static String enumerar(List<String> elementos) {
+        if (elementos.size() == 1) {
+            return elementos.get(0);
+        }
+        return String.join(", ", elementos.subList(0, elementos.size() - 1)) + " y " + elementos.get(elementos.size() - 1);
+    }
+
+    /**
+     * Qué significa cada nivel según los manuales de la batería: riesgo psicosocial (intralaboral y
+     * extralaboral) y, si hubo cuestionario de estrés, síntomas de estrés. Cada nivel en su color.
+     */
+    private void interpretacionNiveles(XWPFDocument doc, boolean conEstres) {
+        nota(doc, "Interpretación de los niveles según los manuales de la Batería de instrumentos para la evaluación de "
+                + "factores de riesgo psicosocial. Sirve de referencia para las conclusiones y el plan de acción.");
+        subtitulo(doc, "Niveles de riesgo psicosocial (intralaboral y extralaboral)");
+        tablaInterpretacion(doc, InformeVistaMapper.INTERPRETACION_RIESGO);
+        if (conEstres) {
+            subtitulo(doc, "Niveles de síntomas de estrés");
+            tablaInterpretacion(doc, InformeVistaMapper.INTERPRETACION_ESTRES);
+        }
+    }
+
+    /** Nivel (en el color del semáforo, de menor a mayor) y su interpretación. */
+    private void tablaInterpretacion(XWPFDocument doc, List<InformeVista.ParrafoVista> niveles) {
+        XWPFTable tabla = tabla(doc, 1, ANCHOS_INTERPRETACION);
+        encabezado(tabla.getRow(0), ANCHOS_INTERPRETACION, "Nivel", "Interpretación");
+        for (int i = 0; i < niveles.size(); i++) {
+            XWPFTableRow fila = tabla.createRow();
+            fila.setCantSplitRow(true);
+            celda(fila.getCell(0), niveles.get(i).titulo(), true, ParagraphAlignment.LEFT,
+                    COLOR_NIVEL.get((long) i + 1), ANCHOS_INTERPRETACION[0]);
+            celda(fila.getCell(1), niveles.get(i).texto().substring(0, 1).toUpperCase() + niveles.get(i).texto().substring(1),
+                    false, ParagraphAlignment.BOTH, null, ANCHOS_INTERPRETACION[1]);
+        }
+        espacio(doc);
     }
 
     /** Recuadro de una celda con un texto guía en gris, para escribir en Word; crece con lo que se escriba. */

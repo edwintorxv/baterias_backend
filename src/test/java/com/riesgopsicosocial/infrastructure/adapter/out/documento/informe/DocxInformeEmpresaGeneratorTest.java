@@ -151,12 +151,12 @@ class DocxInformeEmpresaGeneratorTest {
                 "2 personas respondieron", "FACTORES DE RIESGO PSICOSOCIAL INTRALABORALES",
                 "FACTORES DE RIESGO PSICOSOCIAL EXTRALABORALES", "VALORACIÓN DEL ESTRÉS",
                 "Riesgo alto", "66,7 %", "Nivel de síntomas de estrés", "Alto", "TOTAL", "100 %",
-                "4. CONCENTRACIÓN DEL RIESGO INTRALABORAL (FORMAS A Y B)", "DOMINIOS INTRALABORALES",
+                "5. CONCENTRACIÓN DEL RIESGO INTRALABORAL (FORMAS A Y B)", "DOMINIOS INTRALABORALES",
                 "POR CIUDAD DE TRABAJO (REGIONALES)", "POR ÁREA", "Nivel de riesgo intralaboral total, ordenado",
-                "5. SÍNTOMAS DE ESTRÉS", "FRECUENCIA DE SÍNTOMAS POR DIMENSIÓN", "no trae baremos por dimensión", "no sobre las personas",
+                "6. SÍNTOMAS DE ESTRÉS", "FRECUENCIA DE SÍNTOMAS POR DIMENSIÓN", "no trae baremos por dimensión", "no sobre las personas",
                 "\"Otras ciudades\" reúne 4 ciudades con menos de 2 personas evaluadas",
                 "1 persona no se muestra para proteger la confidencialidad: pertenecen a áreas con menos de 2 personas",
-                "Nivel de síntomas de estrés, ordenado", "3. RESULTADOS INTRALABORALES – FORMA A (3 PERSONAS)", "RANKING DE DOMINIOS", "Recompensas",
+                "Nivel de síntomas de estrés, ordenado", "4. RESULTADOS INTRALABORALES – FORMA A (3 PERSONAS)", "RANKING DE DOMINIOS", "Recompensas",
                 "RANKING DE DIMENSIONES", "primero el de mayor porcentaje de personas en riesgo muy alto", "FORMA A – LIDERAZGO",
                 "RECONOCIMIENTO Y COMPENSACIÓN", "Forma A · 3 personas", "DIMENSIÓN 5", "Forma A · 2 personas",
                 "1 (50,0 %)", "Depende de una pregunta filtro")) {
@@ -164,10 +164,10 @@ class DocxInformeEmpresaGeneratorTest {
         }
         assertTrue(texto.indexOf("CONCENTRACIÓN DEL RIESGO") > texto.indexOf("FORMA A – LIDERAZGO"),
                 "las secciones nuevas van al final, después de las fichas");
-        assertTrue(texto.indexOf("5. SÍNTOMAS DE ESTRÉS") > texto.indexOf("4. CONCENTRACIÓN DEL RIESGO INTRALABORAL"),
+        assertTrue(texto.indexOf("6. SÍNTOMAS DE ESTRÉS") > texto.indexOf("5. CONCENTRACIÓN DEL RIESGO INTRALABORAL"),
                 "estrés va en su propia sección, después de la intralaboral");
-        assertTrue(texto.indexOf("6. CONCLUSIONES DEL PROFESIONAL") > texto.indexOf("5. SÍNTOMAS DE ESTRÉS")
-                && texto.indexOf("7. PLAN DE ACCIÓN") > texto.indexOf("6. CONCLUSIONES DEL PROFESIONAL"),
+        assertTrue(texto.indexOf("8. CONCLUSIONES DEL PROFESIONAL") > texto.indexOf("6. SÍNTOMAS DE ESTRÉS")
+                && texto.indexOf("9. PLAN DE ACCIÓN") > texto.indexOf("8. CONCLUSIONES DEL PROFESIONAL"),
                 "conclusiones y plan de acción al final");
         for (String esperado : List.of("Escriba aquí las conclusiones del profesional.", "ACCIONES A CORTO PLAZO",
                 "ACCIONES A MEDIANO PLAZO", "ACCIONES A LARGO PLAZO", "Escriba aquí las acciones a largo plazo.",
@@ -175,6 +175,19 @@ class DocxInformeEmpresaGeneratorTest {
             assertTrue(texto.contains(esperado), "falta: " + esperado);
         }
         assertTrue(texto.lastIndexOf("Firma del profesional") > texto.indexOf("ACCIONES A LARGO PLAZO"));
+        for (String esperado : List.of("1. INTRODUCCIÓN", "Resolución 2764 de 2022", "Empresa X realizó en 2026",
+                "intralaboral forma A (jefes, profesionales y técnicos)", "cuestionario de factores de riesgo psicosocial extralaboral y "
+                        + "cuestionario para la evaluación del estrés, tercera versión.",
+                "4 personas esperadas, 3 evaluadas (75,0 %)", "menos de 2 personas evaluadas no se muestran por separado",
+                "2. POBLACIÓN EVALUADA", "3. RESULTADOS GLOBALES", "7. INTERPRETACIÓN DE LOS NIVELES",
+                "NIVELES DE RIESGO PSICOSOCIAL (INTRALABORAL Y EXTRALABORAL)", "requieren intervención inmediata", "Nivel de riesgo con amplia posibilidad",
+                "NIVELES DE SÍNTOMAS DE ESTRÉS", "Muy bajo")) {
+            assertTrue(texto.contains(esperado), "falta: " + esperado);
+        }
+        assertTrue(texto.indexOf("1. INTRODUCCIÓN") < texto.indexOf("2. POBLACIÓN EVALUADA"), "la introducción va al inicio");
+        assertTrue(texto.indexOf("7. INTERPRETACIÓN DE LOS NIVELES") > texto.indexOf("6. SÍNTOMAS DE ESTRÉS")
+                && texto.indexOf("7. INTERPRETACIÓN DE LOS NIVELES") < texto.indexOf("8. CONCLUSIONES DEL PROFESIONAL"),
+                "la interpretación va antes de las conclusiones");
         assertFalse(texto.contains("muy alto +") || texto.contains("Alto + muy alto"), "no se suman niveles");
     }
 
