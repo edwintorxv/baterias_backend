@@ -16,6 +16,7 @@ import com.riesgopsicosocial.domain.model.resultado.ResultadoAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoCuestionario;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoDimension;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoDominio;
+import com.riesgopsicosocial.domain.model.resultado.ResultadoTotalGeneral;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.FiltrosAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.MetodoCalculo;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionEntity;
@@ -44,6 +45,8 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadodim
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadodimension.ResultadoDimensionJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadodominio.ResultadoDominioEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadodominio.ResultadoDominioJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadototalgeneral.ResultadoTotalGeneralEntity;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadototalgeneral.ResultadoTotalGeneralJpaRepository;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -64,6 +67,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
     private final ResultadoCuestionarioJpaRepository resultadoCuestionarioRepository;
     private final ResultadoDominioJpaRepository resultadoDominioRepository;
     private final ResultadoDimensionJpaRepository resultadoDimensionRepository;
+    private final ResultadoTotalGeneralJpaRepository resultadoTotalGeneralRepository;
     private final CuestionarioJpaRepository cuestionarioRepository;
     private final DominioCuestionarioJpaRepository dominioCuestionarioRepository;
     private final DominioJpaRepository dominioRepository;
@@ -81,6 +85,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                                             ResultadoCuestionarioJpaRepository resultadoCuestionarioRepository,
                                             ResultadoDominioJpaRepository resultadoDominioRepository,
                                             ResultadoDimensionJpaRepository resultadoDimensionRepository,
+                                            ResultadoTotalGeneralJpaRepository resultadoTotalGeneralRepository,
                                             CuestionarioJpaRepository cuestionarioRepository,
                                             DominioCuestionarioJpaRepository dominioCuestionarioRepository,
                                             DominioJpaRepository dominioRepository,
@@ -97,6 +102,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         this.resultadoCuestionarioRepository = resultadoCuestionarioRepository;
         this.resultadoDominioRepository = resultadoDominioRepository;
         this.resultadoDimensionRepository = resultadoDimensionRepository;
+        this.resultadoTotalGeneralRepository = resultadoTotalGeneralRepository;
         this.cuestionarioRepository = cuestionarioRepository;
         this.dominioCuestionarioRepository = dominioCuestionarioRepository;
         this.dominioRepository = dominioRepository;
@@ -246,6 +252,9 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         Map<Long, List<ResultadoDimensionEntity>> dimensiones = resultadoDimensionRepository
                 .findByFkAplicacionIn(cuestionarios.keySet())
                 .stream().collect(Collectors.groupingBy(ResultadoDimensionEntity::getFkAplicacion));
+        Map<Long, ResultadoTotalGeneralEntity> totalesGenerales = resultadoTotalGeneralRepository
+                .findByFkAplicacionIn(cuestionarios.keySet()).stream()
+                .collect(Collectors.toMap(ResultadoTotalGeneralEntity::getFkAplicacion, Function.identity()));
         Map<Long, CuestionarioInforme> configuracion = buscarCuestionarios().stream()
                 .collect(Collectors.toMap(CuestionarioInforme::idCuestionario, Function.identity()));
         Map<Long, NivelRiesgo> niveles = catalogo.cargarNiveles();
@@ -288,8 +297,13 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                                 resultadoDimensiones);
                     })
                     .toList();
+            ResultadoTotalGeneralEntity total = totalesGenerales.get(aplicacion.getId());
+            ResultadoTotalGeneral totalGeneral = total == null ? null : new ResultadoTotalGeneral(
+                    total.getFkCuestionarioIntralaboral(), configuracion.get(total.getFkCuestionarioIntralaboral()).forma(),
+                    total.getPuntajeBruto(), total.getPuntajeTransformado(), niveles.get(total.getFkNivelRiesgo()));
             resultados.put(aplicacion.getId(), new ResultadoAplicacion(aplicacion.getId(),
-                    aplicacion.getFkGrupoOcupacional(), suyos.get(0).getFechaCalculo(), resultadoCuestionarios, null));
+                    aplicacion.getFkGrupoOcupacional(), suyos.get(0).getFechaCalculo(), resultadoCuestionarios,
+                    totalGeneral));
         }
         return resultados;
     }

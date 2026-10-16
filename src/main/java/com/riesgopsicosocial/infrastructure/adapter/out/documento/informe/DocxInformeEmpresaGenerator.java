@@ -131,6 +131,12 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
             tablaNiveles(doc, "Nivel de riesgo", general.intralaboral(), c -> c.nivel().nombre());
             subtitulo(doc, "Factores de riesgo psicosocial extralaborales");
             tablaNiveles(doc, "Nivel de riesgo", general.extralaboral(), c -> c.nivel().nombre());
+            if (general.totalGeneral().total() > 0) {
+                subtitulo(doc, "Total general de factores de riesgo psicosocial (intralaboral + extralaboral)");
+                nota(doc, "Solo personas con las dos pruebas. Cada una se interpreta con el baremo de su forma "
+                        + "intralaboral (A + extralaboral o B + extralaboral).").setKeepNext(true);
+                tablaNiveles(doc, "Nivel de riesgo", general.totalGeneral(), c -> c.nivel().nombre());
+            }
             subtitulo(doc, "Valoración del estrés");
             tablaNiveles(doc, "Nivel de síntomas de estrés", general.estres(), c -> NivelEstres.etiqueta(c.nivel().id()));
 

@@ -49,7 +49,7 @@ class DocxInformeEmpresaGeneratorTest {
                 List.of(new CoberturaCiudad(1L, "BOGOTA, D.C.", new Cobertura(3, 3, new BigDecimal("100.0"))),
                         new CoberturaCiudad(null, "Sin ciudad", new Cobertura(1, 0, new BigDecimal("0.0")))),
                 2,
-                distribucion, distribucion, distribucion,
+                distribucion, distribucion, distribucion, distribucion,
                 List.of(new DominiosForma(1L, "A", 3, List.of(
                         new DistribucionDominio(10L, "Recompensas", distribucion, List.of(
                                 new DistribucionDimension(100L, "Reconocimiento y compensación", distribucion))),
@@ -82,17 +82,17 @@ class DocxInformeEmpresaGeneratorTest {
         try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(word));
              XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
             texto = extractor.getText();
-            // Intralaboral, extralaboral, estrés, ranking de dominios y una ficha por dimensión (6).
+            // Intralaboral, extralaboral, total general, estrés, ranking de dominios y una ficha por dimensión (6).
             // Al final, la sección intralaboral con A y B juntas: dominios (1), por ciudad (2) y por área (2),
             // de a 2 grupos por gráfico; y la de estrés: frecuencia por dimensión (1) y por ciudad (2). El estrés
             // por área no tiene grupos visibles (1 persona omitida): sin tabla ni gráfico, solo la nota.
             // Entre las dos, la extralaboral: dimensiones (2), por ciudad (2) y por área (2), de a 2.
             // La población por ciudad y el resumen de dimensiones no llevan gráfico.
             // getCharts() no garantiza el orden del documento: se identifican por sus categorías.
-            assertEquals(24, doc.getCharts().size());
+            assertEquals(25, doc.getCharts().size());
             List<List<String>> categorias = doc.getCharts().stream().map(DocxInformeEmpresaGeneratorTest::categorias).toList();
-            assertEquals(8, categorias.stream().filter(List.of("Riesgo bajo", "Riesgo alto")::equals).count(),
-                    "intralaboral, extralaboral y las 6 fichas usan el gráfico de barras por nivel");
+            assertEquals(9, categorias.stream().filter(List.of("Riesgo bajo", "Riesgo alto")::equals).count(),
+                    "intralaboral, extralaboral, total general y las 6 fichas usan el gráfico de barras por nivel");
             assertTrue(categorias.contains(List.of("Bajo", "Alto")), "estrés con las etiquetas del manual");
             assertTrue(categorias.contains(List.of("Recompensas", "Liderazgo")), "dominios en orden de ranking");
 
@@ -156,7 +156,8 @@ class DocxInformeEmpresaGeneratorTest {
                     .filter(g -> categorias(g).equals(List.of("Riesgo bajo", "Riesgo alto")))
                     .map(g -> g.getChartSeries().get(0).getSeries(0).getValuesData().getPointAt(1).doubleValue())
                     .toList();
-            assertEquals(3, riesgoAlto.stream().filter(v -> v == 66.7).count(), "intralaboral, extralaboral y Reconocimiento");
+            assertEquals(4, riesgoAlto.stream().filter(v -> v == 66.7).count(),
+                    "intralaboral, extralaboral, total general y Reconocimiento");
             assertEquals(5, riesgoAlto.stream().filter(v -> v == 50.0).count(), "las 5 dimensiones de Liderazgo");
         }
         for (String esperado : List.of("Empresa X", "900", "Año 2026", "13/10/2026", "POBLACIÓN EVALUADA", "Ciudad de trabajo", "BOGOTA, D.C.", "3 (100,0 %)", "Sin ciudad",
@@ -202,6 +203,11 @@ class DocxInformeEmpresaGeneratorTest {
         assertTrue(texto.indexOf("6. FACTORES DE RIESGO EXTRALABORALES") > texto.indexOf("5. CONCENTRACIÓN DEL RIESGO INTRALABORAL")
                 && texto.indexOf("6. FACTORES DE RIESGO EXTRALABORALES") < texto.indexOf("7. SÍNTOMAS DE ESTRÉS"),
                 "el extralaboral va antes del estrés");
+        assertTrue(texto.contains("TOTAL GENERAL DE FACTORES DE RIESGO PSICOSOCIAL (INTRALABORAL + EXTRALABORAL)")
+                && texto.contains("Solo personas con las dos pruebas"));
+        assertTrue(texto.indexOf("TOTAL GENERAL DE FACTORES") > texto.indexOf("FACTORES DE RIESGO PSICOSOCIAL EXTRALABORALES")
+                && texto.indexOf("TOTAL GENERAL DE FACTORES") < texto.indexOf("VALORACIÓN DEL ESTRÉS"),
+                "el total general va entre el extralaboral y el estrés");
         assertTrue(texto.contains("CARACTERÍSTICAS DE LA POBLACIÓN EVALUADA") && texto.contains("Personas evaluadas (3)"));
         assertTrue(texto.indexOf("CARACTERÍSTICAS DE LA POBLACIÓN EVALUADA") > texto.indexOf("2. POBLACIÓN EVALUADA")
                 && texto.indexOf("CARACTERÍSTICAS DE LA POBLACIÓN EVALUADA") < texto.indexOf("3. RESULTADOS GLOBALES"),

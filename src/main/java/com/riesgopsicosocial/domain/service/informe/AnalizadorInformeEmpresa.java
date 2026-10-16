@@ -79,6 +79,10 @@ public class AnalizadorInformeEmpresa {
                 (int) participantes.stream().filter(ParticipanteEmpresa::pendienteDeCalculo).count(),
                 distribuir(intralaborales.stream().map(ResultadoCuestionario::nivelRiesgo).toList()),
                 distribuir(nivelesDe(resultadosPorMetodo(participantes, MetodoCalculo.SUMA_DIRECTA))),
+                distribuir(participantes.stream()
+                        .filter(p -> p.resultado() != null && p.resultado().totalGeneral() != null)
+                        .map(p -> p.resultado().totalGeneral().nivelRiesgo())
+                        .toList()),
                 distribuir(nivelesDe(resultadosPorMetodo(participantes, MetodoCalculo.PROMEDIO_PONDERADO))),
                 dominiosPorForma(participantes));
     }

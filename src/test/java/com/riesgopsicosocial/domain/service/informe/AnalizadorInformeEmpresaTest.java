@@ -412,6 +412,25 @@ class AnalizadorInformeEmpresaTest {
     }
 
     @Test
+    void totalGeneral_soloQuienesTienenIntralaboralYExtralaboral() {
+        List<ParticipanteEmpresa> participantes = List.of(
+                participante(1L, null, conTotalGeneral(ALTO, intra(FORMA_A, ALTO), total(FORMA_C, BAJO))),
+                participante(2L, null, conTotalGeneral(MUY_ALTO, intra(FORMA_B, MUY_ALTO), total(FORMA_C, ALTO))),
+                participante(3L, null, resultado(intra(FORMA_A, MEDIO))));   // sin extralaboral: sin total general
+
+        DistribucionNiveles totalGeneral = analizador.analizar(participantes).totalGeneral();
+
+        assertEquals(2, totalGeneral.total());
+        assertEquals(List.of(0, 0, 0, 1, 1), cantidades(totalGeneral));
+        assertEquals(bd("50.0"), totalGeneral.niveles().get(4).porcentaje());
+    }
+
+    private static ResultadoAplicacion conTotalGeneral(NivelRiesgo nivel, ResultadoCuestionario... cuestionarios) {
+        return new ResultadoAplicacion(1L, 1L, null, List.of(cuestionarios),
+                new ResultadoTotalGeneral(cuestionarios[0].idCuestionario(), cuestionarios[0].forma(), bd("0"), bd("0"), nivel));
+    }
+
+    @Test
     void cuestionarioSinConfiguracion_lanzaReglaNegocio() {
         CuestionarioInforme desconocido = new CuestionarioInforme(99L, "Z", MetodoCalculo.SUMA_DIRECTA, List.of());
         List<ParticipanteEmpresa> participantes = List.of(participante(1L, null, resultado(total(desconocido, BAJO))));
