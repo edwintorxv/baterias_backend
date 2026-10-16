@@ -1,449 +1,95 @@
-# Contexto del Proyecto — Sistema de Baterías de Riesgo Psicosocial
+# Contexto — Sistema de Baterías de Riesgo Psicosocial (backend)
 
-> Documento de contexto para continuar el desarrollo desde IntelliJ (Claude Pro / Claude Code).
-> Generado a partir de una sesión de diseño e implementación del backend.
-> Última actualización: 2026-10-15 (informe de empresa: Word y JSON completos según el plan del día, todo commiteado — ver sección 10).
+> Resumen para retomar el desarrollo. Última actualización: 2026-10-15. Todo commiteado y en `origin/main`.
+> Forma de trabajo: **paso a paso** (diseño → código → el usuario revisa → commit/push cuando lo pide).
 
----
+## 0. Puesta en marcha
 
-## 0. Puesta en marcha en otro computador
-
-Requisitos: **JDK 17**, **PostgreSQL 16** (la máquina original usa `C:\Program Files\PostgreSQL\16`), Maven vía `./mvnw` (incluido en el repo). Repo: `https://github.com/edwintorxv/baterias_backend.git`, rama `main`.
-
-1. Crear la BD vacía: `CREATE DATABASE bateria_psicosocial;` (usuario `postgres` / clave `1234`, según `application-dev.properties`; si cambian, ajustar ese archivo localmente sin subirlo).
-2. **Ojo — los datos maestros NO están en las migraciones.** `V1__initial_schema.sql` solo crea tablas (los `INSERT` se quitaron, ver incidente 6.1) y `V2` solo inserta `grupo_ocupacional`. Catálogos, cuestionarios, dimensiones/dominios, preguntas, escalas, baremos y los datos de prueba (aplicaciones 1 y 2) viven únicamente en la BD local de la máquina original. Para tenerlos en la nueva hay dos caminos:
-   - **Copiar la BD completa (recomendado)**: en la máquina original
-     `& "C:\Program Files\PostgreSQL\16\bin\pg_dump.exe" -U postgres -d bateria_psicosocial -F c -f bateria_psicosocial.dump`
-     y en la nueva (con la BD vacía creada)
-     `pg_restore -U postgres -d bateria_psicosocial bateria_psicosocial.dump`.
-     Esto trae también `flyway_schema_history`, así que Flyway no vuelve a aplicar V1/V2. El `.dump` contiene datos de evaluados: **no subirlo a git**; pasarlo por otro medio.
-   - **BD vacía**: dejar que Flyway aplique V1 y V2 al arrancar (funcionan sobre tablas vacías) y cargar los datos maestros a mano. Pendiente a futuro: crear una migración `V13__datos_maestros.sql` (o la siguiente libre; la V12 corrigió una errata de `nivel_academico`) con esos `INSERT` (ya con los valores corregidos por V3–V9 y V11); como los `UPDATE`/`INSERT` de datos de V3–V11 no tocan nada sobre una BD vacía (la estructura de V7–V9 sí se crea), esa migración debe traer los datos ya corregidos —incluidos `condicion_aplicacion`/`max_items_sin_respuesta` (V8) y `baremo_total_general` (V9)— y terminar con `setval` de las secuencias para que el repo sea autosuficiente.
-3. Arrancar: `./mvnw spring-boot:run` (perfil `dev` por defecto; en macOS/Linux, si `mvnw` no tiene permiso de ejecución porque viene de Windows, usar `sh mvnw spring-boot:run`). API en `http://localhost:8080/api`, Swagger en `http://localhost:8080/api/swagger-ui.html`.
-4. Tests: `./mvnw test` (incluye `CalculadoraResultadoTest`, lógica pura sin BD, y `ArquitecturaHexagonalTest`, reglas de ArchUnit).
-5. La carpeta `logs/` está en `.gitignore` (se generan localmente al arrancar).
-
----
+- **JDK 17**, **PostgreSQL 16**, `./mvnw` (en macOS: `sh mvnw`). Repo `https://github.com/edwintorxv/baterias_backend.git`, rama `main`.
+- BD `bateria_psicosocial` (postgres/1234, `application-dev.properties`). API `http://localhost:8080/api`, Swagger `/api/swagger-ui.html`.
+- **Los datos maestros NO están en las migraciones** (catálogos, cuestionarios, preguntas, escalas, baremos y datos de prueba viven solo en la BD local). En otra máquina: `pg_dump -F c` + `pg_restore` (trae `flyway_schema_history`; el `.dump` tiene datos de evaluados: **no subirlo a git**). Pendiente: migración `V14__datos_maestros.sql` (la V13 ya se usó) con los datos ya corregidos y `setval` de secuencias.
+- **La app la arranca el usuario en IntelliJ (8080)**: no levantar/detener instancias sin avisar. Tiene **spring-boot-devtools**: un `mvnw compile`/`test` la reinicia sola y Flyway aplica migraciones nuevas en la BD local; `@SpringBootTest` también corre contra la BD local. Avisar antes de compilar si hay una migración nueva.
+- Tests: `sh mvnw test` → **82** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, ArchUnit, contexto).
+- Manuales y Res. 2764 de 2022 en PDF (fuera del repo): `/Users/edwingacha/proyectos/Documentacion/baterias/` (texto en macOS con `osascript -l JavaScript` + PDFKit). El `.pptx` de ejemplo de informe de empresa tiene datos reales: no subirlo.
 
 ## 1. Stack y arquitectura
 
-- **Spring Boot 3.5.16**, **Java 17**, **PostgreSQL**, **Flyway**, **MapStruct**, **Lombok**
-- Arquitectura **hexagonal parcial**: no todas las ~34 tablas la usan completa.
+Spring Boot 3.5.16, Java 17, PostgreSQL, Flyway (`ddl-auto=validate`), MapStruct, Lombok, Apache POI 5.4.1, OpenHTMLtoPDF + Thymeleaf. `context-path=/api`, zona `America/Bogota`.
 
-### Estructura de paquetes
-
+**Hexagonal parcial**: hexágono completo solo en el motor de cálculo (`resultado`) y los informes (`informe`); el resto es CRUD `Controller → Service → JpaRepository`.
 ```
-domain/       → solo módulos con lógica de negocio real (reservado para motor de cálculo de riesgo)
-application/  → solo módulos con lógica de negocio real (idem)
-infrastructure/adapter/in/rest/{entidad}/           → Controller
-infrastructure/adapter/in/rest/{entidad}/dto/       → Request/Response (records)
-infrastructure/adapter/out/persistence/{entidad}/   → Entity + JpaRepository + Service
-shared/catalogo/  → CRUD genérico reutilizable para catálogos simples
-shared/exception/ → GlobalExceptionHandler + BusinessException/ResourceNotFoundException/ValidationException
-shared/response/  → ApiResponse, ApiError, ResponseBuilder
+domain/            lógica pura (sin Spring/JPA/shared); lanza domain.exception.ReglaNegocioException (→ 409)
+application/       port/in (casos de uso), port/out, service
+infrastructure/adapter/in/rest/{modulo}/(dto/)       controladores + records
+infrastructure/adapter/out/persistence/{tabla}/      Entity + JpaRepository (+ Service si es CRUD)
+infrastructure/adapter/out/documento/informe/        generadores Word/PDF
+shared/            catalogo (CRUD genérico), exception, response (ApiResponse/ApiError/ResponseBuilder)
 ```
+Reglas ArchUnit (`ArquitecturaHexagonalTest`): domain solo `java..`; application sin infrastructure/JPA/Spring Data; puertos solo con modelos del dominio; adaptadores de entrada usan `port.in` (los CRUD quedan fuera a propósito).
 
-### Decisión clave de arquitectura
-
-No todas las tablas usan hexagonal completo (`domain` + `application`). Los catálogos simples usan un patrón CRUD directo (`Controller → Service → JpaRepository`) apoyado en `shared/catalogo`. El hexagonal completo se reserva para el **Grupo 5 / motor de cálculo de riesgo** (`resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`), y posiblemente partes del Grupo D.
-
-### Reglas del hexágono (verificadas con ArchUnit, 2026-10-08)
-
-`src/test/.../arquitectura/ArquitecturaHexagonalTest` falla el build si se rompe alguna:
-- `domain` solo depende de `java..` y de sí mismo (nada de Spring, JPA, `shared` ni otras capas). Por eso el dominio lanza su propia `domain.exception.ReglaNegocioException`; el `GlobalExceptionHandler` la traduce a 409 `BUSINESS_ERROR`, igual que `BusinessException`.
-- `application` no depende de `infrastructure`, `jakarta.persistence` ni Spring Data (sí puede usar `shared.exception` y `@Service`/`@Transactional`, compromiso aceptado).
-- Los puertos (`application.port..`) solo usan modelos del dominio: nunca entidades ni DTOs.
-- Los adaptadores de entrada (`infrastructure.adapter.in..`) usan los casos de uso (`port.in`), no `application.service`.
-- El CRUD (`Controller → Service → JpaRepository`) queda fuera a propósito. `RespuestaService` (`valor_obtenido`) y `AplicacionService` (grupo ocupacional) tienen reglas de negocio pequeñas fuera del hexágono; moverlas si crecen.
-
----
-
-## 2. Clasificación de tablas por verbos HTTP
-
-- **Grupo A** (solo `GET` listar, sin escritura): 16 catálogos — ✅ completado
-- **Grupo B** (`GET` + `GET/{id}`, filtro opcional por FK vía `@RequestParam`): `industria`, `ciudad_municipio` — ✅ completado
-- **Grupo C** (`POST`, `PUT`, `GET`, `GET/{id}`, sin `DELETE`):
-  - Ya implementados antes de esta sesión: `cuestionario`, `dominio`, `dimension`, `opcion_respuesta` (se les quitó el `DELETE`) — ✅
-  - Implementados en esta sesión: `cliente`, `evaluado`, `evaluado_cliente`, `aplicacion` — ✅
-  - Implementados en sesión posterior: `dimension_cuestionario`, `dominio_cuestionario`, `pregunta`, `baremo_dimension`, `baremo_dominio` — ✅ (Grupo C completo)
-- **Grupo D** (transaccional, sin listar todo genérico, sin `delete`):
-  - `respuesta` (`POST`, `GET/{id}`, `GET` filtrado por `@RequestParam` **obligatorio** `fkAplicacion`, **sin `PUT`** — inmutable una vez creada) — ✅ implementado. Decisiones tomadas:
-    - Consulta: `GET /respuestas?fkAplicacion=X` (mismo patrón `@RequestParam` que el resto del proyecto, `fkAplicacion` obligatorio en vez de opcional porque no hay listado general).
-    - `valor_obtenido`: lo calcula el backend. `RespuestaService.crear` busca la `PreguntaEntity` (para obtener `fkEscala`) y luego en `EscalaDetalleJpaRepository.findByFkEscalaAndFkOpcionRespuesta` el valor correspondiente; si no existe esa combinación lanza `BusinessException` (409). Decisión del usuario: las tablas `escala`, `opcion_respuesta` y `escala_detalle` se diseñaron justamente para que el backend calcule ese valor, no para que lo mande el frontend.
-    - `PUT`: no existe. Una respuesta ya registrada es inmutable; si hay un error se maneja a nivel de aplicación completa, no editando la respuesta puntual.
-    - Se creó `EscalaDetalleEntity` + `EscalaDetalleJpaRepository` (paquete `escaladetalle`) como pieza de soporte interna — no tenía controller/CRUD propio definido en ninguna sesión anterior y solo se usa como lookup desde `RespuestaService`. Si en el futuro hace falta gestionar sus valores por API, agregar el molde catálogo/entidad plana que corresponda.
-  - `resultado_cuestionario`, `resultado_dimension`, `resultado_dominio` (motor de cálculo de riesgo) — **pendiente**, decisión de alcance tomada: se implementan en una etapa aparte, con diseño hexagonal completo (`domain`/`application`), ya que agregan puntajes de `respuesta`, aplican `factor_transformacion` de `dimension_cuestionario`/`dominio_cuestionario` y determinan `nivel_riesgo` según los rangos de `baremo_dimension`/`baremo_dominio`/`baremo_cuestionario`. Falta definir el disparador (¿se calcula automáticamente al finalizar la `aplicacion`, o mediante un endpoint explícito?).
-
-- **Migración `V2__grupo_ocupacional_y_metodo_calculo.sql`** (preparación del motor de cálculo):
-  - Catálogo `grupo_ocupacional` (1 = Jefes, profesionales y técnicos; 2 = Auxiliares y operarios). `tipo_cargo.fk_grupo_ocupacional` (cargos 1,2 → grupo 1; 3,4 → grupo 2).
-  - `aplicacion.fk_grupo_ocupacional` NOT NULL: **foto del grupo al momento de aplicar** (decisión del usuario, "opción 2"). `AplicacionService.crear` lo deriva de `evaluado_cliente → tipo_cargo` si el request no lo manda; así un cambio de cargo posterior no altera los baremos de resultados históricos.
-  - `baremo_dimension`/`baremo_dominio`/`baremo_cuestionario.fk_grupo_ocupacional` NOT NULL: los cuestionarios C (extralaboral) y D (estrés) tienen baremos distintos por grupo. Los baremos existentes de C se asignaron al grupo 1 — **verificar contra el manual** y cargar el juego del grupo 2.
-  - `cuestionario.factor_transformacion` (A=492, B=388, C=124, D=61.16) y `cuestionario.metodo_calculo` (enum `domain.model.resultado.configuracion.MetodoCalculo`: `SUMA_POR_DOMINIOS` para A/B, `SUMA_DIRECTA` para C, `PROMEDIO_PONDERADO` para D).
-  - `dimension_cuestionario.peso` (solo D: fisiológicos 4, comportamiento social 3, intelectuales 2, psicoemocionales 1). Total estrés = Σ promedio(dimensión) × peso, transformado = bruto / 61.16 × 100. El manual no trae baremos por dimensión para D, solo total.
-  - `UNIQUE (fk_aplicacion, ...)` en `resultado_dominio` y `resultado_cuestionario`.
-  - Aclaración: los cuestionarios C y D son **los mismos para todos los cargos** (mismas preguntas y respuestas); lo único que varía por grupo es el baremo con el que se interpreta el puntaje. Por eso el grupo vive en `baremo_*` y en `aplicacion`, nunca en `respuesta`.
-  - Estado de datos de prueba (2026-10-07): aplicaciones 1 y 2 (cargo "Profesional" → grupo 1). La **1 tiene A (123) + C (31) + D (31)**; la **2 solo A (123)**. Las respuestas de C y D de la aplicación 1 son de prueba, cargadas por `POST /respuestas`: C con opción = ((número − 1) mod 5) + 1; D rotando Siempre, Casi siempre, A veces, Nunca (opciones 1, 2, 3, 5; D no tiene "Casi nunca"). Resultados de referencia: A 46,3 / C 54,8 / D 57,4 (bruto 35,08) / total general 48,1, todos nivel 5 (C, D y total general verificados a mano contra los manuales). Los baremos de C/D de ambos grupos ya están cargados (V4).
-  - La V2 ya está aplicada en la BD local (confirmado en `flyway_schema_history` el 2026-09-25).
-- **Comportamiento esperado del motor si falta un baremo**: `ReglaNegocioException` (409) indicando qué falta (cuestionario/dimensión, grupo, puntaje); nunca guardar resultados parciales en silencio.
-- **Disparador del cálculo**: endpoint explícito `POST /aplicaciones/{id}/resultados` (recalculable: borra y reinserta en la misma transacción) + `GET /aplicaciones/{id}/resultados`.
-
-**Motor de cálculo — ✅ implementado (2026-09-25)**:
-  - Estructura (organizada por módulo `resultado` en cada capa):
-    - `domain/model/resultado/` → resultados (`ResultadoAplicacion`, `ResultadoCuestionario`, `ResultadoDominio`, `ResultadoDimension`, `NivelRiesgo`); `domain/model/resultado/configuracion/` → entrada del cálculo (`Configuracion*`, `RangoBaremo`, `RespuestaCalculo`, `MetodoCalculo`).
-    - `domain/service/resultado/CalculadoraResultado` (lógica pura, sin Spring; test en `src/test/.../domain/service/resultado/CalculadoraResultadoTest`).
-    - `application/port/in/resultado/` (`CalcularResultadosUseCase`, `ConsultarResultadosUseCase`), `application/port/out/resultado/` (`DatosCalculoPort`, `ResultadoPort`), `application/service/resultado/ResultadoAplicacionService`.
-    - Persistencia: una carpeta por tabla (`resultadodimension/`, `resultadodominio/`, `resultadocuestionario/`, `baremocuestionario/`: Entity + JpaRepository) y `persistence/resultado/` con los adaptadores (`DatosCalculoPersistenceAdapter`, `ResultadoPersistenceAdapter`) + `CatalogoCalculoLoader` (configuración y niveles, compartido; los adaptadores no dependen entre sí).
-    - REST: `infrastructure/adapter/in/rest/resultado/ResultadoController` + `dto/`.
-  - Reglas: transformado = bruto / factor × 100 redondeado a 1 decimal (HALF_UP); solo se calculan los cuestionarios con al menos una respuesta; dentro de uno, cada dimensión debe tener todas sus preguntas respondidas salvo la tolerancia y las condiciones descritas abajo (si no → 409); D solo guarda total (sin baremo por dimensión); C guarda dimensiones + total; A/B dimensiones + dominios + total.
-  - Probado: aplicaciones 1 y 2 (forma A) → 46.3 y 47.6, "Riesgo muy alto" (recalculado tras la V3; los valores anteriores 57.9/52.4 estaban mal por la escala invertida).
-  - **Migración `V3__corregir_escalas_y_dimensiones_forma_c.sql`** (2026-10-07): (1) los valores de `escala_detalle` de las escalas 1 y 2 estaban invertidos; según la Tabla 21 del manual, escala 1 = Siempre 0 … Nunca 4 (ítems positivos) y escala 2 = Siempre 4 … Nunca 0. La asignación de ítems a cada escala se verificó contra el manual y coincide 100 %: forma A (Tabla 21, 73 + 50) y forma B (Tabla 22, 68 + 29) y forma C (Tabla 11, 23 + 8). Forma D (escalas 3/4/5 = 9-6-3-0, 6-4-2-0, 3-2-1-0; sin "Casi nunca") también verificada: 9 + 13 + 9 ítems correctos. (2) Se recalculó `respuesta.valor_obtenido` (había además una respuesta de A con valor 9.00). (3) Forma C: ítems 18, 19, 20, 21, 23 → "Comunicación y relaciones interpersonales" (dimensión 22); "Relaciones familiares" (dimensión 21) queda con 22, 25, 27.
-  - **Migración `V4__baremos_extralaboral_y_estres.sql`** (2026-10-07): carga los totales de C (Tablas 17/18 del manual extralaboral) y D (Tabla 6 del manual de estrés) para los dos grupos en `baremo_cuestionario`, y las dimensiones de C del grupo 2 (Tabla 18). Reemplazó 5 filas de C grupo 1 que se habían cargado a mano con la Tabla 34 (esa tabla es el **total general** intra + extra, no el total de C). Los niveles de estrés (muy bajo … muy alto) se mapean por posición a `nivel_riesgo` 1..5. Verificado también: dimensiones de C grupo 1 = Tabla 17 y totales de A/B = Tabla 33.
-  - **Migración `V5__sincronizar_secuencias.sql`**: los datos se cargaron con ids explícitos y varias secuencias quedaron atrasadas (`aplicacion`, `evaluado_cliente`, `pregunta`, `baremo_dominio`, `sector_economico`), lo que hacía fallar los `POST` con llave duplicada. La V5 adelanta todas las secuencias a `MAX(id)`. **Regla**: si se cargan datos con ids explícitos, terminar con `setval`.
-  - **Migración `V6__corregir_retroalimentacion_formas_a_b.sql`**: forma A, "Retroalimentación del desempeño" tenía factor 28 (es 20); forma B, la fila de los ítems 74-78 apuntaba a "Relación con los colaboradores" (no aplica en B) en vez de "Retroalimentación del desempeño". Con esto, la configuración de A/B (dimensiones, ítems, factores, dominios) y todos sus baremos (Tablas 23, 25, 26, 29-33) quedaron verificados contra el manual sin diferencias. Recalculado: retroalimentación app 1 = 35.0 (riesgo medio, antes 25.0 bajo), app 2 = 50.0 (riesgo alto, antes 35.7 medio); totales sin cambio.
-  - **Ítems condicionales y faltantes — ✅ implementado (2026-10-07, V7 + V8)**, según el manual intralaboral:
-    - Preguntas filtro en `aplicacion` (V7): `atiende_clientes` ("debo brindar servicio a clientes o usuarios") y `es_jefe` ("soy jefe de otras personas"), expuestas en `AplicacionRequest/Response`. `NULL` = no registrado (se exigen las respuestas), `false` = no aplica. El `PUT` conserva el valor si el campo no viene, así que por API no se puede volver a `NULL` (solo por SQL).
-    - Configuración en `dimension_cuestionario` (V8): `condicion_aplicacion` (enum `domain.model.resultado.configuracion.CondicionAplicacion`: `ATIENDE_CLIENTES` → demandas emocionales A/B; `ES_JEFE` → relación con los colaboradores A) y `max_items_sin_respuesta` (1 en liderazgo, relaciones sociales, colaboradores y demandas ambientales de A/B; 0 en el resto).
-    - Motor: los filtros llegan con `DatosCalculoPort.buscarFiltros` → `FiltrosAplicacion` → `CalculadoraResultado.calcular(config, respuestas, filtros)`. Dimensión que no aplica = bruto 0 (suma al dominio y al total); si trae respuestas → 409. Ítems faltantes dentro de la tolerancia: bruto = suma de lo respondido, mismo factor. `PROMEDIO_PONDERADO` (D) rechaza dimensiones con condición o tolerancia (evita dividir por 0).
-    - Tests en `CalculadoraResultadoTest` (12). Probado de punta a punta con la aplicación 1 (`atiende_clientes=false` → 409 por las 9 respuestas de demandas emocionales; revertido).
-  - **Total general — ✅ implementado (2026-10-07, V9)**: puntaje bruto = bruto intralaboral (A o B) + bruto extralaboral (C); transformado = bruto / factor × 100, factor 616 con A y 512 con B (Tabla 15 del manual extralaboral = suma de los factores de cada cuestionario). Baremos (Tabla 34): A+C 0–18,8 / 18,9–24,4 / 24,5–29,5 / 29,6–35,4 / 35,5–100; B+C 0–19,9 / 20,0–24,8 / 24,9–29,5 / 29,6–35,4 / 35,5–100.
-    - Tablas `baremo_total_general` (por forma intralaboral, sin grupo ocupacional) y `resultado_total_general` (una fila por aplicación). El factor no se guarda: se suma `cuestionario.factor_transformacion` de ambos.
-    - `CalculadoraResultado.calcularTotalGeneral` (intra = `SUMA_POR_DOMINIOS`, extra = `SUMA_DIRECTA`; se distinguen por `metodo_calculo`, no por letra). `ResultadoAplicacionService` lo calcula si la aplicación tiene ambos; si falta uno → `totalGeneral = null` (sin error); si tiene A **y** B (o dos extralaborales) → 409 antes de calcular. D no entra en el total general.
-    - Expuesto como `totalGeneral` en `GET`/`POST /aplicaciones/{id}/resultados`. Probado: ejemplo 4 del manual en tests (306/616 = 49,7) y aplicación 1 (A+C).
-  - Manuales en PDF (fuera del repo): `/Users/edwingacha/proyectos/Documentacion/baterias/` (en macOS se extrae el texto con `osascript -l JavaScript` + PDFKit, porque no hay poppler).
-  - **Etiquetas de D — decisión (2026-10-07)**: no se cambia el backend. D usa los mismos `nivel_riesgo` 1–5; los informes muestran para la forma D las etiquetas del manual de estrés (Tabla 6): 1 Muy bajo, 2 Bajo, 3 Medio, 4 Alto, 5 Muy alto, con el título "Nivel de síntomas de estrés". La API ya da `forma` + `fkNivelRiesgo` para hacer ese mapeo. Si el frontend llegara a necesitarlo antes que los informes: columna `nivel_riesgo.nombre_estres`.
-  - Configuración de D verificada contra el manual de estrés: ítems 1–8 ×4, 9–12 ×3, 13–22 ×2, 23–31 ×1, factor 61,16 (los factores por dimensión de D en `dimension_cuestionario` no se usan).
-  - **Pendiente**: informes (ver sección 10).
-
----
-
-## 3. Patrón de código — dos moldes distintos dentro de Grupo C
-
-### 3.1 Molde "catálogo simple" (con `Identificable`/`Nombrable`)
-
-Usado en: catálogos de Grupo A/B y en `cuestionario`, `dominio`, `dimension`, `opcion_respuesta` (Grupo C).
-
-```java
-@Service
-public class CuestionarioService extends CatalogoCrudService<CuestionarioEntity> {
-    public CuestionarioService(CuestionarioJpaRepository repository) {
-        super(repository, "Cuestionario");
-    }
-}
-
-public interface CuestionarioJpaRepository extends CatalogoJpaRepository<CuestionarioEntity> { }
-
-@NoRepositoryBean
-public interface CatalogoJpaRepository<T> extends JpaRepository<T, Long> {
-    boolean existsByNombre(String nombre);
-    boolean existsByNombreIgnoreCase(String nombre);
-}
-```
-
-`CatalogoCrudService<T extends Identificable & Nombrable>` (clase base completa):
-
-```java
-public abstract class CatalogoCrudService<T extends Identificable & Nombrable> {
-
-    private final CatalogoJpaRepository<T> repository;
-    private final String nombreEntidad;
-
-    protected CatalogoCrudService(CatalogoJpaRepository<T> repository, String nombreEntidad) {
-        this.repository = repository;
-        this.nombreEntidad = nombreEntidad;
-    }
-
-    public T crear(T entidad) {
-        String nombreNormalizado = normalizar(entidad.getNombre());
-        if (repository.existsByNombre(nombreNormalizado)) {
-            throw new CatalogoNombreDuplicadoException(nombreEntidad, nombreNormalizado);
-        }
-        return repository.save(entidad);
-    }
-
-    public T actualizar(Long id, T entidad) {
-        T existente = obtenerPorId(id);
-        String nombreNormalizado = normalizar(entidad.getNombre());
-        boolean cambioNombre = !existente.getNombre().equalsIgnoreCase(nombreNormalizado);
-        if (cambioNombre && repository.existsByNombreIgnoreCase(nombreNormalizado)) {
-            throw new CatalogoNombreDuplicadoException(nombreEntidad, nombreNormalizado);
-        }
-        existente.setNombre(nombreNormalizado);
-        return repository.save(existente);
-    }
-
-    private String normalizar(String valor) {
-        return valor == null ? null : valor.trim();
-    }
-
-    public T obtenerPorId(Long id) {
-        return repository.findById(id)
-                .orElseThrow(() -> new CatalogoNoEncontradoException(nombreEntidad, id));
-    }
-
-    public List<T> listarTodos() {
-        return repository.findAll();
-    }
-
-    public void eliminar(Long id) {
-        if (!repository.existsById(id)) {
-            throw new CatalogoNoEncontradoException(nombreEntidad, id);
-        }
-        repository.deleteById(id);
-    }
-}
-```
-
-**Regla de decisión**: este molde solo aplica cuando la entidad se identifica de forma única por un campo `nombre` real (no cuando `nombre` es solo descriptivo).
-
-### 3.2 Molde "entidad plana" (service propio, sin `CatalogoCrudService`)
-
-Usado en: `cliente`, `evaluado`, `evaluado_cliente`, `aplicacion` — y se usará en el resto de Grupo C pendiente.
-
-Razón: ninguna de estas tablas tiene una clave de negocio de tipo `nombre` único (`cliente` usa `nit`, `evaluado` usa `numero_identificacion`, `evaluado_cliente`/`aplicacion` no tienen ni campo `nombre`). Forzar `Identificable`/`Nombrable` aquí generaría semántica falsa (ver discusión completa en la sección 5).
-
-Estructura por tabla (4 archivos + DTOs):
-- `{Entidad}Entity` (JPA)
-- `{Entidad}JpaRepository` (`extends JpaRepository<Entidad, Long>` directo, **no** `CatalogoJpaRepository`)
-- `{Entidad}Service` (clase propia, sin herencia)
-- `{Entidad}Controller`
-- `{Entidad}Request` / `{Entidad}Response` (records, en subpaquete `dto/`)
-
-Cada `Service` implementa su propia validación de unicidad/integridad de negocio (no genérica):
-- `cliente` → único por `nit`
-- `evaluado` → único por `numero_identificacion`
-- `evaluado_cliente` → único **activo** por (`fk_evaluado`, `fk_cliente`) — no se puede repetir una relación activa; si se reactiva tras estar inactiva, se permite crear una fila nueva (no se fuerza reactivación de la anterior)
-- `aplicacion` → sin unicidad; `fecha_aplicacion` y `estado` se completan manualmente en el service si el request no los manda (`LocalDateTime.now()` y `"FINALIZADA"` respectivamente), porque Hibernate ignora los `DEFAULT` de Postgres al mandar `INSERT` con esos campos en `null`
-
----
-
-## 4. Piezas transversales (`shared/`)
-
-```java
-public final class ResponseBuilder {
-    public static <T> ApiResponse<T> success(String message, T data) {
-        return ApiResponse.<T>builder()
-                .success(true).message(message).data(data)
-                .timestamp(LocalDateTime.now()).build();
-    }
-
-    public static ApiError error(String message, String errorCode, List<String> details) {
-        return ApiError.builder()
-                .success(false).message(message).errorCode(errorCode)
-                .details(details).timestamp(LocalDateTime.now()).build();
-    }
-}
-
-@Data @Builder @NoArgsConstructor @AllArgsConstructor
-public class ApiResponse<T> {
-    private boolean success;
-    private String message;
-    private T data;
-    private LocalDateTime timestamp;
-}
-
-@Data @Builder
-public class ApiError {
-    private boolean success;
-    private String message;
-    private String errorCode;
-    private List<String> details;
-    private LocalDateTime timestamp;
-}
-```
-
-Excepciones:
-```java
-public class BusinessException extends RuntimeException { /* ... */ }
-public class ResourceNotFoundException extends RuntimeException { /* ... */ }
-public class ValidationException extends RuntimeException { /* con List<String> details */ }
-
-// Específicas de shared/catalogo, extienden las genéricas:
-public class CatalogoNombreDuplicadoException extends BusinessException { /* ... */ }
-public class CatalogoNoEncontradoException extends ResourceNotFoundException { /* ... */ }
-```
-
-`GlobalExceptionHandler` (`@RestControllerAdvice`) maneja, en este orden de especificidad:
-1. `ResourceNotFoundException` → 404
-2. `BusinessException` → 409
-3. `ValidationException` → 400 (con `details`)
-4. `MethodArgumentNotValidException` (bean validation `@Valid`) → 400
-5. **`DataIntegrityViolationException`** (agregado en esta sesión) → 409, cubre violaciones de FK/UNIQUE que se escapan a nivel de Postgres (ej. `fk_industria` inexistente). Requiere agregar `DATA_INTEGRITY_VIOLATION` al enum `ErrorCode` (no confirmado si ya se agregó — **verificar**).
-6. `Exception.class` genérico → 500 (con log de error)
-
-```java
-@ExceptionHandler(DataIntegrityViolationException.class)
-public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-    log.warn("Violación de integridad de datos: {}", ex.getMostSpecificCause().getMessage());
-    ApiError error = ResponseBuilder.error(
-            "La operación viola una restricción de integridad de datos (verifique que las referencias existan y no haya duplicados)",
-            ErrorCode.DATA_INTEGRITY_VIOLATION.name(), null);
-    return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
-}
-```
-
-**Auditoría**: los campos `fecha_creado`, `fecha_modificado`, `usuario_crea`, `usuario_modifica` **no se gestionan automáticamente** (no hay `@EnableJpaAuditing` ni `AuditorAware`). `fecha_creado` se mapea con `insertable=false, updatable=false` (la BD la pone por `DEFAULT`); el resto quedan en `NULL` salvo que se seteen manualmente en el futuro. Decisión explícita del usuario: no se implementa auditoría automática porque "tocaría hacer un ajuste significativo en la BD".
-
----
-
-## 5. Convenciones y decisiones de diseño confirmadas
-
-- **Naming de campos**: las entidades JPA usan camelCase mapeado a snake_case vía `@Column(name = "...")`; no se sigue el nombre literal de la columna SQL cuando conviene semántica de negocio distinta (ver nota histórica: en el ejemplo original de `Cuestionario`, el campo Java se llamaba `nombre` pese a que la columna SQL es `descripcion` — para las tablas nuevas del Grupo C se prefirió respetar el nombre real de columna, ej. `numeroIdentificacion` para `numero_identificacion`).
-- **`Identificable`/`Nombrable`**: solo se implementan cuando la entidad tiene una clave de negocio real de tipo nombre único. No se implementan "por si acaso" aunque Lombok genere `getId()`/`getNombre()` que técnicamente cumplirían la interfaz — hacerlo sin necesidad sería semántica engañosa y código muerto.
-- **Filtrado en listados**: se prefiere `@RequestParam` opcional sobre `GET` general (ej. `GET /evaluados?numeroIdentificacion=123`, `GET /evaluado-clientes?fkEvaluado=X&fkCliente=Y`) en vez de rutas anidadas tipo `GET /evaluados/cedula/{id}`, para mantener consistencia con el patrón ya usado en Grupo B.
-- **Búsqueda por clave de negocio devuelta como lista de 1 elemento**: cuando un filtro por `@RequestParam` encuentra coincidencia única (ej. por cédula), se envuelve en `List.of(resultado)` para mantener el tipo de retorno consistente (`List<Response>`) entre el caso filtrado y el caso de listar todo. Alternativa no tomada: usar `ResponseEntity<?>` o endpoints separados.
-- **Violaciones de FK**: no se valida manualmente en cada service que las FKs referenciadas existan antes de guardar; se delega en la constraint de Postgres + el handler genérico de `DataIntegrityViolationException` en `GlobalExceptionHandler`. Decisión tomada para no repetir la misma validación en las ~9 tablas de Grupo C restantes.
-- **`evaluado_cliente`**: representa la relación laboral evaluado↔cliente. Solo puede existir **una fila activa** (`activo = true`) por par (`fk_evaluado`, `fk_cliente`). Si el evaluado deja la empresa y años después vuelve a ser contratado por el mismo cliente, se permite crear una **fila nueva** (no se reactiva la anterior) — se conserva el historial completo.
-
----
-
-## 6. Incidentes resueltos en esta sesión (para no repetir)
-
-1. **Flyway checksum mismatch en `V1`**: ocurrió porque se editó `V1__initial_schema.sql` después de haber sido aplicado (se eliminaron los `INSERT` de datos maestros). Como los datos ya estaban insertados en la BD, la solución correcta fue `flyway:repair` (no `DROP SCHEMA`, que habría dejado los catálogos vacíos). Comando final que funcionó en PowerShell (los argumentos `-D` deben ir entre comillas por el `://` en la URL):
-   ```powershell
-   ./mvnw flyway:repair "-Dflyway.url=jdbc:postgresql://localhost:5432/bateria_psicosocial" "-Dflyway.user=postgres" "-Dflyway.password=1234"
-   ```
-   **Regla a futuro**: nunca editar una migración de Flyway ya aplicada; crear una migración nueva (`V2__...`) en su lugar.
-
-2. **`DataIntegrityViolationException` al actualizar `cliente`**: fue un error de uso (se llamó `PUT` con `fkIndustria=0` en vez de un ID válido), no un bug — confirmó que el handler agregado en `GlobalExceptionHandler` funciona correctamente devolviendo 409 en vez de 500.
-
----
-
-## 7. Estado de `application.properties`
-
-```properties
-spring.application.name=riesgo-psicosocial
-server.port=8080
-server.servlet.context-path=/api
-spring.profiles.active=dev
-spring.jpa.open-in-view=false
-spring.jackson.time-zone=America/Bogota
-spring.jackson.serialization.write-dates-as-timestamps=false
-spring.flyway.repair-on-migrate=false
-logging.config=classpath:logback-spring.xml
-springdoc.api-docs.path=/v3/api-docs
-springdoc.swagger-ui.path=/swagger-ui.html
-spring.servlet.multipart.max-file-size=20MB
-spring.servlet.multipart.max-request-size=20MB
-```
-
-`application-dev.properties`:
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/bateria_psicosocial
-spring.datasource.username=postgres
-spring.datasource.password=1234
-spring.datasource.driver-class-name=org.postgresql.Driver
-spring.jpa.show-sql=true
-spring.jpa.hibernate.ddl-auto=validate
-spring.jpa.properties.hibernate.format_sql=true
-spring.jpa.properties.hibernate.jdbc.time_zone=America/Bogota
-```
-
-(`ddl-auto=validate` → el esquema lo gestiona Flyway exclusivamente; Hibernate solo valida que las entidades coincidan.)
-
----
-
-## 8. Preguntas abiertas / pendientes antes de continuar
-
-1. **`ErrorCode.DATA_INTEGRITY_VIOLATION`**: ✅ confirmado, ya está agregado al enum `ErrorCode`.
-2. **`aplicacion.estado`**: ¿existe un catálogo cerrado de valores (`FINALIZADA`, `EN_PROGRESO`, `ANULADA`...) o es texto libre por ahora? Sin resolver aún.
-3. **Diseño de Grupo D — `respuesta`**: ✅ resuelto (ver sección 2). Pendiente solo el motor de cálculo (`resultado_*`):
-   - Definir el disparador del cálculo (automático al finalizar `aplicacion` vs. endpoint explícito)
-   - Diseñar el `domain`/`application` del motor de cálculo de riesgo
-
----
-
-## 9. Script SQL completo de referencia
-
-El script de creación de las ~34 tablas (`cuestionario`, `dominio`, `dimension`, `opcion_respuesta`, `escala`, `escala_detalle`, `nivel_riesgo`, `dimension_cuestionario`, `dominio_cuestionario`, `baremo_dimension`, `baremo_dominio`, `baremo_cuestionario`, `pregunta`, tablas maestras de evaluado/cliente, ubicación geográfica, sectores/industria, `cliente`, `evaluado`, `evaluado_cliente`, `aplicacion`, `respuesta`, `resultado_dimension`, `resultado_dominio`, `resultado_cuestionario`) ya fue compartido al inicio de la conversación original y corresponde a `V1__initial_schema.sql`. Pégalo aparte en IntelliJ si necesitas que Claude lo tenga en contexto de nuevo, ya que no se incluye aquí para no duplicar un archivo grande que ya tienes en el repo.
-
----
-
-## 10. Siguiente paso acordado (retomar el 2026-10-14)
-
-### Estado al cierre del 2026-10-15
-- Informe de empresa: lo del 13 quedó en `4b11109`. Plan del 15, todo ✅ y commiteado: (1) concentración intralaboral, estrés, conclusiones `9508997`; (2) mínimo N `3eee3a9`; (3) introducción e interpretación de niveles `2aa0f24`; (4) extralaboral `0408c30`; (5) características de la población `b225cf6`; (6) total general `e9d8ba4`; (7) JSON completo `375a251`. Tests: 66. Todo subido a `origin/main` el 2026-10-15.
-- **Orden actual del Word**: datos de la empresa · 1. Introducción · 2. Población evaluada (cobertura por ciudad + características: forma aplicada, sexo, rango de edad, nivel académico, tipo de cargo y de contrato, tablas de dos en dos) · 3. Resultados globales (intralaboral, extralaboral, **total general** intra + extra, estrés) · una sección por forma (A, B) · Concentración del riesgo intralaboral (A+B) · Factores de riesgo extralaborales (dimensiones de C de a 2, ciudad, área; **antes del estrés por pedido del usuario**) · Síntomas de estrés · Interpretación de los niveles (textos de los manuales, compartidos con el individual vía `InformeVistaMapper`) · Conclusiones · Plan de acción + firma. La numeración se ajusta sola según las formas presentadas.
-- **Confidencialidad**: `AnalizadorInformeEmpresa.MINIMO_PERSONAS_GRUPO = 2` (provisional, decisión del usuario): por prueba, los grupos (ciudad/área) con menos personas se juntan en "Otras ciudades"/"Otras áreas" al final (`DesgloseGrupos.agrupados`); si aun juntos no llegan, se omiten con nota (`omitidos`).
-- **V12** (2026-10-15): corrige la errata "Bachillerato in completo" → "Bachillerato incompleto" en `nivel_academico` (id 4).
-- **Conclusiones y plan de acción guardados en la BD** (2026-10-15; el usuario revirtió la decisión de llenarlos a mano en el Word): **V13** tabla `informe_empresa` (una fila por `fk_cliente` + `anio`, UNIQUE; `conclusiones`, `acciones_corto_plazo`, `acciones_mediano_plazo`, `acciones_largo_plazo` TEXT; `fk_evaluador` opcional = profesional responsable). CRUD molde "entidad plana" en `persistence/informeempresa/` (`InformeEmpresaEntity`, `InformeEmpresaJpaRepository`, `ConclusionesInformeEmpresaService`) + `rest/informe/ConclusionesInformeEmpresaController`: `GET /clientes/{idCliente}/informe/conclusiones?anio=` (si no hay nada: vacío con `guardado=false`, sin crear fila) y `PUT` mismo path (crea o reemplaza todo; blanco = vacío; textos con `strip`). Validaciones: cliente inexistente / año sin aplicaciones → 404; evaluador inexistente → 404, inactivo → 409 (solo al asignarlo o cambiarlo). El informe lee esta fila (`InformeEmpresaPort.buscarConclusiones`/`buscarFirma` → `InformeEmpresa.conclusiones`, `ConclusionesInforme.VACIAS` si no hay): el Word pone los textos en los recuadros (un párrafo por línea; vacío = texto guía) y llena "Profesional responsable" con los datos del evaluador, **su firma** (`DocxSoporte.imagenFirma`, compartida con el individual) y "T.P. … – Licencia SO …"; sin evaluador, en blanco. JSON: sección `conclusiones` con textos, `profesional` y `faltantes`. **La descarga exige las cuatro partes** (`ConclusionesInforme.faltantes()`; `DocumentoInformeEmpresaService` → 409 listando lo que falta); el profesional no es obligatorio. Probado por el usuario de punta a punta (`e790395`).
-- **devtools**: la app de IntelliJ tiene `spring-boot-devtools`; un `sh mvnw compile`/`test` la reinicia sola y Flyway aplica migraciones nuevas en la BD local (así se aplicaron V12 y V13). `@SpringBootTest` también corre contra la BD local.
-- `DocxInformeEvaluadoGenerator` usa `DocxSoporte` (2026-10-15): se borraron sus copias de las piezas comunes (eran idénticas); conserva sus tonos suaves como `COLOR_NIVEL_SUAVE`.
-- **Periodicidad de la evaluación — ✅ implementada** (2026-10-15). Res. 2764 de 2022, art. 3 (PDF en `/Users/edwingacha/proyectos/Documentacion/baterias/Resolución 2764 de 2022 Ministerio del Trabajo.pdf`): anual si el nivel intralaboral de la empresa es alto o muy alto en la forma A **o** en la B; cada dos años si es medio o bajo. Nivel de la empresa (parágrafo): por forma, promedio del puntaje bruto total de las personas → `CalculadoraResultado.transformar` (ahora pública y compartida con el motor) → baremo total de la forma.
-  - **Dónde vive**: la regla en código (`AnalizadorInformeEmpresa.nivelRiesgoEmpresa`, enum `Periodicidad`; "alto/muy alto" = los dos últimos niveles del catálogo); los datos en la BD (`cuestionario.factor_transformacion`, `baremo_cuestionario` de A y B, `nivel_riesgo`, `resultado_cuestionario`) vía `InformeEmpresaPort.buscarConfiguracionNivelEmpresa`; los textos en `DocxInformeEmpresaGenerator`. Funciona sola para cualquier cliente/año; un cambio de norma exige tocar código (opción descartada por ahora: tabla `periodicidad_evaluacion`). Sin baremo para el puntaje → 409.
-  - Se calcula al vuelo, no se guarda ni compara años ni da fecha (la norma la cuenta desde el inicio de la intervención, dato que el sistema no tiene).
-  - Word: tabla "Nivel de riesgo intralaboral de la empresa y periodicidad de la evaluación" en Resultados globales tras el intralaboral + párrafo "Periodicidad" en la introducción. JSON: `resultadosGlobales.nivelEmpresa` {formas, periodicidad, periodicidadDescripcion}. Datos de prueba: A 27,8 medio, B 30,0 medio → cada dos años. **Descartados por el usuario** (2026-10-15): PDF del informe de empresa y las preguntas abiertas para el área usuaria (factor protector/riesgo, mínimo N oficial, guardar conclusiones, catálogo de áreas).
-- "EAF" es texto libre de `evaluado_cliente` 1 (evaluado 1, dato de prueba inicial); nadie sabe qué significa.
-
-### Estado al cierre del 2026-10-13
-- Tests: 55 (`sh mvnw test`): a los 37 de abajo se suman 10 `AnalizadorInformeEmpresaTest`, 7 `InformeEmpresaServiceTest` y 1 `DocxInformeEmpresaGeneratorTest`.
-- **La app la arranca el usuario desde IntelliJ (puerto 8080)**: no levantar ni detener instancias desde la terminal sin avisar (una instancia propia le bloqueó el despliegue). Para probar, pedirle que reinicie y descargue el Word desde Swagger.
-- Datos de prueba del informe de empresa (solo BD local; respaldo previo en el scratchpad de la sesión, `respaldo_antes_datos_prueba.dump`): de las 200 personas del cliente 1, **162 evaluadas** (160 aplicaciones nuevas con fechas 2026-08-01…2026-10-11, estado FINALIZADA, A para grupo 1 y B para grupo 2, C y D para todos; `atiende_clientes` true en Comercial/VENTAS y 30 % del resto, `es_jefe` 25 % del grupo 1). 157 calculadas por `POST /aplicaciones/{id}/resultados`; las aplicaciones **196, 197 y 200** se dejaron sin calcular a propósito (pendientes de cálculo). Cifras 2026: 200 esperados, 162 evaluados (81 %), 3 pendientes; intralaboral (159) 34/25/35/30/35, extralaboral (158) 22/34/41/43/18, estrés (158) 9/40/62/41/6. `/informe/anios` da [2027, 2026] porque los no evaluados conservan fechas 2027.
-
-### Estado al cierre del 2026-10-08
-- **Informe individual completo** (JSON, PDF y Word), todo commiteado y subido a `origin/main`. Migraciones aplicadas en la BD local hasta **V11**.
-- Tests: 37 (`./mvnw test`, o `sh mvnw test` en macOS): 16 `CalculadoraResultadoTest`, 11 `InformeEvaluadoServiceTest`, 3 `DocumentoInformeEvaluadoServiceTest`, 2 `GeneradoresInformeEvaluadoTest` (PDF y Word con datos de ejemplo), 4 `ArquitecturaHexagonalTest`, 1 de contexto.
-- Forma de trabajo acordada: **paso a paso**, mostrando diseño y diff antes de cada commit.
-- Al retomar en otra máquina: arrancar la app para que Flyway aplique hasta V11 (ver sección 0). Si quedó una instancia vieja de la app corriendo (p. ej. IntelliJ en el 8080), reiniciarla.
-- Datos de prueba en la BD local (macOS): cliente 1 "CALZADO CARDINS" (único cliente; Cartagena, industria "Extracción de recursos naturales") con **200 aplicaciones**, de las cuales **solo 2 tienen resultados calculados** (para probar el informe de empresa habrá que calcular el resto, si tienen respuestas). Aplicación 1 (evaluado 1) = A + C + D, con `fk_evaluador = 1` y recomendaciones de prueba; aplicación 2 = solo A; la 3 (evaluado 193) sin resultados ni evaluador. Evaluador 1 "Psicóloga de Prueba" (c.c. 52000111, activo, con una firma de prueba dibujada). Resultados de referencia en la sección 2.
-
-### Informe individual — ✅ implementado (2026-10-08)
-- Módulo `informe` hexagonal: `domain/model/informe`, `application/{port,service}/informe`, `persistence/informe`, `adapter/out/documento/informe` (generadores), `rest/informe`. `ResultadoResponseMapper` (rest/resultado) compartido entre `ResultadoController` e `InformeController`.
-- **JSON**: `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe?anio=` → cliente, evaluado (con sexo y año de nacimiento) y sus aplicaciones con ese cliente (todas las relaciones `evaluado_cliente` del par, activas o no), de la más antigua a la más reciente; cada una con cargo, área, edad (año de aplicación − año de nacimiento: puede ser 1 año mayor), grupo ocupacional, evaluador, observaciones, recomendaciones, `estadoResultados` (`CALCULADO`/`PENDIENTE`) y `resultados`. Sin `anio` = historial completo; año sin aplicaciones → 404. `GET .../informe/anios` → años con aplicaciones, descendente. 404 si no existe el cliente, el evaluado o la relación.
-- **Archivo**: `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe/archivo?anio=2026&formato=pdf|docx` (`anio` obligatorio, `formato` por defecto pdf, sin distinguir mayúsculas). Sigue los formatos modelo de la batería: Anexos 4 (A) y 5 (B) de `2.-Bateria-riesgo-psicosocial-2.pdf` y Anexo 2 (C) del manual extralaboral; D con la estructura de los demás (el Anexo 3 del manual de estrés **falta** en el PDF local, cortado en la pág. 37) y las etiquetas/interpretación del manual de estrés. Un archivo por año con una sección por aplicación; página 1 = datos del trabajador y del evaluador, desde la 2 resultados (dominios con sus dimensiones, colores por nivel), total general, interpretación de niveles (y de estrés si aplica), observaciones, recomendaciones, fecha de elaboración y firma. Encabezado "CONFIDENCIAL" y "Página X de Y".
-  - Reglas: aplicación sin evaluador o sin resultados → 409 (lista todos los problemas); formato no válido → 400.
-  - Diseño: `GenerarDocumentoInformeEvaluadoUseCase` → `DocumentoInformeEvaluadoService` → `GeneradorDocumentoInformePort` (una implementación por formato, el servicio la elige por `formato()`): `PdfInformeEvaluadoGenerator` (Thymeleaf sin Spring MVC, plantilla `templates/informes/informe-evaluado.html` en XHTML bien formado, + OpenHTMLtoPDF 1.1.22) y `DocxInformeEvaluadoGenerator` (Apache POI 5.4.1; anchos fijos en twips, barras de sección como tablas de una celda, `vMerge`/`gridSpan` para dominio y totales, campos PAGE/NUMPAGES). Ambos parten de `InformeVista` (`InformeVistaMapper`: textos y números ya formateados, coma decimal, interpretaciones del manual) para que digan exactamente lo mismo.
-  - El Word no se pudo ver en Word en la máquina macOS (sin Office/LibreOffice; Quick Look no muestra `vMerge`): **pendiente que el usuario lo abra en Word** y confirme la celda combinada del dominio y el "Página X de Y".
-- **Evaluador (V10)**: tabla `evaluador` (cédula única, nombre, profesión, posgrado, tarjeta profesional, licencia SO y fecha de expedición, firma BYTEA + tipo, `activo`). CRUD `POST/PUT/GET /evaluadores` (filtros `numeroIdentificacion`, `activo`), sin DELETE; firma por `PUT /evaluadores/{id}/firma` (multipart `archivo`, PNG/JPG ≤ 1 MB) y `GET /evaluadores/{id}/firma`. `aplicacion.fk_evaluador` (solo se asignan evaluadores activos; una aplicación conserva el suyo aunque luego se inactive) y `aplicacion.recomendaciones` (un juego de observaciones/recomendaciones por aplicación).
-- **V11**: la dimensión 26 tenía el guion como U+0096 (Windows-1252 mal importado); se revisaron todas las columnas de texto y era el único caso.
-- `GlobalExceptionHandler`: parámetro faltante (`MissingServletRequestParameterException`) o con tipo inválido (`MethodArgumentTypeMismatchException`) → 400 en toda la API (antes caían en el 500).
-- `ResultadoDimension` lleva `idDominioCuestionario` (para agrupar por dominio en los informes).
-- Pendiente para el psicólogo: la dimensión de C se llama "Tiempo fuera del trabajo" en la BD (como en el manual extralaboral), pero el Anexo 2 la lista como "Balance entre la vida laboral y familiar"; cambiar con migración si lo prefiere.
-
-### Informe de empresa — 🚧 en curso (commiteado; última sesión 2026-10-15)
-Referencia: ejemplo del usuario `/Users/edwingacha/proyectos/Documentacion/baterias/Informe total CENTRO GEOLOGIA AC VERSION GERENCIAL.pptx` (informe gerencial de una empresa hecho con Power BI; **datos reales: no subirlo a git**). Se usa como guía de contenido, no se copia su diseño (el usuario prefirió barras separadas a las barras 100 % apiladas del ejemplo).
-
-**Estructura acordada con el usuario** (se arma paso a paso, mostrando el resultado en Word antes de seguir):
-1. Población evaluada: **esperados** = personas cargadas en `evaluado_cliente` (relaciones activas del cliente; siempre existen) vs **evaluados** = personas con filas en `respuesta` en el año. Agrupada **por ciudad de trabajo** (`evaluado_cliente.fk_ciudad_trabajo`, agrupada por id porque hay municipios con el mismo nombre en distintos departamentos; sin ciudad = "Sin ciudad"), con fila TOTAL. Sin gráfico (con muchas sedes quedaría apiñado).
-2. Resultados globales: tres tablas (intralaboral, extralaboral, estrés) con cantidad y % por nivel + gráfico de barras por nivel.
-3. Por cada forma intralaboral (A, luego B; solo las que alguien presentó), **todo junto en su propia sección**: ranking de dominios (tabla + gráfico), ranking de todas las dimensiones de la forma (tabla resumen) y fichas por dimensión (un dominio por página).
-4. **Concentración del riesgo intralaboral (formas A y B)** (2026-10-15): A y B juntas por dominio común (`DominioInforme.idDominio` = `dominio_cuestionario.fk_dominio`; cada persona con el nivel del baremo de su forma). Dominios (ranking, tabla + barras agrupadas), y total intralaboral **por ciudad de trabajo (regionales)** y **por área**: tabla con todos los grupos + gráficos **de a 2 grupos** (`GRUPOS_POR_GRAFICO`), 6 cm de alto, título dinámico dentro del gráfico ("Gráfico 2 de 5 – CALI y MEDELLIN", editable en Word), N en la categoría ("BOGOTA, D.C. (142)"), sin etiquetas en 0 % (formato `0" %";;`, en todas las barras agrupadas), tabla unida a su primer gráfico (`keepNext`). Grupos ordenados por personas de esa prueba. El usuario **descartó los mapas de calor** (tablas coloreadas con % alto+muy alto): se quedan las barras separadas por nivel.
-5. **Síntomas de estrés** (2026-10-15): frecuencia por dimensión de D (el manual **no trae baremos por dimensión**, el motor solo guarda el total): % de respuestas Siempre / Casi siempre / Algunas veces / Nunca en los ítems de cada dimensión, solo de la aplicación que da el resultado de estrés de cada persona; columna "Respuestas (personas × ítems)" con el cálculo ("632 (158 × 4)") porque el usuario pensó que los datos estaban inflados; colores Siempre rojo … Nunca verde (`COLOR_NIVEL` por 6 − id de la opción); orden `FrecuenciaDimension.masFrecuentePrimero()` (más "Siempre", luego "Casi siempre"…). Luego nivel total de estrés por ciudad y por área (etiquetas del manual de estrés), igual que el punto 4.
-6. **Conclusiones del profesional** y 7. **Plan de acción** (corto, mediano y largo plazo) + bloque "Profesional responsable" (datos en blanco y línea de firma): recuadros en blanco con texto guía gris para llenar en Word (decisión del usuario; el sistema no los guarda, al volver a descargar salen vacíos).
-- **Regla del usuario**: cada análisis nuevo va como **sección propia al final** del informe; no se mezcla con las existentes.
-- `AnalizadorInformeEmpresa.analizarPorArea` (análisis completo por área) sigue sin exponerse.
-
-**Reglas de negocio implementadas**
-- Persona con varias aplicaciones en el año: cuenta **una vez**, con la más reciente que tenga resultados (y las preguntas filtro de esa misma aplicación). Las aplicaciones de relaciones inactivas no cuentan.
-- "Pendiente de cálculo" = tiene respuestas pero no resultados: cuenta como evaluada pero no entra en las tablas (nota en el Word).
-- Intralaboral / extralaboral / estrés se distinguen por `metodo_calculo`, no por letra. Intralaboral junta A y B.
-- Porcentajes a 1 decimal (HALF_UP) sobre el total de cada tabla; grupo vacío = 0,0 (sin dividir por cero).
-- **Ranking sin sumar niveles** (el usuario descartó "alto + muy alto" por confuso): `DistribucionNiveles.masCriticaPrimero()` — primero el mayor % en muy alto; en empate, el mayor % en alto, y así hacia abajo; empate total = orden del cuestionario.
-- **Dimensiones condicionales** (demandas emocionales, relación con los colaboradores): no cuentan a quien respondió "no" a la pregunta filtro (`FiltrosAplicacion.noAplica`), porque el cálculo les guarda puntaje 0 = "sin riesgo" y la dimensión parecería protectora. Filtro sin registrar = sí cuenta. En los datos de prueba: colaboradores A cuenta 11 de 50; demandas emocionales excluye 10 (A) y 25 (B).
-- Áreas: se agrupan sin distinguir mayúsculas, tildes ni espacios repetidos; se muestra la escritura más frecuente; vacía = "Sin área". Se ordenan por esperados.
-- Área y ciudad salen del valor **actual** de `evaluado_cliente` (decisión del usuario: "dejémoslo así por ahora"; no se guarda foto en la aplicación).
-- Errores: cliente inexistente → 404; cliente sin personas cargadas → 409; año sin aplicaciones → 404; formato sin generador (pdf) → 409.
-
-**Diseño**
-- Dominio: `domain/model/informe/empresa/` (`ParticipanteEmpresa`, `AnalisisGrupo`, `Cobertura`, `CoberturaCiudad`, `DistribucionNiveles`, `DominiosForma`, `DistribucionDominio`, `DistribucionDimension`, `CuestionarioInforme`/`DominioInforme`/`DimensionInforme`, `AnalisisArea`…) y `domain/service/informe/AnalizadorInformeEmpresa` (lógica pura). `domain/model/resultado/NivelEstres` (etiquetas Muy bajo…Muy alto, compartidas con el informe individual).
-- Aplicación: `ConsultarInformeEmpresaUseCase` → `InformeEmpresaService`; `GenerarDocumentoInformeEmpresaUseCase` → `DocumentoInformeEmpresaService` → `GeneradorDocumentoInformeEmpresaPort` (por formato). Puerto de salida `InformeEmpresaPort`.
-- Persistencia: `persistence/informe/InformeEmpresaPersistenceAdapter`, carga en bloque (~10 consultas por informe) con los nuevos `findByFkAplicacionIn` de `resultado_cuestionario`/`resultado_dominio`/`resultado_dimension`, `RespuestaJpaRepository.buscarAplicacionesConRespuestas`, `AplicacionJpaRepository.buscarPorRelacionesYPeriodo` y `EvaluadoClienteJpaRepository.findByFkClienteAndActivoTrue`. Dimensión → dominio: el `dominio_cuestionario` del mismo cuestionario con `dimension.fk_dominio`. Las dimensiones de C aún no se cargan. Estrés: `RespuestaJpaRepository.buscarPorMetodoCalculo` (respuestas de D con su pregunta y dimensión, en bloque) y `OpcionRespuestaJpaRepository.buscarPorMetodoCalculo` (opciones de las escalas de D).
-- REST (`rest/informe/InformeEmpresaController`): `GET /clientes/{idCliente}/informe?anio=` (JSON en el orden del Word, armado por `InformeEmpresaResponseMapper` — sin cálculo propio, sale del mismo `InformeEmpresa` que el Word: cliente, cobertura, `coberturaPorCiudad`, `pendientesCalculo`, `poblacion`, `resultadosGlobales` {intralaboral, extralaboral, totalGeneral, estres}, `formas`, `concentracionIntralaboral`, `factoresExtralaborales`, `sintomasEstres`; desgloses con `grupos`/`agrupados`/`omitidos`; sin los textos fijos ni los espacios para llenar), `GET .../informe/anios`, `GET .../informe/archivo?anio=&formato=docx` (por defecto docx; nombre `informe_empresa_{nit}_{anio}.docx`).
-- Word: `DocxInformeEmpresaGenerator` + `DocxSoporte` (piezas comunes de los dos informes en Word) + `DocxGraficos` (**gráficos nativos de Word** con XDDF, editables, datos en Excel incrustado: `barras` = una barra por nivel; `barrasAgrupadas` = por categoría una barra por nivel, con leyenda). Detalles: eje Y con `crossBetween = between` (si no, la primera barra queda montada sobre el eje), colores de nivel del semáforo en tablas y gráficos del informe de empresa (`COLOR_NIVEL` 00B050, 92D050, FFD700, FF8C00, E53935; el individual conserva sus tonos pastel), fichas con `keepNext`/`cantSplit` para no partirse entre páginas, `getCharts()` de POI no respeta el orden del documento (los tests identifican los gráficos por sus categorías).
-- Encabezado del Word: "CONFIDENCIAL – Resultados agregados de la empresa; no contiene información individual".
-- Los gráficos no se ven en Quick Look (macOS): el usuario los revisa en Word.
-
-**Siguiente (cuando el usuario lo indique)**: ver los pendientes en "Estado al cierre del 2026-10-15". Otro posible: puntaje promedio del grupo con su nivel por baremo (como el ejemplo).
-
-**Preguntas para el área usuaria**: el usuario las dio por cerradas el 2026-10-15 (no se van a plantear): factor protector/riesgo, mínimo N oficial (queda 2), guardar conclusiones (se llenan a mano en el Word), catálogo de áreas, consolidado de varias empresas.
-
-### Decisiones vigentes para los informes
-- Navegación prevista del front (aún no existe): listado de clientes → (a) descargar informe de empresa por año, o (b) entrar a los empleados del cliente → descargar informe individual por año.
-- **Requisito para descargar el Word del informe de empresa** (decisión del usuario, 2026-10-15, para cuando se construya el front): el profesional debe diligenciar **desde el front** las conclusiones y **las tres** acciones del plan (corto, mediano y largo plazo) antes de poder descargar el informe. El front guarda con `PUT /clientes/{idCliente}/informe/conclusiones` y solo habilita la descarga cuando las cuatro están completas. El backend ya lo exige en `GET .../informe/archivo` (409 listando lo que falta) y el JSON trae `conclusiones.faltantes` para que el front sepa si habilitar la descarga.
-- Período: **por año** (evaluaciones anuales o cada 2 años según el nivel de riesgo); se ofrecen solo los años con aplicaciones.
-- Confidencialidad: manual intralaboral pág. 1349 — el informe individual es del trabajador (historia clínica ocupacional); la empresa solo lo conoce con autorización escrita y vía el médico de SO → el individual es para el psicólogo/firma evaluadora, no para el cliente. El de empresa, solo agregados con mínimo N. **No hay autenticación en la API**: pendiente antes de producción (roles).
-- La forma D se muestra con las etiquetas del manual de estrés (1 Muy bajo … 5 Muy alto) y el título "Nivel de síntomas de estrés".
-
-### Otros pendientes menores
-- `aplicacion.estado`: definir si es catálogo cerrado (sección 8).
-- Migración de datos maestros (`V13__datos_maestros.sql` o la siguiente libre) para que el repo arranque solo sobre una BD vacía (sección 0).
-- El `PUT /aplicaciones` no permite volver `atiendeClientes`/`esJefe` a `NULL` (solo por SQL); ajustar si hiciera falta.
-- Mensajes de validación de bean validation salen en inglés ("must not be blank"); traducir con mensajes en las anotaciones o `messages.properties`.
+**Moldes CRUD**: (a) *catálogo simple* (`CatalogoCrudService<T extends Identificable & Nombrable>` + `CatalogoJpaRepository`) solo si hay un `nombre` único real; (b) *entidad plana* (Entity, `JpaRepository` directo, Service propio con su validación de unicidad, Controller, Request/Response records).
+
+**Convenciones**: camelCase ↔ snake_case con `@Column`; filtros por `@RequestParam` opcional (búsqueda única devuelta como `List.of(x)`); FKs inválidas las ataja Postgres + handler `DataIntegrityViolationException` → 409; sin `DELETE` en tablas de negocio; auditoría (`fecha_creado` por DEFAULT, el resto manual) sin `@EnableJpaAuditing` (decisión del usuario).
+
+**Errores** (`GlobalExceptionHandler`): 404 `ResourceNotFoundException`; 409 `BusinessException`/`ReglaNegocioException`/integridad; 400 validación, parámetro faltante o de tipo inválido; 500 el resto.
+
+**Regla Flyway**: nunca editar una migración aplicada (incidente: checksum de V1 → `flyway:repair`); si se cargan datos con ids explícitos, terminar con `setval`.
+
+## 2. Dominio de la batería y motor de cálculo
+
+- Cuestionarios: A y B intralaboral (`SUMA_POR_DOMINIOS`, factores 492 y 388), C extralaboral (`SUMA_DIRECTA`, 124), D estrés (`PROMEDIO_PONDERADO`, 61,16; pesos por dimensión 4/3/2/1). Se distinguen por `metodo_calculo`, nunca por letra. C y D son iguales para todos; lo que cambia por grupo ocupacional es el baremo.
+- `grupo_ocupacional` (1 jefes/profesionales/técnicos → A; 2 auxiliares/operarios → B). `aplicacion.fk_grupo_ocupacional` es **foto al aplicar** (se deriva de `tipo_cargo` si no viene).
+- `respuesta`: inmutable (sin PUT); `valor_obtenido` lo calcula el backend con `escala_detalle`.
+- **Motor** (`POST/GET /aplicaciones/{id}/resultados`, recalculable): `CalculadoraResultado` (dominio puro). Transformado = bruto/factor×100 a 1 decimal HALF_UP (`CalculadoraResultado.transformar`, pública). A/B guardan dimensiones+dominios+total; C dimensiones+total; D solo total (el manual no trae baremos por dimensión de D). Falta un baremo → 409, nunca resultados parciales.
+- Preguntas filtro (V7/V8): `aplicacion.atiende_clientes`/`es_jefe` (`NULL` = no registrado); `dimension_cuestionario.condicion_aplicacion` (demandas emocionales, relación con los colaboradores) y `max_items_sin_respuesta` (tolerancia 1 en 4 dimensiones de A/B). Dimensión que no aplica = bruto 0.
+- **Total general** (V9): bruto A o B + bruto C, factor 616 (A+C) o 512 (B+C), baremos Tabla 34 en `baremo_total_general`; `resultado_total_general`. D no entra.
+- Etiquetas de estrés: mismos `nivel_riesgo` 1–5 mostrados como Muy bajo…Muy alto (`domain.model.resultado.NivelEstres`), título "Nivel de síntomas de estrés".
+- Toda la configuración (escalas, ítems, factores, dominios, dimensiones y baremos de A, B, C y D) quedó verificada contra los manuales (V3–V6).
+
+**Migraciones**: V1 esquema · V2 grupo ocupacional/método de cálculo · V3 escalas invertidas e ítems de C · V4 baremos de C y D · V5 secuencias · V6 retroalimentación A/B · V7 preguntas filtro · V8 condiciones y tolerancias · V9 total general · V10 evaluador · V11 guion U+0096 · V12 errata "Bachillerato incompleto" · V13 `informe_empresa` (conclusiones). Siguiente libre: **V14**.
+
+## 3. Informe individual — ✅ completo y verificado por el usuario (Word y PDF)
+
+- `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe?anio=` (JSON; sin `anio` = historial), `.../informe/anios`, `.../informe/archivo?anio=&formato=pdf|docx`.
+- Sigue los formatos modelo de la batería (Anexos 4 y 5 intralaboral, Anexo 2 extralaboral; D con la estructura de los demás). Un archivo por año, una sección por aplicación; datos del trabajador y del evaluador, resultados, interpretación, observaciones, recomendaciones y firma. Encabezado "CONFIDENCIAL – Hace parte de la historia clínica ocupacional del trabajador".
+- Aplicación sin evaluador o sin resultados → 409. PDF y Word salen de `InformeVista` (`InformeVistaMapper`).
+- **Evaluador** (V10): CRUD `/evaluadores` (sin DELETE, `activo`), firma por `PUT /evaluadores/{id}/firma` (PNG/JPG ≤ 1 MB). Solo se asignan evaluadores activos; quien ya lo tenía lo conserva aunque se inactive.
+- El informe individual es del trabajador (historia clínica): para el psicólogo, no para el cliente.
+
+## 4. Informe de empresa — ✅ completo (Word y JSON)
+
+Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`, `.../informe/archivo?anio=&formato=docx` (`informe_empresa_{nit}_{anio}.docx`), `GET/PUT .../informe/conclusiones?anio=`.
+
+**Orden del Word** (numeración automática según las formas presentadas): datos de la empresa · 1 Introducción (marco Res. 2764, objetivo, instrumentos aplicados, población, periodicidad, confidencialidad) · 2 Población evaluada (cobertura por ciudad + características: forma, sexo, rango de edad, nivel académico, tipo de cargo y de contrato) · 3 Resultados globales (intralaboral + **nivel de la empresa y periodicidad**, extralaboral, total general, estrés) · una sección por forma A/B (ranking de dominios, ranking de dimensiones, fichas) · Concentración del riesgo intralaboral A+B (dominios, ciudad, área) · Factores extralaborales (dimensiones, ciudad, área) · Síntomas de estrés (frecuencia por dimensión, ciudad, área) · Interpretación de los niveles · Conclusiones · Plan de acción (corto/mediano/largo) + profesional responsable con firma.
+
+**Reglas**
+- Esperados = relaciones activas de `evaluado_cliente`; evaluados = con respuestas en el año. Cada persona cuenta una vez, con su aplicación más reciente con resultados. "Pendiente de cálculo" cuenta como evaluada pero no entra en las tablas.
+- % a 1 decimal sobre el total de cada tabla. **Ranking sin sumar niveles**: primero el mayor % en muy alto, luego alto… (`DistribucionNiveles.masCriticaPrimero()`).
+- Dimensiones condicionales: no cuentan a quien respondió "no" a la pregunta filtro.
+- Área y ciudad: valor **actual** de `evaluado_cliente`; áreas sin distinguir mayúsculas/tildes/espacios.
+- **Confidencialidad**: `MINIMO_PERSONAS_GRUPO = 2` (decisión del usuario); por prueba, grupos menores se juntan en "Otras ciudades/áreas" al final; si aun juntos no llegan, se omiten con nota.
+- Estrés por dimensión: % de respuestas Siempre…Nunca (personas × ítems, mostrado como "632 (158 × 4)").
+- **Periodicidad (Res. 2764 de 2022, art. 3)**: por forma, promedio del bruto total intralaboral → transformado → baremo de la forma; **anual** si alguna forma queda en alto/muy alto, si no **cada dos años**. Regla en código (`AnalizadorInformeEmpresa.nivelRiesgoEmpresa`, enum `Periodicidad`), datos en BD (factores, `baremo_cuestionario`, `nivel_riesgo`). Se calcula al vuelo (no se guarda, no compara años, no da fecha).
+- **Conclusiones** (V13, `informe_empresa`, una fila por cliente+año): conclusiones, tres acciones y `fk_evaluador` opcional. **La descarga del Word exige las cuatro partes** (409 con lo que falta); el JSON trae `conclusiones.faltantes` para que el front habilite la descarga. Con evaluador, el Word pone sus datos y su firma.
+- Errores: cliente inexistente / año sin aplicaciones → 404; cliente sin personas → 409; formato no soportado (pdf) → 409.
+
+**Diseño**: dominio `domain/model/informe/empresa/` + `domain/service/informe/AnalizadorInformeEmpresa` (puro); `InformeEmpresaService` / `DocumentoInformeEmpresaService` / `InformeEmpresaPort`; `InformeEmpresaPersistenceAdapter` (carga en bloque) + `FichasPersonaLoader`; Word `DocxInformeEmpresaGenerator` + `DocxSoporte` (piezas comunes a los dos informes, incluida la firma) + `DocxGraficos` (gráficos nativos de Word editables; barras agrupadas de a 2 grupos, 6 cm, título dinámico, sin etiquetas en 0 %); JSON `InformeEmpresaResponseMapper` (sin cálculo, sale del mismo `InformeEmpresa` que el Word). Colores semáforo `COLOR_NIVEL` (empresa); el individual usa `COLOR_NIVEL_SUAVE`.
+
+**Preferencias del usuario para informes**: cada análisis nuevo va como **sección propia al final** (salvo que pida otra ubicación); tabla + barras agrupadas separadas por nivel (no mapas de calor ni barras 100 % apiladas); recordar la lista de pasos con su estado antes de proponer el siguiente. Descartados: PDF del informe de empresa y las preguntas al área usuaria (factor protector/riesgo, mínimo N oficial, catálogo de áreas, consolidado de varias empresas).
+
+**Datos de prueba (BD local)**: cliente 1 "CALZADO CARDINS", 200 personas, 162 evaluadas en 2026 (aplicaciones 196, 197 y 200 sin calcular a propósito); evaluador 1 "Psicóloga de Prueba" activo con firma. Nivel de la empresa: A 27,8 y B 30,0 (medio) → cada dos años. "EAF" es un área de prueba de texto libre.
+
+## 5. Pendientes
+
+**Antes de producción**
+1. Autenticación y roles en la API (hoy cualquiera ve informes confidenciales y edita conclusiones).
+2. Migración `V14__datos_maestros.sql` para arrancar sobre una BD vacía.
+3. Front (no existe): clientes → informe de empresa por año, o empleados → informe individual; diligenciar conclusiones y las tres acciones antes de descargar el Word de empresa.
+
+**Menores / por decidir**
+4. `aplicacion.estado`: ¿catálogo cerrado (FINALIZADA, EN_PROGRESO, ANULADA…) o texto libre?
+5. Dimensión de C "Tiempo fuera del trabajo" vs "Balance entre la vida laboral y familiar" (Anexo 2): lo decide el psicólogo.
+6. `PUT /aplicaciones` no permite volver `atiendeClientes`/`esJefe` a `NULL` (solo por SQL).
+7. Mensajes de bean validation en inglés ("must not be blank").
+
+**Opcionales del informe de empresa**: puntaje promedio del grupo con su nivel por baremo (como el ejemplo); fecha de inicio de la intervención para calcular la próxima evaluación; guardar la periodicidad como registro histórico; evolución entre años; exponer `AnalizadorInformeEmpresa.analizarPorArea`.
