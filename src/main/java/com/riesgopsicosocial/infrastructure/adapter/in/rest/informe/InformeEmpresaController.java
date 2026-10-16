@@ -4,11 +4,6 @@ import com.riesgopsicosocial.application.port.in.informe.ConsultarInformeEmpresa
 import com.riesgopsicosocial.application.port.in.informe.GenerarDocumentoInformeEmpresaUseCase;
 import com.riesgopsicosocial.domain.model.informe.DocumentoInforme;
 import com.riesgopsicosocial.domain.model.informe.FormatoDocumento;
-import com.riesgopsicosocial.domain.model.informe.empresa.AnalisisGrupo;
-import com.riesgopsicosocial.domain.model.informe.empresa.ConteoNivel;
-import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionNiveles;
-import com.riesgopsicosocial.domain.model.informe.empresa.InformeEmpresa;
-import com.riesgopsicosocial.domain.model.resultado.NivelEstres;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.*;
 import com.riesgopsicosocial.shared.exception.ValidationException;
 import com.riesgopsicosocial.shared.response.ApiResponse;
@@ -20,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.function.Function;
 
 @RestController
 @RequestMapping("/clientes/{idCliente}/informe")
@@ -38,41 +32,14 @@ public class InformeEmpresaController {
         this.generarDocumentoInformeEmpresa = generarDocumentoInformeEmpresa;
     }
 
-    private InformeEmpresaResponse toResponse(InformeEmpresa informe) {
-        AnalisisGrupo general = informe.general();
-        return new InformeEmpresaResponse(
-                new ClienteInformeResponse(informe.cliente().id(), informe.cliente().nit(), informe.cliente().nombre()),
-                informe.anio(),
-                new CoberturaResponse(general.cobertura().esperados(), general.cobertura().evaluados(),
-                        general.cobertura().porcentaje()),
-                general.coberturaPorCiudad().stream()
-                        .map(c -> new CoberturaCiudadResponse(c.idCiudad(), c.ciudad(), c.cobertura().esperados(),
-                                c.cobertura().evaluados(), c.cobertura().porcentaje()))
-                        .toList(),
-                general.pendientesCalculo(),
-                toResponse(general.intralaboral(), c -> c.nivel().nombre()),
-                toResponse(general.extralaboral(), c -> c.nivel().nombre()),
-                // Estrés: mismos niveles 1–5 con las etiquetas del manual de estrés
-                toResponse(general.estres(), c -> NivelEstres.etiqueta(c.nivel().id()))
-        );
-    }
-
-    private DistribucionNivelesResponse toResponse(DistribucionNiveles distribucion, Function<ConteoNivel, String> etiqueta) {
-        return new DistribucionNivelesResponse(
-                distribucion.total(),
-                distribucion.niveles().stream()
-                        .map(c -> new ConteoNivelResponse(c.nivel().id(), etiqueta.apply(c), c.cantidad(), c.porcentaje()))
-                        .toList());
-    }
-
-    /** Informe de la empresa en el año: cobertura y distribución por nivel de riesgo. */
+    /** Informe de la empresa en el año: lo mismo del Word, sin los textos fijos ni los espacios para llenar a mano. */
     @GetMapping
     public ResponseEntity<ApiResponse<InformeEmpresaResponse>> consultarInformeEmpresa(@PathVariable Long idCliente,
                                                                                       @RequestParam int anio) {
         return ResponseEntity.ok(
                 ResponseBuilder.success(
                         "Informe de la empresa",
-                        toResponse(consultarInformeEmpresa.consultar(idCliente, anio)))
+                        InformeEmpresaResponseMapper.toResponse(consultarInformeEmpresa.consultar(idCliente, anio)))
         );
     }
 
