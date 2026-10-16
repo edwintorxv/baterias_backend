@@ -8,7 +8,7 @@ import java.math.BigInteger;
 import java.util.Map;
 
 /**
- * Piezas comunes de los informes en Word: página carta, tablas de ancho fijo, barras de
+ * Piezas comunes de los informes en Word (individual y de empresa): página carta, tablas de ancho fijo, barras de
  * sección, textos y numeración "Página X de Y".
  */
 final class DocxSoporte {
