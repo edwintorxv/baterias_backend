@@ -2,6 +2,7 @@ package com.riesgopsicosocial.application.service.informe;
 
 import com.riesgopsicosocial.application.port.out.informe.InformeEmpresaPort;
 import com.riesgopsicosocial.domain.model.informe.DatosCliente;
+import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
 import com.riesgopsicosocial.domain.model.informe.empresa.*;
 import com.riesgopsicosocial.domain.model.resultado.NivelRiesgo;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoAplicacion;
@@ -150,6 +151,16 @@ class InformeEmpresaServiceTest {
         @Override
         public List<OpcionFrecuencia> buscarOpcionesEstres() {
             return List.of();
+        }
+
+        @Override
+        public Optional<ConclusionesInforme> buscarConclusiones(Long idCliente, int anio) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<FirmaEvaluador> buscarFirma(Long idEvaluador) {
+            return Optional.empty();
         }
 
     }

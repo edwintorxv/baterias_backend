@@ -1,5 +1,6 @@
 package com.riesgopsicosocial.infrastructure.adapter.in.rest.informe;
 
+import com.riesgopsicosocial.domain.model.informe.DatosEvaluador;
 import com.riesgopsicosocial.domain.model.informe.empresa.*;
 import com.riesgopsicosocial.domain.model.resultado.NivelEstres;
 import com.riesgopsicosocial.domain.model.resultado.NivelRiesgo;
@@ -59,7 +60,18 @@ public final class InformeEmpresaResponseMapper {
                         sintomas.personas(),
                         sintomas.dimensiones().stream().map(InformeEmpresaResponseMapper::frecuencia).toList(),
                         desglose(concentracion.estresPorCiudad(), ESTRES),
-                        desglose(concentracion.estresPorArea(), ESTRES)));
+                        desglose(concentracion.estresPorArea(), ESTRES)),
+                conclusiones(informe.conclusiones()));
+    }
+
+    private static ConclusionesEmpresaResponse conclusiones(ConclusionesInforme conclusiones) {
+        DatosEvaluador p = conclusiones.profesional();
+        return new ConclusionesEmpresaResponse(conclusiones.conclusiones(), conclusiones.accionesCortoPlazo(),
+                conclusiones.accionesMedianoPlazo(), conclusiones.accionesLargoPlazo(),
+                p == null ? null : new EvaluadorInformeResponse(p.id(), p.numeroIdentificacion(), p.nombre(),
+                        p.profesion(), p.posgrado(), p.tarjetaProfesional(), p.licenciaSaludOcupacional(),
+                        p.fechaExpedicionLicencia(), p.tieneFirma()),
+                conclusiones.faltantes());
     }
 
     private static PoblacionResponse poblacion(DescripcionPoblacion poblacion) {

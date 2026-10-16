@@ -1,12 +1,14 @@
 package com.riesgopsicosocial.infrastructure.adapter.in.rest.informe;
 
 import com.riesgopsicosocial.domain.model.informe.DatosCliente;
+import com.riesgopsicosocial.domain.model.informe.DatosEvaluador;
 import com.riesgopsicosocial.domain.model.informe.empresa.*;
 import com.riesgopsicosocial.domain.model.resultado.NivelRiesgo;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.*;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -65,6 +67,12 @@ class InformeEmpresaResponseMapperTest {
                 sintomas.dimensiones().get(0));
         assertEquals(List.of("Bajo", "Alto"), etiquetas(sintomas.porCiudad().grupos().get(0).distribucion()),
                 "estrés por ciudad con las etiquetas del manual de estrés");
+
+        ConclusionesEmpresaResponse conclusiones = respuesta.conclusiones();
+        assertEquals("Conclusiones.", conclusiones.conclusiones());
+        assertEquals("Psicóloga de Prueba", conclusiones.profesional().nombre());
+        assertTrue(conclusiones.profesional().tieneFirma());
+        assertEquals(List.of("acciones a mediano plazo"), conclusiones.faltantes(), "le dice al front qué falta para descargar");
     }
 
     private static List<String> etiquetas(DistribucionNivelesResponse distribucion) {
@@ -89,7 +97,9 @@ class InformeEmpresaResponseMapperTest {
                 new ResultadosExtralaborales(List.of(new DistribucionDimension(36L, "Tiempo fuera del trabajo", DISTRIBUCION)),
                         ciudades, areas),
                 new SintomasEstres(3, List.of(new FrecuenciaDimension(43L, "Síntomas fisiológicos", 3, 2, 6,
-                        List.of(new ConteoFrecuencia(new OpcionFrecuencia(1L, "Siempre"), 6, new BigDecimal("100.0")))))));
+                        List.of(new ConteoFrecuencia(new OpcionFrecuencia(1L, "Siempre"), 6, new BigDecimal("100.0")))))),
+                new ConclusionesInforme("Conclusiones.", "Corto", null, "Largo", new DatosEvaluador(1L, "52000111",
+                        "Psicóloga de Prueba", "Psicóloga", null, "TP-1", "LSO-1", LocalDate.of(2020, 1, 15), true)));
     }
 
 }

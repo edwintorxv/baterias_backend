@@ -5,14 +5,10 @@ import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
 import com.riesgopsicosocial.domain.model.informe.FormatoDocumento;
 import com.riesgopsicosocial.domain.model.informe.InformeEvaluado;
 import com.riesgopsicosocial.infrastructure.adapter.out.documento.informe.InformeVista.*;
-import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.*;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.*;
 import org.springframework.stereotype.Component;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -37,8 +33,6 @@ public class DocxInformeEvaluadoGenerator implements GeneradorDocumentoInformePo
     private static final int[] ANCHOS_DATOS = {3876, 6324};
     private static final int[] ANCHOS_INTRALABORAL = {2244, 4182, 1326, 2448};
     private static final int[] ANCHOS_TRES_COLUMNAS = {6426, 1326, 2448};
-    private static final double ANCHO_MAXIMO_FIRMA = 200;
-    private static final double ALTO_MAXIMO_FIRMA = 60;
 
     private final InformeVistaMapper vistaMapper;
 
@@ -242,20 +236,7 @@ public class DocxInformeEvaluadoGenerator implements GeneradorDocumentoInformePo
 
     private void firma(XWPFDocument doc, EvaluadorVista evaluador) {
         if (evaluador.firma() != null) {
-            XWPFParagraph imagen = parrafo(doc, ParagraphAlignment.LEFT, 300, 0);
-            try {
-                BufferedImage leida = ImageIO.read(new ByteArrayInputStream(evaluador.firma()));
-                double escala = leida == null ? 1
-                        : Math.min(1, Math.min(ANCHO_MAXIMO_FIRMA / leida.getWidth(), ALTO_MAXIMO_FIRMA / leida.getHeight()));
-                double ancho = leida == null ? ANCHO_MAXIMO_FIRMA : leida.getWidth() * escala;
-                double alto = leida == null ? ALTO_MAXIMO_FIRMA : leida.getHeight() * escala;
-                int tipo = "image/jpeg".equals(evaluador.firmaTipoContenido())
-                        ? Document.PICTURE_TYPE_JPEG : Document.PICTURE_TYPE_PNG;
-                imagen.createRun().addPicture(new ByteArrayInputStream(evaluador.firma()), tipo, "firma",
-                        Units.toEMU(ancho), Units.toEMU(alto));
-            } catch (Exception e) {
-                throw new IllegalStateException("No se pudo insertar la firma del evaluador en el Word", e);
-            }
+            imagenFirma(doc, evaluador.firma(), evaluador.firmaTipoContenido());
         }
         XWPFParagraph linea = parrafo(doc, ParagraphAlignment.LEFT, evaluador.firma() == null ? 600 : 0, 0);
         linea.setBorderTop(Borders.SINGLE);

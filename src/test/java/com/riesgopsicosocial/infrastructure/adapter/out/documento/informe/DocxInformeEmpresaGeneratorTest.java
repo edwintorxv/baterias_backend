@@ -1,6 +1,8 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.documento.informe;
 
 import com.riesgopsicosocial.domain.model.informe.DatosCliente;
+import com.riesgopsicosocial.domain.model.informe.DatosEvaluador;
+import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
 import com.riesgopsicosocial.domain.model.informe.empresa.*;
 import com.riesgopsicosocial.domain.model.resultado.NivelRiesgo;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
@@ -9,7 +11,10 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -74,9 +79,10 @@ class DocxInformeEmpresaGeneratorTest {
                         ciudades, areas),
                 new SintomasEstres(3, List.of(
                         frecuencia("Síntomas psicoemocionales", "40.0", "60.0"),
-                        frecuencia("Síntomas fisiológicos", "10.0", "90.0"))));
+                        frecuencia("Síntomas fisiológicos", "10.0", "90.0"))),
+                ConclusionesInforme.VACIAS);
 
-        byte[] word = new DocxInformeEmpresaGenerator().generar(informe, LocalDate.of(2026, 10, 13));
+        byte[] word = new DocxInformeEmpresaGenerator().generar(informe, null, LocalDate.of(2026, 10, 13));
 
         String texto;
         try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(word));
@@ -232,6 +238,48 @@ class DocxInformeEmpresaGeneratorTest {
                 && texto.indexOf("8. INTERPRETACIÓN DE LOS NIVELES") < texto.indexOf("9. CONCLUSIONES DEL PROFESIONAL"),
                 "la interpretación va antes de las conclusiones");
         assertFalse(texto.contains("muy alto +") || texto.contains("Alto + muy alto"), "no se suman niveles");
+    }
+
+    @Test
+    void conclusionesGuardadas_salenEnLosRecuadrosYElProfesionalConSuFirma() throws Exception {
+        DistribucionNiveles vacia = new DistribucionNiveles(0, List.of());
+        DesgloseGrupos sinGrupos = new DesgloseGrupos(List.of(), 0, 0);
+        AnalisisGrupo general = new AnalisisGrupo(new Cobertura(1, 1, new BigDecimal("100.0")), List.of(), 0,
+                vacia, vacia, vacia, vacia, List.of());
+        DatosEvaluador profesional = new DatosEvaluador(1L, "52000111", "Psicóloga de Prueba", "Psicóloga",
+                "Especialista en SST", "TP-123", "LSO-456", LocalDate.of(2020, 1, 15), true);
+        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general,
+                new DescripcionPoblacion(0, List.of()),
+                new ConcentracionRiesgo(List.of(), sinGrupos, sinGrupos, sinGrupos, sinGrupos),
+                new ResultadosExtralaborales(List.of(), sinGrupos, sinGrupos),
+                new SintomasEstres(0, List.of()),
+                new ConclusionesInforme("Primera conclusión.\nSegunda conclusión.", "Pausas activas.",
+                        "Taller de liderazgo.", "Rediseño de cargas.", profesional));
+
+        byte[] word = new DocxInformeEmpresaGenerator().generar(informe, new FirmaEvaluador(firmaPng(), "image/png"),
+                LocalDate.of(2026, 10, 15));
+
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(word));
+             XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
+            String texto = extractor.getText();
+            for (String esperado : List.of("Primera conclusión.", "Segunda conclusión.", "Pausas activas.",
+                    "Taller de liderazgo.", "Rediseño de cargas.", "Psicóloga de Prueba", "Especialista en SST",
+                    "TP-123", "15/01/2020", "T.P. TP-123 – Licencia SO LSO-456")) {
+                assertTrue(texto.contains(esperado), "falta: " + esperado);
+            }
+            assertFalse(texto.contains("Escriba aquí"), "con texto guardado no hay texto guía");
+            XWPFTable conclusiones = doc.getTables().stream()
+                    .filter(t -> t.getRow(0).getCell(0).getText().startsWith("Primera conclusión."))
+                    .findFirst().orElseThrow();
+            assertEquals(2, conclusiones.getRow(0).getCell(0).getParagraphs().size(), "un párrafo por línea");
+            assertEquals(1, doc.getAllPictures().size(), "la firma del profesional");
+        }
+    }
+
+    private static byte[] firmaPng() throws Exception {
+        ByteArrayOutputStream salida = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(400, 100, BufferedImage.TYPE_INT_RGB), "png", salida);
+        return salida.toByteArray();
     }
 
 }

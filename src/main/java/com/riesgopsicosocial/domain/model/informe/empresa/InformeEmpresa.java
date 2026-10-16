@@ -10,8 +10,9 @@ import com.riesgopsicosocial.domain.model.informe.DatosCliente;
  * @param concentracion concentración del riesgo por dominio intralaboral, ciudad y área (intralaboral y estrés)
  * @param extralaboral  dimensiones extralaborales y nivel total extralaboral por ciudad y área
  * @param sintomas      frecuencia de síntomas por dimensión del cuestionario de estrés
+ * @param conclusiones  conclusiones, plan de acción y profesional responsable ({@link ConclusionesInforme#VACIAS} si no hay)
  */
 public record InformeEmpresa(DatosCliente cliente, int anio, AnalisisGrupo general, DescripcionPoblacion poblacion,
                              ConcentracionRiesgo concentracion, ResultadosExtralaborales extralaboral,
-                             SintomasEstres sintomas) {
+                             SintomasEstres sintomas, ConclusionesInforme conclusiones) {
 }

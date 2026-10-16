@@ -18,7 +18,8 @@ public record InformeEmpresaResponse(
         List<FormaIntralaboralResponse> formas,
         ConcentracionIntralaboralResponse concentracionIntralaboral,
         FactoresExtralaboralesResponse factoresExtralaborales,
-        SintomasEstresResponse sintomasEstres
+        SintomasEstresResponse sintomasEstres,
+        ConclusionesEmpresaResponse conclusiones
 
 ) {
 }

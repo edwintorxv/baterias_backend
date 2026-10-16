@@ -2,6 +2,9 @@ package com.riesgopsicosocial.infrastructure.adapter.out.persistence.informe;
 
 import com.riesgopsicosocial.application.port.out.informe.InformeEmpresaPort;
 import com.riesgopsicosocial.domain.model.informe.DatosCliente;
+import com.riesgopsicosocial.domain.model.informe.DatosEvaluador;
+import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
+import com.riesgopsicosocial.domain.model.informe.empresa.ConclusionesInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.AplicacionEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.CiudadTrabajo;
 import com.riesgopsicosocial.domain.model.informe.empresa.CuestionarioInforme;
@@ -36,6 +39,8 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.dominiocuest
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.dominiocuestionario.DominioCuestionarioJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.informeempresa.InformeEmpresaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.opcionrespuesta.OpcionRespuestaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.respuesta.RespuestaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultado.CatalogoCalculoLoader;
@@ -76,6 +81,8 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
     private final CiudadMunicipioJpaResository ciudadRepository;
     private final OpcionRespuestaJpaRepository opcionRespuestaRepository;
     private final FichasPersonaLoader fichasPersona;
+    private final InformeEmpresaJpaRepository informeEmpresaRepository;
+    private final EvaluadorJpaRepository evaluadorRepository;
     private final CatalogoCalculoLoader catalogo;
 
     public InformeEmpresaPersistenceAdapter(ClienteJpaRepository clienteRepository,
@@ -94,6 +101,8 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                                             CiudadMunicipioJpaResository ciudadRepository,
                                             OpcionRespuestaJpaRepository opcionRespuestaRepository,
                                             FichasPersonaLoader fichasPersona,
+                                            InformeEmpresaJpaRepository informeEmpresaRepository,
+                                            EvaluadorJpaRepository evaluadorRepository,
                                             CatalogoCalculoLoader catalogo) {
         this.clienteRepository = clienteRepository;
         this.evaluadoClienteRepository = evaluadoClienteRepository;
@@ -111,6 +120,8 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         this.ciudadRepository = ciudadRepository;
         this.opcionRespuestaRepository = opcionRespuestaRepository;
         this.fichasPersona = fichasPersona;
+        this.informeEmpresaRepository = informeEmpresaRepository;
+        this.evaluadorRepository = evaluadorRepository;
         this.catalogo = catalogo;
     }
 
@@ -227,6 +238,26 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         return opcionRespuestaRepository.buscarPorMetodoCalculo(MetodoCalculo.PROMEDIO_PONDERADO).stream()
                 .map(o -> new OpcionFrecuencia(o.getId(), o.getNombre()))
                 .toList();
+    }
+
+    @Override
+    public Optional<ConclusionesInforme> buscarConclusiones(Long idCliente, int anio) {
+        return informeEmpresaRepository.findByFkClienteAndAnio(idCliente, anio)
+                .map(i -> new ConclusionesInforme(i.getConclusiones(), i.getAccionesCortoPlazo(),
+                        i.getAccionesMedianoPlazo(), i.getAccionesLargoPlazo(),
+                        i.getFkEvaluador() == null ? null : evaluadorRepository.findById(i.getFkEvaluador())
+                                .map(e -> new DatosEvaluador(e.getId(), e.getNumeroIdentificacion(), e.getNombre(),
+                                        e.getProfesion(), e.getPosgrado(), e.getTarjetaProfesional(),
+                                        e.getLicenciaSaludOcupacional(), e.getFechaExpedicionLicencia(),
+                                        e.getFirma() != null))
+                                .orElse(null)));
+    }
+
+    @Override
+    public Optional<FirmaEvaluador> buscarFirma(Long idEvaluador) {
+        return evaluadorRepository.findById(idEvaluador)
+                .filter(e -> e.getFirma() != null)
+                .map(e -> new FirmaEvaluador(e.getFirma(), e.getFirmaTipoContenido()));
     }
 
     private Set<Long> idsRelaciones(Long idCliente) {

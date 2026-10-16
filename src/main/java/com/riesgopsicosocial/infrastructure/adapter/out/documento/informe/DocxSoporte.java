@@ -1,9 +1,13 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.documento.informe;
 
+import org.apache.poi.util.Units;
 import org.apache.poi.wp.usermodel.HeaderFooterType;
 import org.apache.poi.xwpf.usermodel.*;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.*;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.math.BigInteger;
 import java.util.Map;
 
@@ -24,6 +28,9 @@ final class DocxSoporte {
             1L, "00B050", 2L, "92D050", 3L, "FFD700", 4L, "FF8C00", 5L, "E53935");
     /** Ancho útil de la página carta con márgenes de 1,8 cm, en twips (1/20 de punto). */
     static final int ANCHO_TEXTO = 10200;
+    /** Tamaño máximo de la imagen de la firma, en puntos. */
+    private static final double ANCHO_MAXIMO_FIRMA = 200;
+    private static final double ALTO_MAXIMO_FIRMA = 60;
 
     private DocxSoporte() {
     }
@@ -128,6 +135,26 @@ final class DocxSoporte {
 
     static void espacio(XWPFDocument doc) {
         parrafo(doc, ParagraphAlignment.LEFT, 0, 60);
+    }
+
+    /**
+     * Imagen de la firma (PNG o JPEG) en su propio párrafo, escalada para caber en 200 × 60 puntos
+     * sin deformarse.
+     */
+    static void imagenFirma(XWPFDocument doc, byte[] imagen, String tipoContenido) {
+        XWPFParagraph parrafo = parrafo(doc, ParagraphAlignment.LEFT, 300, 0);
+        try {
+            BufferedImage leida = ImageIO.read(new ByteArrayInputStream(imagen));
+            double escala = leida == null ? 1
+                    : Math.min(1, Math.min(ANCHO_MAXIMO_FIRMA / leida.getWidth(), ALTO_MAXIMO_FIRMA / leida.getHeight()));
+            double ancho = leida == null ? ANCHO_MAXIMO_FIRMA : leida.getWidth() * escala;
+            double alto = leida == null ? ALTO_MAXIMO_FIRMA : leida.getHeight() * escala;
+            int tipo = "image/jpeg".equals(tipoContenido) ? Document.PICTURE_TYPE_JPEG : Document.PICTURE_TYPE_PNG;
+            parrafo.createRun().addPicture(new ByteArrayInputStream(imagen), tipo, "firma",
+                    Units.toEMU(ancho), Units.toEMU(alto));
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo insertar la firma en el Word", e);
+        }
     }
 
     static void saltoDePagina(XWPFDocument doc) {

@@ -1,12 +1,15 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.documento.informe;
 
 import com.riesgopsicosocial.application.port.out.informe.GeneradorDocumentoInformeEmpresaPort;
+import com.riesgopsicosocial.domain.model.informe.DatosEvaluador;
+import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
 import com.riesgopsicosocial.domain.model.informe.FormatoDocumento;
 import com.riesgopsicosocial.domain.model.informe.empresa.AnalisisGrupo;
 import com.riesgopsicosocial.domain.model.informe.empresa.Cobertura;
 import com.riesgopsicosocial.domain.model.informe.empresa.CoberturaCiudad;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConteoFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConcentracionRiesgo;
+import com.riesgopsicosocial.domain.model.informe.empresa.ConclusionesInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConteoNivel;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConteoCategoria;
 import com.riesgopsicosocial.domain.model.informe.empresa.DescripcionPoblacion;
@@ -61,8 +64,8 @@ import static com.riesgopsicosocial.infrastructure.adapter.out.documento.informe
  * extralaboral y estrés), por cada forma intralaboral ranking de dominios y de dimensiones
  * y una ficha por dimensión; luego la concentración del riesgo intralaboral con A y B juntas
  * (dominios, ciudad y área), los factores extralaborales (dimensiones, ciudad y área), los síntomas de estrés (frecuencia por dimensión, ciudad y área), la
- * interpretación de los niveles y, para llenar en Word, las conclusiones del profesional, el plan de
- * acción y su firma. Solo trae resultados agregados, nunca datos individuales.
+ * interpretación de los niveles, y las conclusiones, el plan de acción y el profesional responsable
+ * (con su firma) que se guardan en el sistema. Solo trae resultados agregados, nunca datos individuales.
  */
 @Component
 public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmpresaPort {
@@ -96,7 +99,7 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
     }
 
     @Override
-    public byte[] generar(InformeEmpresa informe, LocalDate fechaElaboracion) {
+    public byte[] generar(InformeEmpresa informe, FirmaEvaluador firma, LocalDate fechaElaboracion) {
         try (XWPFDocument doc = new XWPFDocument(); ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
             configurarPagina(doc, "CONFIDENCIAL – Resultados agregados de la empresa; no contiene información individual");
             AnalisisGrupo general = informe.general();
@@ -175,16 +178,20 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
             seccion(doc, numero++ + ". INTERPRETACIÓN DE LOS NIVELES");
             interpretacionNiveles(doc, general.estres().total() > 0);
 
-            // Para llenar en Word: el sistema no guarda estos textos.
+            // Lo que escribió el profesional (informe_empresa); para descargar, las cuatro partes son obligatorias.
+            ConclusionesInforme conclusiones = informe.conclusiones();
             saltoDePagina(doc);
             seccion(doc, numero++ + ". CONCLUSIONES DEL PROFESIONAL");
-            espacioParaEscribir(doc, "Escriba aquí las conclusiones del profesional.", ALTO_CONCLUSIONES);
+            recuadroTexto(doc, conclusiones.conclusiones(), "Escriba aquí las conclusiones del profesional.",
+                    ALTO_CONCLUSIONES);
             seccion(doc, numero++ + ". PLAN DE ACCIÓN");
-            for (String plazo : List.of("corto", "mediano", "largo")) {
-                subtitulo(doc, "Acciones a " + plazo + " plazo");
-                espacioParaEscribir(doc, "Escriba aquí las acciones a " + plazo + " plazo.", ALTO_ACCIONES);
+            String[][] plazos = {{"corto", conclusiones.accionesCortoPlazo()}, {"mediano", conclusiones.accionesMedianoPlazo()},
+                    {"largo", conclusiones.accionesLargoPlazo()}};
+            for (String[] plazo : plazos) {
+                subtitulo(doc, "Acciones a " + plazo[0] + " plazo");
+                recuadroTexto(doc, plazo[1], "Escriba aquí las acciones a " + plazo[0] + " plazo.", ALTO_ACCIONES);
             }
-            firmaProfesional(doc);
+            profesionalResponsable(doc, conclusiones.profesional(), firma);
 
             doc.write(salida);
             return salida.toByteArray();
@@ -410,31 +417,69 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
         espacio(doc);
     }
 
-    /** Recuadro de una celda con un texto guía en gris, para escribir en Word; crece con lo que se escriba. */
-    private static void espacioParaEscribir(XWPFDocument doc, String guia, int alto) {
+    /**
+     * Recuadro de una celda con el texto del profesional (un párrafo por línea). Sin texto, queda en
+     * blanco con un texto guía en gris y un alto mínimo para escribir en Word.
+     */
+    private static void recuadroTexto(XWPFDocument doc, String contenido, String guia, int altoVacio) {
         XWPFTable recuadro = tabla(doc, 1, new int[]{ANCHO_TEXTO});
         XWPFTableRow fila = recuadro.getRow(0);
-        fila.setHeight(alto); // alto mínimo: Word lo agranda si el texto no cabe
         XWPFTableCell celda = fila.getCell(0);
         celda(celda, null, false, ParagraphAlignment.LEFT, null, ANCHO_TEXTO);
         celda.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.TOP);
-        texto(celda.getParagraphs().get(0), guia, 9, false, "808080").setItalic(true);
+        if (contenido == null || contenido.isBlank()) {
+            fila.setHeight(altoVacio); // alto mínimo: Word lo agranda si el texto no cabe
+            texto(celda.getParagraphs().get(0), guia, 9, false, "808080").setItalic(true);
+        } else {
+            String[] lineas = contenido.strip().split("\\R");
+            for (int i = 0; i < lineas.length; i++) {
+                XWPFParagraph parrafo = i == 0 ? celda.getParagraphs().get(0) : celda.addParagraph();
+                parrafo.setAlignment(ParagraphAlignment.BOTH);
+                parrafo.setSpacingAfter(60);
+                texto(parrafo, lineas[i], 9.5, false, null);
+            }
+        }
         espacio(doc);
     }
 
-    /** Datos del profesional en blanco y línea de firma, para llenar a mano. */
-    private void firmaProfesional(XWPFDocument doc) {
+    /**
+     * Datos del profesional responsable, su firma (si la cargó) y la línea de firma. Sin profesional
+     * asignado, los datos quedan en blanco para llenar a mano.
+     */
+    private void profesionalResponsable(XWPFDocument doc, DatosEvaluador profesional, FirmaEvaluador firma) {
         subtitulo(doc, "Profesional responsable");
-        tablaDatos(doc, new String[][]{
-                {"Nombre del profesional", ""},
-                {"Profesión", ""},
-                {"No. tarjeta profesional", ""},
-                {"No. licencia en salud ocupacional", ""},
-                {"Fecha de expedición de la licencia en salud ocupacional", ""}});
-        XWPFParagraph linea = parrafo(doc, ParagraphAlignment.LEFT, 1200, 0);
+        if (profesional == null) {
+            tablaDatos(doc, new String[][]{
+                    {"Nombre del profesional", ""},
+                    {"Profesión", ""},
+                    {"No. tarjeta profesional", ""},
+                    {"No. licencia en salud ocupacional", ""},
+                    {"Fecha de expedición de la licencia en salud ocupacional", ""}});
+        } else {
+            List<String[]> filas = new ArrayList<>();
+            filas.add(new String[]{"Nombre del profesional", profesional.nombre()});
+            filas.add(new String[]{"Profesión", profesional.profesion()});
+            if (profesional.posgrado() != null && !profesional.posgrado().isBlank()) {
+                filas.add(new String[]{"Posgrado", profesional.posgrado()});
+            }
+            filas.add(new String[]{"No. tarjeta profesional", profesional.tarjetaProfesional()});
+            filas.add(new String[]{"No. licencia en salud ocupacional", profesional.licenciaSaludOcupacional()});
+            filas.add(new String[]{"Fecha de expedición de la licencia en salud ocupacional",
+                    profesional.fechaExpedicionLicencia() == null ? "" : profesional.fechaExpedicionLicencia().format(FECHA)});
+            tablaDatos(doc, filas.toArray(String[][]::new));
+        }
+        if (firma != null) {
+            imagenFirma(doc, firma.imagen(), firma.tipoContenido());
+        }
+        XWPFParagraph linea = parrafo(doc, ParagraphAlignment.LEFT, firma == null ? 1200 : 0, 0);
         linea.setBorderTop(Borders.SINGLE);
         linea.setIndentationRight(5500);
         texto(linea, "Firma del profesional", 9.5, false, null);
+        if (profesional != null) {
+            texto(parrafo(doc, ParagraphAlignment.LEFT, 0, 0), profesional.nombre(), 9.5, false, null);
+            texto(parrafo(doc, ParagraphAlignment.LEFT, 0, 0), "T.P. " + profesional.tarjetaProfesional()
+                    + " – Licencia SO " + profesional.licenciaSaludOcupacional(), 9.5, false, null);
+        }
     }
 
     /** Dominios con A y B juntas (ranking) y total intralaboral por ciudad de trabajo y por área. */

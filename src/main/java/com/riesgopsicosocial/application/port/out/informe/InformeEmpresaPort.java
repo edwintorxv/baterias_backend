@@ -1,6 +1,8 @@
 package com.riesgopsicosocial.application.port.out.informe;
 
 import com.riesgopsicosocial.domain.model.informe.DatosCliente;
+import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
+import com.riesgopsicosocial.domain.model.informe.empresa.ConclusionesInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.AplicacionEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.CuestionarioInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
@@ -39,5 +41,11 @@ public interface InformeEmpresaPort {
 
     /** Opciones de respuesta del cuestionario de estrés, de la más frecuente (Siempre) a la menos (Nunca). */
     List<OpcionFrecuencia> buscarOpcionesEstres();
+
+    /** Conclusiones y plan de acción del año con su profesional; vacío si no se ha escrito nada. */
+    Optional<ConclusionesInforme> buscarConclusiones(Long idCliente, int anio);
+
+    /** Vacío si el profesional no ha cargado su firma. */
+    Optional<FirmaEvaluador> buscarFirma(Long idEvaluador);
 
 }

@@ -1,5 +1,6 @@
 package com.riesgopsicosocial.application.port.out.informe;
 
+import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
 import com.riesgopsicosocial.domain.model.informe.FormatoDocumento;
 import com.riesgopsicosocial.domain.model.informe.empresa.InformeEmpresa;
 
@@ -10,6 +11,9 @@ public interface GeneradorDocumentoInformeEmpresaPort {
 
     FormatoDocumento formato();
 
-    byte[] generar(InformeEmpresa informe, LocalDate fechaElaboracion);
+    /**
+     * @param firma firma del profesional responsable; {@code null} si no hay profesional o no cargó su firma
+     */
+    byte[] generar(InformeEmpresa informe, FirmaEvaluador firma, LocalDate fechaElaboracion);
 
 }
