@@ -20,6 +20,10 @@ class InformeEmpresaResponseMapperTest {
     private static final DistribucionNiveles DISTRIBUCION = new DistribucionNiveles(3, List.of(
             new ConteoNivel(BAJO, 1, new BigDecimal("33.3")), new ConteoNivel(ALTO, 2, new BigDecimal("66.7"))));
 
+    private static final NivelRiesgoEmpresa NIVEL_EMPRESA = new NivelRiesgoEmpresa(List.of(
+            new NivelForma(1L, "A", 3, new BigDecimal("190.50"), new BigDecimal("38.7"), new NivelRiesgo(5L, "Riesgo muy alto"))),
+            Periodicidad.ANUAL);
+
     @Test
     void traduceTodasLasSeccionesDelInforme() {
         InformeEmpresaResponse respuesta = InformeEmpresaResponseMapper.toResponse(informe());
@@ -68,6 +72,12 @@ class InformeEmpresaResponseMapperTest {
         assertEquals(List.of("Bajo", "Alto"), etiquetas(sintomas.porCiudad().grupos().get(0).distribucion()),
                 "estrés por ciudad con las etiquetas del manual de estrés");
 
+        NivelEmpresaResponse nivelEmpresa = globales.nivelEmpresa();
+        assertEquals(List.of(new NivelFormaResponse(1L, "A", 3, new BigDecimal("190.50"), new BigDecimal("38.7"), 5L,
+                "Riesgo muy alto")), nivelEmpresa.formas());
+        assertEquals("ANUAL", nivelEmpresa.periodicidad());
+        assertEquals("Anual", nivelEmpresa.periodicidadDescripcion());
+
         ConclusionesEmpresaResponse conclusiones = respuesta.conclusiones();
         assertEquals("Conclusiones.", conclusiones.conclusiones());
         assertEquals("Psicóloga de Prueba", conclusiones.profesional().nombre());
@@ -89,7 +99,7 @@ class InformeEmpresaResponseMapperTest {
         DesgloseGrupos ciudades = new DesgloseGrupos(List.of(new DistribucionGrupo("BOGOTA, D.C.", DISTRIBUCION),
                 new DistribucionGrupo("Otras ciudades", DISTRIBUCION)), 3, 0);
         DesgloseGrupos areas = new DesgloseGrupos(List.of(new DistribucionGrupo("Ventas", DISTRIBUCION)), 0, 1);
-        return new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general,
+        return new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general, NIVEL_EMPRESA,
                 new DescripcionPoblacion(3, List.of(new VariablePoblacion("Sexo",
                         List.of(new ConteoCategoria("Femenino", 3, new BigDecimal("100.0")))))),
                 new ConcentracionRiesgo(List.of(new DominioConsolidado(1L, "Liderazgo", DISTRIBUCION)),

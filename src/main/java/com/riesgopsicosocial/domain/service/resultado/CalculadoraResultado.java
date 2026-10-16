@@ -256,7 +256,8 @@ public class CalculadoraResultado {
                         + " no cae en ningún rango del baremo del " + baremo));
     }
 
-    private BigDecimal transformar(BigDecimal bruto, BigDecimal factor) {
+    /** Puntaje transformado = bruto / factor × 100, a un decimal (HALF_UP). También lo usa el informe de empresa. */
+    public static BigDecimal transformar(BigDecimal bruto, BigDecimal factor) {
         return bruto.multiply(CIEN).divide(factor, PRECISION).setScale(1, RoundingMode.HALF_UP);
     }
 

@@ -32,6 +32,10 @@ class DocxInformeEmpresaGeneratorTest {
         return IntStream.range(0, datos.getPointCount()).mapToObj(i -> String.valueOf(datos.getPointAt(i))).toList();
     }
 
+    private static final NivelRiesgoEmpresa NIVEL_EMPRESA = new NivelRiesgoEmpresa(List.of(
+            new NivelForma(1L, "A", 3, new BigDecimal("136.58"), new BigDecimal("27.8"), new NivelRiesgo(3L, "Riesgo medio"))),
+            Periodicidad.CADA_DOS_ANIOS);
+
     /** Dimensión de 2 personas (una pregunta filtro dejó fuera a 1 de las 3 del dominio). */
     private static DistribucionDimension dimension(int numero) {
         DistribucionNiveles dos = new DistribucionNiveles(2, List.of(
@@ -69,7 +73,7 @@ class DocxInformeEmpresaGeneratorTest {
                 new VariablePoblacion("Sexo", List.of(new ConteoCategoria("Femenino", 2, new BigDecimal("66.7")),
                         new ConteoCategoria("Masculino", 1, new BigDecimal("33.3")))),
                 new VariablePoblacion("Rango de edad", List.of(new ConteoCategoria("25 a 34 años", 3, new BigDecimal("100.0"))))));
-        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general, poblacion,
+        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general, NIVEL_EMPRESA, poblacion,
                 new ConcentracionRiesgo(List.of(new DominioConsolidado(1L, "Liderazgo", distribucion)),
                         ciudades, areas, ciudades, new DesgloseGrupos(List.of(), 0, 1)),
                 new ResultadosExtralaborales(List.of(
@@ -109,7 +113,9 @@ class DocxInformeEmpresaGeneratorTest {
                     resumen.getRows().stream().skip(1).map(f -> f.getCell(0).getText()).toList(),
                     "todas las dimensiones de la forma, de la más crítica a la menos crítica");
             long fichas = doc.getTables().stream()
-                    .filter(t -> t.getNumberOfRows() == 2 && t.getRow(0).getTableCells().size() == 5).count();
+                    .filter(t -> t.getNumberOfRows() == 2 && t.getRow(0).getTableCells().size() == 5)
+                    .filter(t -> !t.getRow(0).getCell(0).getText().equals("Forma")) // la del nivel de la empresa
+                    .count();
             assertEquals(6, fichas);
 
             assertTrue(categorias.contains(List.of("Liderazgo")), "dominios con A y B juntas");
@@ -209,6 +215,15 @@ class DocxInformeEmpresaGeneratorTest {
         assertTrue(texto.indexOf("6. FACTORES DE RIESGO EXTRALABORALES") > texto.indexOf("5. CONCENTRACIÓN DEL RIESGO INTRALABORAL")
                 && texto.indexOf("6. FACTORES DE RIESGO EXTRALABORALES") < texto.indexOf("7. SÍNTOMAS DE ESTRÉS"),
                 "el extralaboral va antes del estrés");
+        for (String esperado : List.of("NIVEL DE RIESGO INTRALABORAL DE LA EMPRESA Y PERIODICIDAD DE LA EVALUACIÓN",
+                "Resolución 2764 de 2022, art. 3, parágrafo", "Forma A", "136,58", "27,8", "Riesgo medio",
+                "Periodicidad de la evaluación: cada dos años", "lo determina el profesional",
+                "la evaluación debe realizarse cada dos años")) {
+            assertTrue(texto.contains(esperado), "falta: " + esperado);
+        }
+        assertTrue(texto.indexOf("NIVEL DE RIESGO INTRALABORAL DE LA EMPRESA") > texto.indexOf("FACTORES DE RIESGO PSICOSOCIAL INTRALABORALES")
+                && texto.indexOf("NIVEL DE RIESGO INTRALABORAL DE LA EMPRESA") < texto.indexOf("FACTORES DE RIESGO PSICOSOCIAL EXTRALABORALES"),
+                "después del intralaboral global");
         assertTrue(texto.contains("TOTAL GENERAL DE FACTORES DE RIESGO PSICOSOCIAL (INTRALABORAL + EXTRALABORAL)")
                 && texto.contains("Solo personas con las dos pruebas"));
         assertTrue(texto.indexOf("TOTAL GENERAL DE FACTORES") > texto.indexOf("FACTORES DE RIESGO PSICOSOCIAL EXTRALABORALES")
@@ -248,7 +263,7 @@ class DocxInformeEmpresaGeneratorTest {
                 vacia, vacia, vacia, vacia, List.of());
         DatosEvaluador profesional = new DatosEvaluador(1L, "52000111", "Psicóloga de Prueba", "Psicóloga",
                 "Especialista en SST", "TP-123", "LSO-456", LocalDate.of(2020, 1, 15), true);
-        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general,
+        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general, NIVEL_EMPRESA,
                 new DescripcionPoblacion(0, List.of()),
                 new ConcentracionRiesgo(List.of(), sinGrupos, sinGrupos, sinGrupos, sinGrupos),
                 new ResultadosExtralaborales(List.of(), sinGrupos, sinGrupos),

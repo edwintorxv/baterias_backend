@@ -8,8 +8,11 @@ import com.riesgopsicosocial.domain.model.resultado.ResultadoDimension;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoDominio;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.FiltrosAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.MetodoCalculo;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.RangoBaremo;
+import com.riesgopsicosocial.domain.service.resultado.CalculadoraResultado;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.text.Normalizer;
 import java.util.*;
@@ -229,6 +232,49 @@ public class AnalizadorInformeEmpresa {
             return new Categoria(4L, "45 a 54 años");
         }
         return new Categoria(5L, "55 años o más");
+    }
+
+    /**
+     * Nivel de riesgo intralaboral de la empresa y periodicidad de la evaluación (Resolución 2764 de
+     * 2022, art. 3): por cada forma presentada, el promedio del puntaje bruto total de sus personas,
+     * transformado con el factor de la forma y ubicado en su baremo. Anual si alguna forma queda en
+     * los dos niveles más altos (alto o muy alto); si no, cada dos años.
+     *
+     * @param configuraciones factor y baremo total de cada forma intralaboral
+     */
+    public NivelRiesgoEmpresa nivelRiesgoEmpresa(List<ParticipanteEmpresa> participantes,
+                                                 List<ConfiguracionNivelEmpresa> configuraciones) {
+        Map<Long, List<ResultadoCuestionario>> porForma = resultadosPorMetodo(participantes, MetodoCalculo.SUMA_POR_DOMINIOS)
+                .stream()
+                .collect(Collectors.groupingBy(ResultadoCuestionario::idCuestionario));
+        List<NivelForma> formas = configuraciones.stream()
+                .filter(c -> porForma.containsKey(c.idCuestionario()))
+                .sorted(Comparator.comparing(c -> cuestionarios.indexOf(cuestionario(c.idCuestionario()))))
+                .map(c -> nivelForma(c, porForma.get(c.idCuestionario())))
+                .toList();
+        if (formas.isEmpty()) {
+            return new NivelRiesgoEmpresa(List.of(), null);
+        }
+        Set<Long> nivelesAltos = niveles.subList(Math.max(0, niveles.size() - 2), niveles.size()).stream()
+                .map(NivelRiesgo::id)
+                .collect(Collectors.toSet());
+        boolean anual = formas.stream().anyMatch(f -> nivelesAltos.contains(f.nivel().id()));
+        return new NivelRiesgoEmpresa(formas, anual ? Periodicidad.ANUAL : Periodicidad.CADA_DOS_ANIOS);
+    }
+
+    private static NivelForma nivelForma(ConfiguracionNivelEmpresa configuracion, List<ResultadoCuestionario> resultados) {
+        BigDecimal suma = resultados.stream().map(ResultadoCuestionario::puntajeBruto).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal promedio = suma.divide(BigDecimal.valueOf(resultados.size()), MathContext.DECIMAL64);
+        BigDecimal transformado = CalculadoraResultado.transformar(promedio, configuracion.factorTransformacion());
+        NivelRiesgo nivel = configuracion.baremos().stream()
+                .filter(r -> r.contiene(transformado))
+                .map(RangoBaremo::nivelRiesgo)
+                .findFirst()
+                .orElseThrow(() -> new ReglaNegocioException("No hay baremo del total intralaboral de la forma "
+                        + configuracion.forma() + " para el puntaje " + transformado
+                        + " (nivel de riesgo de la empresa)"));
+        return new NivelForma(configuracion.idCuestionario(), configuracion.forma(), resultados.size(),
+                promedio.setScale(2, RoundingMode.HALF_UP), transformado, nivel);
     }
 
     /** Personas agrupadas por ciudad de trabajo (por id: hay municipios homónimos); sin ciudad = un grupo. */

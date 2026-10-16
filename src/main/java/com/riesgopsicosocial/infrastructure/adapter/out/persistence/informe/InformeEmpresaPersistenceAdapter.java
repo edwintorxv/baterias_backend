@@ -5,6 +5,7 @@ import com.riesgopsicosocial.domain.model.informe.DatosCliente;
 import com.riesgopsicosocial.domain.model.informe.DatosEvaluador;
 import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConclusionesInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.ConfiguracionNivelEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.AplicacionEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.CiudadTrabajo;
 import com.riesgopsicosocial.domain.model.informe.empresa.CuestionarioInforme;
@@ -22,8 +23,11 @@ import com.riesgopsicosocial.domain.model.resultado.ResultadoDominio;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoTotalGeneral;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.FiltrosAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.MetodoCalculo;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.RangoBaremo;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremocuestionario.BaremoCuestionarioEntity;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremocuestionario.BaremoCuestionarioJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.ciudadmunicipio.CiudadMunicipioEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.ciudadmunicipio.CiudadMunicipioJpaResository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cliente.ClienteJpaRepository;
@@ -80,6 +84,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
     private final DimensionJpaRespository dimensionRepository;
     private final CiudadMunicipioJpaResository ciudadRepository;
     private final OpcionRespuestaJpaRepository opcionRespuestaRepository;
+    private final BaremoCuestionarioJpaRepository baremoCuestionarioRepository;
     private final FichasPersonaLoader fichasPersona;
     private final InformeEmpresaJpaRepository informeEmpresaRepository;
     private final EvaluadorJpaRepository evaluadorRepository;
@@ -100,6 +105,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                                             DimensionJpaRespository dimensionRepository,
                                             CiudadMunicipioJpaResository ciudadRepository,
                                             OpcionRespuestaJpaRepository opcionRespuestaRepository,
+                                            BaremoCuestionarioJpaRepository baremoCuestionarioRepository,
                                             FichasPersonaLoader fichasPersona,
                                             InformeEmpresaJpaRepository informeEmpresaRepository,
                                             EvaluadorJpaRepository evaluadorRepository,
@@ -119,6 +125,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         this.dimensionRepository = dimensionRepository;
         this.ciudadRepository = ciudadRepository;
         this.opcionRespuestaRepository = opcionRespuestaRepository;
+        this.baremoCuestionarioRepository = baremoCuestionarioRepository;
         this.fichasPersona = fichasPersona;
         this.informeEmpresaRepository = informeEmpresaRepository;
         this.evaluadorRepository = evaluadorRepository;
@@ -212,6 +219,27 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                 .sorted(Comparator.comparing(CuestionarioEntity::getId))
                 .map(c -> new CuestionarioInforme(c.getId(), c.getForma(), c.getMetodoCalculo(),
                         dominiosPorCuestionario.getOrDefault(c.getId(), List.of())))
+                .toList();
+    }
+
+    /**
+     * Cuestionarios intralaborales con su factor y el baremo de su total. Cada forma tiene baremos de
+     * un solo grupo ocupacional (A del 1, B del 2), así que basta filtrar por cuestionario.
+     */
+    @Override
+    public List<ConfiguracionNivelEmpresa> buscarConfiguracionNivelEmpresa() {
+        Map<Long, NivelRiesgo> niveles = catalogo.cargarNiveles();
+        Map<Long, List<BaremoCuestionarioEntity>> baremos = baremoCuestionarioRepository.findAll().stream()
+                .collect(Collectors.groupingBy(BaremoCuestionarioEntity::getFkCuestionario));
+        return cuestionarioRepository.findAll().stream()
+                .filter(c -> c.getMetodoCalculo() == MetodoCalculo.SUMA_POR_DOMINIOS)
+                .sorted(Comparator.comparing(CuestionarioEntity::getId))
+                .map(c -> new ConfiguracionNivelEmpresa(c.getId(), c.getForma(), c.getFactorTransformacion(),
+                        baremos.getOrDefault(c.getId(), List.of()).stream()
+                                .sorted(Comparator.comparing(BaremoCuestionarioEntity::getFkNivelRiesgo))
+                                .map(b -> new RangoBaremo(b.getValorMinimo(), b.getValorMaximo(),
+                                        niveles.get(b.getFkNivelRiesgo())))
+                                .toList()))
                 .toList();
     }
 

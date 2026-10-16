@@ -139,6 +139,11 @@ class InformeEmpresaServiceTest {
         }
 
         @Override
+        public List<ConfiguracionNivelEmpresa> buscarConfiguracionNivelEmpresa() {
+            return List.of();
+        }
+
+        @Override
         public List<NivelRiesgo> buscarNiveles() {
             return List.of(BAJO, ALTO);
         }

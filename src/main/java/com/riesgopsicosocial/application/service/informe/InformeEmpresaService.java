@@ -53,6 +53,7 @@ public class InformeEmpresaService implements ConsultarInformeEmpresaUseCase {
         Map<Long, FichaPersona> fichas = personas.stream()
                 .collect(Collectors.toMap(PersonaCargada::idEvaluadoCliente, PersonaCargada::ficha));
         return new InformeEmpresa(cliente, anio, analizador.analizar(participantes),
+                analizador.nivelRiesgoEmpresa(participantes, informeEmpresaPort.buscarConfiguracionNivelEmpresa()),
                 analizador.describirPoblacion(participantes, fichas, anio),
                 analizador.concentracionRiesgo(participantes),
                 analizador.extralaboral(participantes),

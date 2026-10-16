@@ -41,6 +41,7 @@ public final class InformeEmpresaResponseMapper {
                 poblacion(informe.poblacion()),
                 new ResultadosGlobalesResponse(
                         distribucion(general.intralaboral(), RIESGO),
+                        nivelEmpresa(informe.nivelEmpresa()),
                         distribucion(general.extralaboral(), RIESGO),
                         distribucion(general.totalGeneral(), RIESGO),
                         distribucion(general.estres(), ESTRES)),
@@ -72,6 +73,17 @@ public final class InformeEmpresaResponseMapper {
                         p.profesion(), p.posgrado(), p.tarjetaProfesional(), p.licenciaSaludOcupacional(),
                         p.fechaExpedicionLicencia(), p.tieneFirma()),
                 conclusiones.faltantes());
+    }
+
+    private static NivelEmpresaResponse nivelEmpresa(NivelRiesgoEmpresa nivelEmpresa) {
+        Periodicidad periodicidad = nivelEmpresa.periodicidad();
+        return new NivelEmpresaResponse(
+                nivelEmpresa.formas().stream()
+                        .map(f -> new NivelFormaResponse(f.idCuestionario(), f.forma(), f.personas(),
+                                f.promedioPuntajeBruto(), f.puntajeTransformado(), f.nivel().id(), f.nivel().nombre()))
+                        .toList(),
+                periodicidad == null ? null : periodicidad.name(),
+                periodicidad == null ? null : periodicidad.descripcion());
     }
 
     private static PoblacionResponse poblacion(DescripcionPoblacion poblacion) {

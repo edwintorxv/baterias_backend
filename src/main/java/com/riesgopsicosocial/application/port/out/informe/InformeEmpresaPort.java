@@ -3,6 +3,7 @@ package com.riesgopsicosocial.application.port.out.informe;
 import com.riesgopsicosocial.domain.model.informe.DatosCliente;
 import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConclusionesInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.ConfiguracionNivelEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.AplicacionEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.CuestionarioInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
@@ -32,6 +33,9 @@ public interface InformeEmpresaPort {
 
     /** Todos los cuestionarios con sus dominios, en orden. */
     List<CuestionarioInforme> buscarCuestionarios();
+
+    /** Factor de transformación y baremo del puntaje total de cada forma intralaboral (A y B). */
+    List<ConfiguracionNivelEmpresa> buscarConfiguracionNivelEmpresa();
 
     /** Niveles de riesgo en orden (1 a 5). */
     List<NivelRiesgo> buscarNiveles();

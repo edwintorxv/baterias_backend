@@ -25,6 +25,8 @@ class DocumentoInformeEmpresaServiceTest {
     private static final DatosEvaluador PROFESIONAL = new DatosEvaluador(7L, "1", "Psicóloga", "Psicología", null,
             "TP", "LSO", LocalDate.of(2020, 1, 1), true);
 
+    private static final NivelRiesgoEmpresa NIVEL_EMPRESA = new NivelRiesgoEmpresa(List.of(), null);
+
     private final ConsultarInformeEmpresaUseCase consultar = mock(ConsultarInformeEmpresaUseCase.class);
     private final InformeEmpresaPort puerto = mock(InformeEmpresaPort.class);
     private final GeneradorDocumentoInformeEmpresaPort generador = mock(GeneradorDocumentoInformeEmpresaPort.class);
@@ -66,6 +68,7 @@ class DocumentoInformeEmpresaServiceTest {
         return new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026,
                 new AnalisisGrupo(new Cobertura(1, 1, new BigDecimal("100.0")), List.of(), 0, vacia, vacia, vacia, vacia,
                         List.of()),
+                NIVEL_EMPRESA,
                 new DescripcionPoblacion(0, List.of()),
                 new ConcentracionRiesgo(List.of(), sinGrupos, sinGrupos, sinGrupos, sinGrupos),
                 new ResultadosExtralaborales(List.of(), sinGrupos, sinGrupos),

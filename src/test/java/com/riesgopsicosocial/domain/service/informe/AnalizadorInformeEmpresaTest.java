@@ -6,6 +6,7 @@ import com.riesgopsicosocial.domain.model.resultado.*;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.CondicionAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.FiltrosAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.MetodoCalculo;
+import com.riesgopsicosocial.domain.model.resultado.configuracion.RangoBaremo;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -428,6 +429,78 @@ class AnalizadorInformeEmpresaTest {
     private static ResultadoAplicacion conTotalGeneral(NivelRiesgo nivel, ResultadoCuestionario... cuestionarios) {
         return new ResultadoAplicacion(1L, 1L, null, List.of(cuestionarios),
                 new ResultadoTotalGeneral(cuestionarios[0].idCuestionario(), cuestionarios[0].forma(), bd("0"), bd("0"), nivel));
+    }
+
+    private static final List<RangoBaremo> BAREMO_A = List.of(
+            rango("0.0", "19.7", SIN_RIESGO), rango("19.8", "25.8", BAJO), rango("25.9", "31.5", MEDIO),
+            rango("31.6", "38.0", ALTO), rango("38.1", "100.0", MUY_ALTO));
+    private static final List<RangoBaremo> BAREMO_B = List.of(
+            rango("0.0", "20.6", SIN_RIESGO), rango("20.7", "26.0", BAJO), rango("26.1", "31.2", MEDIO),
+            rango("31.3", "38.7", ALTO), rango("38.8", "100.0", MUY_ALTO));
+    private static final List<ConfiguracionNivelEmpresa> CONFIGURACION = List.of(
+            new ConfiguracionNivelEmpresa(1L, "A", bd("492"), BAREMO_A),
+            new ConfiguracionNivelEmpresa(2L, "B", bd("388"), BAREMO_B));
+
+    @Test
+    void nivelEmpresa_promedioDelBrutoTransformadoYUbicadoEnElBaremoDeCadaForma_cadaDosAnios() {
+        List<ParticipanteEmpresa> participantes = List.of(
+                participante(1L, null, resultado(conBruto(FORMA_A, "130"))),
+                participante(2L, null, resultado(conBruto(FORMA_A, "143.17"))),
+                participante(3L, null, resultado(conBruto(FORMA_B, "100"))),
+                participante(4L, null, resultado(total(FORMA_C, MUY_ALTO))));   // sin intralaboral: no cuenta
+
+        NivelRiesgoEmpresa nivel = analizador.nivelRiesgoEmpresa(participantes, CONFIGURACION);
+
+        // A: (130 + 143,17) / 2 = 136,585 → 136,585 / 492 × 100 = 27,76… → 27,8 (medio)
+        NivelForma formaA = nivel.formas().get(0);
+        assertEquals("A", formaA.forma());
+        assertEquals(2, formaA.personas());
+        assertEquals(bd("136.59"), formaA.promedioPuntajeBruto());
+        assertEquals(bd("27.8"), formaA.puntajeTransformado());
+        assertEquals(MEDIO, formaA.nivel());
+        // B: 100 / 388 × 100 = 25,77… → 25,8 (bajo)
+        assertEquals(BAJO, nivel.formas().get(1).nivel());
+        assertEquals(Periodicidad.CADA_DOS_ANIOS, nivel.periodicidad());
+    }
+
+    @Test
+    void nivelEmpresa_unaFormaEnAltoOMuyAlto_anual() {
+        List<ParticipanteEmpresa> participantes = List.of(
+                participante(1L, null, resultado(conBruto(FORMA_A, "100"))),      // 20,3: bajo
+                participante(2L, null, resultado(conBruto(FORMA_B, "130"))));      // 33,5: alto
+
+        NivelRiesgoEmpresa nivel = analizador.nivelRiesgoEmpresa(participantes, CONFIGURACION);
+
+        assertEquals(List.of(BAJO, ALTO), nivel.formas().stream().map(NivelForma::nivel).toList());
+        assertEquals(Periodicidad.ANUAL, nivel.periodicidad());
+    }
+
+    @Test
+    void nivelEmpresa_soloFormasPresentadas_ySinIntralaboralSinPeriodicidad() {
+        NivelRiesgoEmpresa soloB = analizador.nivelRiesgoEmpresa(
+                List.of(participante(1L, null, resultado(conBruto(FORMA_B, "50")))), CONFIGURACION);
+        assertEquals(List.of("B"), soloB.formas().stream().map(NivelForma::forma).toList());
+
+        NivelRiesgoEmpresa sinIntra = analizador.nivelRiesgoEmpresa(
+                List.of(participante(1L, null, resultado(total(FORMA_C, ALTO)))), CONFIGURACION);
+        assertTrue(sinIntra.formas().isEmpty());
+        assertNull(sinIntra.periodicidad());
+    }
+
+    @Test
+    void nivelEmpresa_sinBaremoParaElPuntaje_lanzaReglaNegocio() {
+        List<ConfiguracionNivelEmpresa> sinBaremos = List.of(new ConfiguracionNivelEmpresa(1L, "A", bd("492"), List.of()));
+
+        assertThrows(ReglaNegocioException.class, () -> analizador.nivelRiesgoEmpresa(
+                List.of(participante(1L, null, resultado(conBruto(FORMA_A, "100")))), sinBaremos));
+    }
+
+    private static ResultadoCuestionario conBruto(CuestionarioInforme forma, String bruto) {
+        return new ResultadoCuestionario(forma.idCuestionario(), forma.forma(), bd(bruto), bd("0"), MEDIO, List.of(), List.of());
+    }
+
+    private static RangoBaremo rango(String minimo, String maximo, NivelRiesgo nivel) {
+        return new RangoBaremo(bd(minimo), bd(maximo), nivel);
     }
 
     @Test

@@ -23,6 +23,9 @@ import com.riesgopsicosocial.domain.model.informe.empresa.DominioConsolidado;
 import com.riesgopsicosocial.domain.model.informe.empresa.DominiosForma;
 import com.riesgopsicosocial.domain.model.informe.empresa.FrecuenciaDimension;
 import com.riesgopsicosocial.domain.model.informe.empresa.InformeEmpresa;
+import com.riesgopsicosocial.domain.model.informe.empresa.NivelForma;
+import com.riesgopsicosocial.domain.model.informe.empresa.NivelRiesgoEmpresa;
+import com.riesgopsicosocial.domain.model.informe.empresa.Periodicidad;
 import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.ResultadosExtralaborales;
 import com.riesgopsicosocial.domain.model.informe.empresa.SintomasEstres;
@@ -80,6 +83,8 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
     private static final int[] ANCHOS_RESUMEN = {2700, 2000, 900, 920, 920, 920, 920, 920};
     /** Ficha de una dimensión: los cinco niveles. */
     private static final int[] ANCHOS_FICHA = {2040, 2040, 2040, 2040, 2040};
+    /** Nivel de riesgo de la empresa: forma, personas, bruto promedio, transformado y nivel. */
+    private static final int[] ANCHOS_NIVEL_EMPRESA = {1800, 1400, 2300, 2100, 2600};
     /** Dos variables de la población lado a lado: categoría, personas y % de cada una, con una columna de separación. */
     private static final int[] ANCHOS_VARIABLES = {2750, 950, 950, 900, 2750, 950, 950};
     /** Interpretación de los niveles: nivel e interpretación. */
@@ -132,6 +137,7 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
             seccion(doc, "3. RESULTADOS GLOBALES");
             subtitulo(doc, "Factores de riesgo psicosocial intralaborales");
             tablaNiveles(doc, "Nivel de riesgo", general.intralaboral(), c -> c.nivel().nombre());
+            nivelEmpresa(doc, informe.nivelEmpresa());
             subtitulo(doc, "Factores de riesgo psicosocial extralaborales");
             tablaNiveles(doc, "Nivel de riesgo", general.extralaboral(), c -> c.nivel().nombre());
             if (general.totalGeneral().total() > 0) {
@@ -208,6 +214,49 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
             celda(fila.getCell(1), filas[i][1], false, ParagraphAlignment.LEFT, null, ANCHOS_DATOS[1]);
         }
         espacio(doc);
+    }
+
+    /**
+     * Nivel de riesgo intralaboral de la empresa por forma (promedio del puntaje bruto, transformado y
+     * ubicado en el baremo) y la periodicidad de la evaluación que resulta (Resolución 2764 de 2022, art. 3).
+     */
+    private void nivelEmpresa(XWPFDocument doc, NivelRiesgoEmpresa nivelEmpresa) {
+        if (nivelEmpresa.periodicidad() == null) {
+            return;
+        }
+        subtitulo(doc, "Nivel de riesgo intralaboral de la empresa y periodicidad de la evaluación");
+        nota(doc, "Resolución 2764 de 2022, art. 3, parágrafo: por cada forma, el promedio del puntaje bruto total "
+                + "de las personas, transformado con la fórmula del manual y ubicado en el baremo de la forma. Si el "
+                + "nivel de alguna forma es alto o muy alto, la evaluación es anual; si no, cada dos años.")
+                .setKeepNext(true);
+        XWPFTable tabla = tabla(doc, 1, ANCHOS_NIVEL_EMPRESA);
+        encabezado(tabla.getRow(0), ANCHOS_NIVEL_EMPRESA, "Forma", "Personas", "Puntaje bruto promedio",
+                "Puntaje transformado", "Nivel de riesgo");
+        for (NivelForma forma : nivelEmpresa.formas()) {
+            XWPFTableRow fila = tabla.createRow();
+            celda(fila.getCell(0), "Forma " + forma.forma(), false, ParagraphAlignment.LEFT, null, ANCHOS_NIVEL_EMPRESA[0]);
+            celda(fila.getCell(1), String.valueOf(forma.personas()), false, ParagraphAlignment.CENTER, null,
+                    ANCHOS_NIVEL_EMPRESA[1]);
+            celda(fila.getCell(2), decimal(forma.promedioPuntajeBruto(), "0.00"), false, ParagraphAlignment.CENTER, null,
+                    ANCHOS_NIVEL_EMPRESA[2]);
+            celda(fila.getCell(3), decimal(forma.puntajeTransformado(), "0.0"), false, ParagraphAlignment.CENTER, null,
+                    ANCHOS_NIVEL_EMPRESA[3]);
+            celda(fila.getCell(4), forma.nivel().nombre(), true, ParagraphAlignment.CENTER,
+                    COLOR_NIVEL.get(forma.nivel().id()), ANCHOS_NIVEL_EMPRESA[4]);
+        }
+        mantenerConLoSiguiente(tabla);
+        XWPFParagraph periodicidad = parrafo(doc, ParagraphAlignment.LEFT, 120, 60);
+        periodicidad.setKeepNext(true);
+        texto(periodicidad, "Periodicidad de la evaluación: ", 10, true, AZUL);
+        texto(periodicidad, nivelEmpresa.periodicidad().descripcion().toLowerCase(), 10, true, null);
+        nota(doc, "Se cuenta a partir del inicio de las acciones de intervención y control. La norma también exige "
+                + "evaluación anual si los factores intralaborales están causando efectos negativos en la salud, el "
+                + "bienestar o el trabajo: eso lo determina el profesional y no se calcula aquí.");
+    }
+
+    /** Coma decimal: 136.58 → "136,58". */
+    private static String decimal(BigDecimal valor, String patron) {
+        return new DecimalFormat(patron, DecimalFormatSymbols.getInstance(Locale.forLanguageTag("es-CO"))).format(valor);
     }
 
     /** Variables de la población evaluada en tablas de dos en dos (categoría, cantidad y %). */
@@ -363,6 +412,13 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
         parrafoIntroduccion(doc, "Población", cobertura.esperados() + " personas esperadas, " + cobertura.evaluados()
                 + " evaluadas (" + porcentaje(cobertura.porcentaje()) + "). El detalle por ciudad de trabajo está en "
                 + "la sección siguiente.");
+        Periodicidad periodicidad = informe.nivelEmpresa().periodicidad();
+        if (periodicidad != null) {
+            parrafoIntroduccion(doc, "Periodicidad", "según el nivel de riesgo psicosocial intralaboral de la "
+                    + "empresa (Resolución 2764 de 2022, art. 3), la evaluación debe realizarse "
+                    + (periodicidad == Periodicidad.ANUAL ? "de forma anual" : "cada dos años")
+                    + ". El cálculo está en la sección de resultados globales.");
+        }
         parrafoIntroduccion(doc, "Confidencialidad", "este informe presenta únicamente resultados agregados de la "
                 + "empresa. Las ciudades y áreas con menos de " + personas(AnalizadorInformeEmpresa.MINIMO_PERSONAS_GRUPO)
                 + " evaluadas no se muestran por separado. Los resultados individuales hacen parte de la historia "
