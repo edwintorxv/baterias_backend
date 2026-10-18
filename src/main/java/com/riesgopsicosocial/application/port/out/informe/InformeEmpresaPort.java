@@ -6,6 +6,7 @@ import com.riesgopsicosocial.domain.model.informe.empresa.ConclusionesInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.ConfiguracionNivelEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.AplicacionEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.CuestionarioInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.ItemSintoma;
 import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.PersonaCargada;
 import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
@@ -45,6 +46,9 @@ public interface InformeEmpresaPort {
 
     /** Opciones de respuesta del cuestionario de estrés, de la más frecuente (Siempre) a la menos (Nunca). */
     List<OpcionFrecuencia> buscarOpcionesEstres();
+
+    /** Ítems (síntomas) del cuestionario de estrés con su texto. */
+    List<ItemSintoma> buscarItemsEstres();
 
     /** Conclusiones y plan de acción del año con su profesional; vacío si no se ha escrito nada. */
     Optional<ConclusionesInforme> buscarConclusiones(Long idCliente, int anio);

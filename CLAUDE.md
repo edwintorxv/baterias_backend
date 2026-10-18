@@ -1,15 +1,15 @@
 # Contexto — Sistema de Baterías de Riesgo Psicosocial (backend)
 
-> Resumen para retomar el desarrollo. Última actualización: 2026-10-15. Todo commiteado y en `origin/main`.
+> Resumen para retomar el desarrollo. Última actualización: 2026-10-17. Todo commiteado y en `origin/main`.
 > Forma de trabajo: **paso a paso** (diseño → código → el usuario revisa → commit/push cuando lo pide).
 
 ## 0. Puesta en marcha
 
 - **JDK 17**, **PostgreSQL 16**, `./mvnw` (en macOS: `sh mvnw`). Repo `https://github.com/edwintorxv/baterias_backend.git`, rama `main`.
 - BD `bateria_psicosocial` (postgres/1234, `application-dev.properties`). API `http://localhost:8080/api`, Swagger `/api/swagger-ui.html`.
-- **Los datos maestros NO están en las migraciones** (catálogos, cuestionarios, preguntas, escalas, baremos y datos de prueba viven solo en la BD local). En otra máquina: `pg_dump -F c` + `pg_restore` (trae `flyway_schema_history`; el `.dump` tiene datos de evaluados: **no subirlo a git**). Pendiente: migración `V14__datos_maestros.sql` (la V13 ya se usó) con los datos ya corregidos y `setval` de secuencias.
+- **Los datos maestros NO están en las migraciones** (catálogos, cuestionarios, preguntas, escalas, baremos y datos de prueba viven solo en la BD local). En otra máquina: `pg_dump -F c` + `pg_restore` (trae `flyway_schema_history`; el `.dump` tiene datos de evaluados: **no subirlo a git**). Pendiente: migración `V15__datos_maestros.sql` (la V14 ya se usó) con los datos ya corregidos (incluidas las comas de la V14) y `setval` de secuencias.
 - **La app la arranca el usuario en IntelliJ (8080)**: no levantar/detener instancias sin avisar. Tiene **spring-boot-devtools**: un `mvnw compile`/`test` la reinicia sola y Flyway aplica migraciones nuevas en la BD local; `@SpringBootTest` también corre contra la BD local. Avisar antes de compilar si hay una migración nueva.
-- Tests: `sh mvnw test` → **82** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, ArchUnit, contexto).
+- Tests: `sh mvnw test` → **84** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, ArchUnit, contexto).
 - Manuales y Res. 2764 de 2022 en PDF (fuera del repo): `/Users/edwingacha/proyectos/Documentacion/baterias/` (texto en macOS con `osascript -l JavaScript` + PDFKit). El `.pptx` de ejemplo de informe de empresa tiene datos reales: no subirlo.
 
 ## 1. Stack y arquitectura
@@ -46,7 +46,7 @@ Reglas ArchUnit (`ArquitecturaHexagonalTest`): domain solo `java..`; application
 - Etiquetas de estrés: mismos `nivel_riesgo` 1–5 mostrados como Muy bajo…Muy alto (`domain.model.resultado.NivelEstres`), título "Nivel de síntomas de estrés".
 - Toda la configuración (escalas, ítems, factores, dominios, dimensiones y baremos de A, B, C y D) quedó verificada contra los manuales (V3–V6).
 
-**Migraciones**: V1 esquema · V2 grupo ocupacional/método de cálculo · V3 escalas invertidas e ítems de C · V4 baremos de C y D · V5 secuencias · V6 retroalimentación A/B · V7 preguntas filtro · V8 condiciones y tolerancias · V9 total general · V10 evaluador · V11 guion U+0096 · V12 errata "Bachillerato incompleto" · V13 `informe_empresa` (conclusiones). Siguiente libre: **V14**.
+**Migraciones**: V1 esquema · V2 grupo ocupacional/método de cálculo · V3 escalas invertidas e ítems de C · V4 baremos de C y D · V5 secuencias · V6 retroalimentación A/B · V7 preguntas filtro · V8 condiciones y tolerancias · V9 total general · V10 evaluador · V11 guion U+0096 · V12 errata "Bachillerato incompleto" · V13 `informe_empresa` (conclusiones) · V14 comas que habían quedado como puntos en 13 preguntas (A, B y D). Siguiente libre: **V15**.
 
 ## 3. Informe individual — ✅ completo y verificado por el usuario (Word y PDF)
 
@@ -60,7 +60,7 @@ Reglas ArchUnit (`ArquitecturaHexagonalTest`): domain solo `java..`; application
 
 Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`, `.../informe/archivo?anio=&formato=docx` (`informe_empresa_{nit}_{anio}.docx`), `GET/PUT .../informe/conclusiones?anio=`.
 
-**Orden del Word** (numeración automática según las formas presentadas): datos de la empresa · 1 Introducción (marco Res. 2764, objetivo, instrumentos aplicados, población, periodicidad, confidencialidad) · 2 Población evaluada (cobertura por ciudad + características: forma, sexo, rango de edad, nivel académico, tipo de cargo y de contrato) · 3 Resultados globales (intralaboral + **nivel de la empresa y periodicidad**, extralaboral, total general, estrés) · una sección por forma A/B (ranking de dominios, ranking de dimensiones, fichas) · Concentración del riesgo intralaboral A+B (dominios, ciudad, área) · Factores extralaborales (dimensiones, ciudad, área) · Síntomas de estrés (frecuencia por dimensión, ciudad, área) · Interpretación de los niveles · Conclusiones · Plan de acción (corto/mediano/largo) + profesional responsable con firma.
+**Orden del Word** (numeración automática según las formas presentadas): datos de la empresa · 1 Introducción (marco Res. 2764, objetivo, instrumentos aplicados, población, periodicidad, confidencialidad) · 2 Población evaluada (cobertura por ciudad + características: forma, sexo, rango de edad, nivel académico, tipo de cargo y de contrato) · 3 Resultados globales (intralaboral + **nivel de la empresa y periodicidad**, extralaboral, total general, estrés) · una sección por forma A/B (ranking de dominios, ranking de dimensiones, fichas) · Concentración del riesgo intralaboral A+B (dominios, ciudad, área) · Factores extralaborales (dimensiones, ciudad, área) · Síntomas de estrés (frecuencia por dimensión, ciudad, área) · Síntomas de estrés por ítem (una tabla + gráficos de a 2 síntomas por dimensión, sin ciudad ni área) · Interpretación de los niveles · Conclusiones · Plan de acción (corto/mediano/largo) + profesional responsable con firma.
 
 **Reglas**
 - Esperados = relaciones activas de `evaluado_cliente`; evaluados = con respuestas en el año. Cada persona cuenta una vez, con su aplicación más reciente con resultados. "Pendiente de cálculo" cuenta como evaluada pero no entra en las tablas.
@@ -69,6 +69,7 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 - Área y ciudad: valor **actual** de `evaluado_cliente`; áreas sin distinguir mayúsculas/tildes/espacios.
 - **Confidencialidad**: `MINIMO_PERSONAS_GRUPO = 2` (decisión del usuario); por prueba, grupos menores se juntan en "Otras ciudades/áreas" al final; si aun juntos no llegan, se omiten con nota.
 - Estrés por dimensión: % de respuestas Siempre…Nunca (personas × ítems, mostrado como "632 (158 × 4)").
+- Estrés por ítem (`SintomasEstres.porItem`, JSON `sintomasEstres.porItem`): dimensiones en el orden del cuestionario (fisiológicos primero); síntomas del más frecuente al menos (mismo criterio sin sumar, empate por número de pregunta); base = personas que respondieron el ítem. **Sin numeración de ítems en el Word** (al ir ordenados quedaría salteada; el JSON trae `numero` solo como referencia).
 - **Periodicidad (Res. 2764 de 2022, art. 3)**: por forma, promedio del bruto total intralaboral → transformado → baremo de la forma; **anual** si alguna forma queda en alto/muy alto, si no **cada dos años**. Regla en código (`AnalizadorInformeEmpresa.nivelRiesgoEmpresa`, enum `Periodicidad`), datos en BD (factores, `baremo_cuestionario`, `nivel_riesgo`). Se calcula al vuelo (no se guarda, no compara años, no da fecha).
 - **Conclusiones** (V13, `informe_empresa`, una fila por cliente+año): conclusiones, tres acciones y `fk_evaluador` opcional. **La descarga del Word exige las cuatro partes** (409 con lo que falta); el JSON trae `conclusiones.faltantes` para que el front habilite la descarga. Con evaluador, el Word pone sus datos y su firma.
 - Errores: cliente inexistente / año sin aplicaciones → 404; cliente sin personas → 409; formato no soportado (pdf) → 409.
@@ -83,7 +84,7 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 
 **Antes de producción**
 1. Autenticación y roles en la API (hoy cualquiera ve informes confidenciales y edita conclusiones).
-2. Migración `V14__datos_maestros.sql` para arrancar sobre una BD vacía.
+2. Migración `V15__datos_maestros.sql` para arrancar sobre una BD vacía.
 3. Front (no existe): clientes → informe de empresa por año, o empleados → informe individual; diligenciar conclusiones y las tres acciones antes de descargar el Word de empresa.
 
 **Menores / por decidir**

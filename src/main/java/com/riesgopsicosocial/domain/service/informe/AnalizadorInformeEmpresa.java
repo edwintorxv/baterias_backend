@@ -324,28 +324,47 @@ public class AnalizadorInformeEmpresa {
     }
 
     /**
-     * Frecuencia de síntomas por dimensión de estrés. Solo cuentan las respuestas de la aplicación
-     * de donde sale el resultado de estrés de cada persona, para que coincida con el total.
+     * Frecuencia de síntomas de estrés por dimensión y por ítem. Solo cuentan las respuestas de la
+     * aplicación de donde sale el resultado de estrés de cada persona, para que coincida con el total.
      *
      * @param respuestas respuestas a los ítems de estrés (pueden traer otras aplicaciones: se descartan)
      * @param opciones   opciones del cuestionario de estrés, de la más frecuente (Siempre) a la menos (Nunca)
+     * @param items      ítems del cuestionario de estrés, con su texto
      */
     public SintomasEstres sintomasEstres(List<ParticipanteEmpresa> participantes, List<RespuestaSintoma> respuestas,
-                                         List<OpcionFrecuencia> opciones) {
+                                         List<OpcionFrecuencia> opciones, List<ItemSintoma> items) {
         Set<Long> aplicaciones = aplicacionesConEstres(participantes);
-        Map<Long, List<RespuestaSintoma>> porDimension = respuestas.stream()
+        List<RespuestaSintoma> deResultado = respuestas.stream()
                 .filter(r -> aplicaciones.contains(r.idAplicacion()))
+                .toList();
+        Map<Long, List<RespuestaSintoma>> porDimension = deResultado.stream()
                 .collect(Collectors.groupingBy(RespuestaSintoma::idDimensionCuestionario));
+        Map<Long, List<RespuestaSintoma>> porPregunta = deResultado.stream()
+                .collect(Collectors.groupingBy(RespuestaSintoma::idPregunta));
+        Map<Long, List<ItemSintoma>> itemsPorDimension = items.stream()
+                .sorted(Comparator.comparingInt(ItemSintoma::numero))
+                .collect(Collectors.groupingBy(ItemSintoma::idDimensionCuestionario));
 
-        List<FrecuenciaDimension> dimensiones = cuestionarios.stream()
+        List<DimensionInforme> dimensionesEstres = cuestionarios.stream()
                 .filter(c -> c.metodoCalculo() == MetodoCalculo.PROMEDIO_PONDERADO)
                 .flatMap(c -> c.dominios().stream())
                 .flatMap(d -> d.dimensiones().stream())
+                .toList();
+        List<FrecuenciaDimension> dimensiones = dimensionesEstres.stream()
                 .map(d -> frecuencia(d, porDimension.getOrDefault(d.idDimensionCuestionario(), List.of()), opciones))
                 .filter(f -> f.respuestas() > 0)
                 .sorted(FrecuenciaDimension.masFrecuentePrimero())
                 .toList();
-        return new SintomasEstres(aplicaciones.size(), dimensiones);
+        List<SintomasDimension> porItem = dimensionesEstres.stream()
+                .map(d -> new SintomasDimension(d.idDimensionCuestionario(), d.nombre(),
+                        itemsPorDimension.getOrDefault(d.idDimensionCuestionario(), List.of()).stream()
+                                .map(i -> frecuencia(i, porPregunta.getOrDefault(i.idPregunta(), List.of()), opciones))
+                                .filter(f -> f.respuestas() > 0)
+                                .sorted(FrecuenciaItem.masFrecuentePrimero())
+                                .toList()))
+                .filter(s -> !s.items().isEmpty())
+                .toList();
+        return new SintomasEstres(aplicaciones.size(), dimensiones, porItem);
     }
 
     /** Aplicación de donde sale el resultado de estrés de cada persona que lo tiene. */
@@ -360,19 +379,30 @@ public class AnalizadorInformeEmpresa {
 
     private static FrecuenciaDimension frecuencia(DimensionInforme dimension, List<RespuestaSintoma> respuestas,
                                                   List<OpcionFrecuencia> opciones) {
+        int personas = (int) respuestas.stream().map(RespuestaSintoma::idAplicacion).distinct().count();
+        int items = (int) respuestas.stream().map(RespuestaSintoma::idPregunta).distinct().count();
+        return new FrecuenciaDimension(dimension.idDimensionCuestionario(), dimension.nombre(), personas, items,
+                respuestas.size(), conteos(respuestas, opciones));
+    }
+
+    /** Cada persona responde un ítem una sola vez: las respuestas del ítem son sus personas. */
+    private static FrecuenciaItem frecuencia(ItemSintoma item, List<RespuestaSintoma> respuestas,
+                                             List<OpcionFrecuencia> opciones) {
+        return new FrecuenciaItem(item.idPregunta(), item.numero(), item.descripcion(), respuestas.size(),
+                conteos(respuestas, opciones));
+    }
+
+    /** Cantidad y porcentaje de cada opción sobre el total de esas respuestas. */
+    private static List<ConteoFrecuencia> conteos(List<RespuestaSintoma> respuestas, List<OpcionFrecuencia> opciones) {
         Map<Long, Long> cantidadPorOpcion = respuestas.stream()
                 .collect(Collectors.groupingBy(RespuestaSintoma::idOpcion, Collectors.counting()));
         int total = respuestas.size();
-        List<ConteoFrecuencia> frecuencias = opciones.stream()
+        return opciones.stream()
                 .map(o -> {
                     int cantidad = cantidadPorOpcion.getOrDefault(o.id(), 0L).intValue();
                     return new ConteoFrecuencia(o, cantidad, porcentaje(cantidad, total));
                 })
                 .toList();
-        int personas = (int) respuestas.stream().map(RespuestaSintoma::idAplicacion).distinct().count();
-        int items = (int) respuestas.stream().map(RespuestaSintoma::idPregunta).distinct().count();
-        return new FrecuenciaDimension(dimension.idDimensionCuestionario(), dimension.nombre(), personas, items,
-                total, frecuencias);
     }
 
     /** Niveles que obtuvieron las personas en un dominio, sea cual sea su forma. */

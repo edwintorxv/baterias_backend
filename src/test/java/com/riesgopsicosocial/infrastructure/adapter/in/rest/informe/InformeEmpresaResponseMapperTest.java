@@ -69,6 +69,10 @@ class InformeEmpresaResponseMapperTest {
         assertEquals(new FrecuenciaDimensionResponse(43L, "Síntomas fisiológicos", 3, 2, 6,
                         List.of(new ConteoFrecuenciaResponse(1L, "Siempre", 6, new BigDecimal("100.0")))),
                 sintomas.dimensiones().get(0));
+        assertEquals(List.of(new SintomasDimensionResponse(43L, "Síntomas fisiológicos", List.of(new FrecuenciaItemResponse(
+                        252L, 1, "Dolores en el cuello y espalda o tensión muscular.", 3,
+                        List.of(new ConteoFrecuenciaResponse(1L, "Siempre", 3, new BigDecimal("100.0"))))))),
+                sintomas.porItem());
         assertEquals(List.of("Bajo", "Alto"), etiquetas(sintomas.porCiudad().grupos().get(0).distribucion()),
                 "estrés por ciudad con las etiquetas del manual de estrés");
 
@@ -107,7 +111,10 @@ class InformeEmpresaResponseMapperTest {
                 new ResultadosExtralaborales(List.of(new DistribucionDimension(36L, "Tiempo fuera del trabajo", DISTRIBUCION)),
                         ciudades, areas),
                 new SintomasEstres(3, List.of(new FrecuenciaDimension(43L, "Síntomas fisiológicos", 3, 2, 6,
-                        List.of(new ConteoFrecuencia(new OpcionFrecuencia(1L, "Siempre"), 6, new BigDecimal("100.0")))))),
+                        List.of(new ConteoFrecuencia(new OpcionFrecuencia(1L, "Siempre"), 6, new BigDecimal("100.0"))))),
+                        List.of(new SintomasDimension(43L, "Síntomas fisiológicos", List.of(new FrecuenciaItem(252L, 1,
+                                "Dolores en el cuello y espalda o tensión muscular.", 3,
+                                List.of(new ConteoFrecuencia(new OpcionFrecuencia(1L, "Siempre"), 3, new BigDecimal("100.0")))))))),
                 new ConclusionesInforme("Conclusiones.", "Corto", null, "Largo", new DatosEvaluador(1L, "52000111",
                         "Psicóloga de Prueba", "Psicóloga", null, "TP-1", "LSO-1", LocalDate.of(2020, 1, 15), true)));
     }

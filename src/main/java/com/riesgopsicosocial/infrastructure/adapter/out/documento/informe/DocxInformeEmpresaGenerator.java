@@ -22,12 +22,14 @@ import com.riesgopsicosocial.domain.model.informe.empresa.DistribucionNiveles;
 import com.riesgopsicosocial.domain.model.informe.empresa.DominioConsolidado;
 import com.riesgopsicosocial.domain.model.informe.empresa.DominiosForma;
 import com.riesgopsicosocial.domain.model.informe.empresa.FrecuenciaDimension;
+import com.riesgopsicosocial.domain.model.informe.empresa.FrecuenciaItem;
 import com.riesgopsicosocial.domain.model.informe.empresa.InformeEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.NivelForma;
 import com.riesgopsicosocial.domain.model.informe.empresa.NivelRiesgoEmpresa;
 import com.riesgopsicosocial.domain.model.informe.empresa.Periodicidad;
 import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.ResultadosExtralaborales;
+import com.riesgopsicosocial.domain.model.informe.empresa.SintomasDimension;
 import com.riesgopsicosocial.domain.model.informe.empresa.SintomasEstres;
 import com.riesgopsicosocial.domain.model.resultado.NivelEstres;
 import com.riesgopsicosocial.domain.service.informe.AnalizadorInformeEmpresa;
@@ -178,6 +180,11 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
                 saltoDePagina(doc);
                 seccion(doc, numero++ + ". SÍNTOMAS DE ESTRÉS");
                 sintomasEstres(doc, informe.sintomas(), concentracion);
+            }
+            if (!informe.sintomas().porItem().isEmpty()) {
+                saltoDePagina(doc);
+                seccion(doc, numero++ + ". SÍNTOMAS DE ESTRÉS POR ÍTEM");
+                sintomasPorItem(doc, informe.sintomas());
             }
 
             saltoDePagina(doc);
@@ -654,17 +661,93 @@ public class DocxInformeEmpresaGenerator implements GeneradorDocumentoInformeEmp
 
     /** Por cada dimensión, una barra por frecuencia. */
     private void graficoFrecuencias(XWPFDocument doc, List<FrecuenciaDimension> dimensiones) {
-        List<OpcionFrecuencia> opciones = dimensiones.get(0).frecuencias().stream().map(ConteoFrecuencia::opcion).toList();
+        DocxGraficos.barrasAgrupadas(doc, dimensiones.stream().map(FrecuenciaDimension::nombre).toArray(String[]::new),
+                seriesFrecuencia(dimensiones.stream().map(FrecuenciaDimension::frecuencias).toList()));
+    }
+
+    /** Una serie por frecuencia (Siempre … Nunca) con el porcentaje de cada categoría, en su color. */
+    private static List<DocxGraficos.Serie> seriesFrecuencia(List<List<ConteoFrecuencia>> frecuencias) {
+        List<OpcionFrecuencia> opciones = frecuencias.get(0).stream().map(ConteoFrecuencia::opcion).toList();
         List<DocxGraficos.Serie> series = new ArrayList<>();
         for (int i = 0; i < opciones.size(); i++) {
             int indice = i;
-            Double[] porcentajes = dimensiones.stream()
-                    .map(d -> d.frecuencias().get(indice).porcentaje().doubleValue())
+            Double[] porcentajes = frecuencias.stream()
+                    .map(f -> f.get(indice).porcentaje().doubleValue())
                     .toArray(Double[]::new);
             series.add(new DocxGraficos.Serie(opciones.get(i).nombre(), porcentajes, colorFrecuencia(opciones.get(i))));
         }
-        DocxGraficos.barrasAgrupadas(doc, dimensiones.stream().map(FrecuenciaDimension::nombre).toArray(String[]::new),
-                series);
+        return series;
+    }
+
+    /**
+     * Cada dimensión de estrés, en el orden del cuestionario, con la frecuencia de cada uno de sus
+     * síntomas (ítems): tabla y gráficos de a {@link #GRUPOS_POR_GRAFICO} síntomas.
+     */
+    private void sintomasPorItem(XWPFDocument doc, SintomasEstres sintomas) {
+        nota(doc, "Porcentaje de personas que respondió cada frecuencia en cada síntoma del cuestionario ("
+                + personas(sintomas.personas()) + "). A diferencia de la frecuencia por dimensión, aquí cada "
+                + "persona cuenta una vez por síntoma. Dentro de cada dimensión, los síntomas van del más "
+                + "frecuente al menos: primero el de mayor porcentaje de respuestas \"Siempre\"; si hay empate, "
+                + "el de mayor porcentaje en \"Casi siempre\", y así sucesivamente.");
+        for (SintomasDimension dimension : sintomas.porItem()) {
+            subtitulo(doc, dimension.nombre());
+            unirConElGrafico(doc, tablaFrecuenciasItem(doc, dimension.items()));
+            List<FrecuenciaItem> items = dimension.items();
+            int graficos = (items.size() + GRUPOS_POR_GRAFICO - 1) / GRUPOS_POR_GRAFICO;
+            for (int i = 0; i < graficos; i++) {
+                List<FrecuenciaItem> parte = items.subList(i * GRUPOS_POR_GRAFICO,
+                        Math.min(items.size(), (i + 1) * GRUPOS_POR_GRAFICO));
+                String titulo = graficos == 1 ? dimension.nombre()
+                        : dimension.nombre() + " – gráfico " + (i + 1) + " de " + graficos;
+                DocxGraficos.barrasAgrupadas(doc,
+                        parte.stream().map(it -> it.descripcion() + " (" + it.respuestas() + ")")
+                                .toArray(String[]::new),
+                        seriesFrecuencia(parte.stream().map(FrecuenciaItem::frecuencias).toList()),
+                        titulo, DocxGraficos.ALTO_COMPACTO);
+            }
+        }
+    }
+
+    /**
+     * Síntoma, personas y el porcentaje de cada frecuencia, con el encabezado en su color. Sin el
+     * número del ítem: al ir ordenados por frecuencia, los números quedarían salteados.
+     */
+    private XWPFTable tablaFrecuenciasItem(XWPFDocument doc, List<FrecuenciaItem> items) {
+        List<OpcionFrecuencia> opciones = items.get(0).frecuencias().stream().map(ConteoFrecuencia::opcion).toList();
+        int[] anchos = anchosFrecuenciasItem(opciones.size());
+        XWPFTable tabla = tabla(doc, 1, anchos);
+        XWPFTableRow encabezado = tabla.getRow(0);
+        celda(encabezado.getCell(0), "Síntoma", true, ParagraphAlignment.CENTER, GRIS_ENCABEZADO, anchos[0]);
+        celda(encabezado.getCell(1), "Personas", true, ParagraphAlignment.CENTER, GRIS_ENCABEZADO, anchos[1]);
+        for (int i = 0; i < opciones.size(); i++) {
+            celda(encabezado.getCell(2 + i), opciones.get(i).nombre(), true, ParagraphAlignment.CENTER,
+                    colorFrecuencia(opciones.get(i)), anchos[2 + i]);
+        }
+        encabezado.setRepeatHeader(true);
+        for (FrecuenciaItem item : items) {
+            XWPFTableRow fila = tabla.createRow();
+            celda(fila.getCell(0), item.descripcion(), false, ParagraphAlignment.LEFT, null, anchos[0]);
+            celda(fila.getCell(1), String.valueOf(item.respuestas()), false, ParagraphAlignment.CENTER, null, anchos[1]);
+            for (int i = 0; i < item.frecuencias().size(); i++) {
+                celda(fila.getCell(2 + i), porcentaje(item.frecuencias().get(i).porcentaje()), false,
+                        ParagraphAlignment.CENTER, null, anchos[2 + i]);
+            }
+        }
+        espacio(doc);
+        return tabla;
+    }
+
+    /** Síntoma y personas fijos; el resto del ancho se reparte entre las frecuencias. */
+    private static int[] anchosFrecuenciasItem(int opciones) {
+        int[] anchos = new int[opciones + 2];
+        anchos[0] = 4400;
+        anchos[1] = 1000;
+        int resto = ANCHO_TEXTO - anchos[0] - anchos[1];
+        for (int i = 2; i < anchos.length; i++) {
+            anchos[i] = resto / opciones;
+        }
+        anchos[anchos.length - 1] += resto % opciones;
+        return anchos;
     }
 
     /**

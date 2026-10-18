@@ -159,6 +159,11 @@ class InformeEmpresaServiceTest {
         }
 
         @Override
+        public List<ItemSintoma> buscarItemsEstres() {
+            return List.of();
+        }
+
+        @Override
         public Optional<ConclusionesInforme> buscarConclusiones(Long idCliente, int anio) {
             return Optional.empty();
         }

@@ -83,7 +83,7 @@ class DocxInformeEmpresaGeneratorTest {
                         ciudades, areas),
                 new SintomasEstres(3, List.of(
                         frecuencia("Síntomas psicoemocionales", "40.0", "60.0"),
-                        frecuencia("Síntomas fisiológicos", "10.0", "90.0"))),
+                        frecuencia("Síntomas fisiológicos", "10.0", "90.0")), List.of()),
                 ConclusionesInforme.VACIAS);
 
         byte[] word = new DocxInformeEmpresaGenerator().generar(informe, null, LocalDate.of(2026, 10, 13));
@@ -267,7 +267,7 @@ class DocxInformeEmpresaGeneratorTest {
                 new DescripcionPoblacion(0, List.of()),
                 new ConcentracionRiesgo(List.of(), sinGrupos, sinGrupos, sinGrupos, sinGrupos),
                 new ResultadosExtralaborales(List.of(), sinGrupos, sinGrupos),
-                new SintomasEstres(0, List.of()),
+                new SintomasEstres(0, List.of(), List.of()),
                 new ConclusionesInforme("Primera conclusión.\nSegunda conclusión.", "Pausas activas.",
                         "Taller de liderazgo.", "Rediseño de cargas.", profesional));
 
@@ -288,6 +288,58 @@ class DocxInformeEmpresaGeneratorTest {
                     .findFirst().orElseThrow();
             assertEquals(2, conclusiones.getRow(0).getCell(0).getParagraphs().size(), "un párrafo por línea");
             assertEquals(1, doc.getAllPictures().size(), "la firma del profesional");
+        }
+    }
+
+    @Test
+    void sintomasPorItem_seccionPropiaConTablaYGraficosDeADosSintomas() throws Exception {
+        DistribucionNiveles vacia = new DistribucionNiveles(0, List.of());
+        DesgloseGrupos sinGrupos = new DesgloseGrupos(List.of(), 0, 0);
+        AnalisisGrupo general = new AnalisisGrupo(new Cobertura(1, 1, new BigDecimal("100.0")), List.of(), 0,
+                vacia, vacia, vacia, vacia, List.of());
+        OpcionFrecuencia siempre = new OpcionFrecuencia(1L, "Siempre");
+        OpcionFrecuencia nunca = new OpcionFrecuencia(5L, "Nunca");
+        List<FrecuenciaItem> items = List.of(
+                new FrecuenciaItem(4L, 4, "Dolor de cabeza", 3, List.of(
+                        new ConteoFrecuencia(siempre, 2, new BigDecimal("66.7")), new ConteoFrecuencia(nunca, 1, new BigDecimal("33.3")))),
+                new FrecuenciaItem(1L, 1, "Dolores en el cuello y espalda o tensión muscular.", 3, List.of(
+                        new ConteoFrecuencia(siempre, 1, new BigDecimal("33.3")), new ConteoFrecuencia(nunca, 2, new BigDecimal("66.7")))),
+                new FrecuenciaItem(3L, 3, "Problemas respiratorios.", 2, List.of(
+                        new ConteoFrecuencia(siempre, 0, new BigDecimal("0.0")), new ConteoFrecuencia(nunca, 2, new BigDecimal("100.0")))));
+        InformeEmpresa informe = new InformeEmpresa(new DatosCliente(1L, "900", "Empresa X"), 2026, general, NIVEL_EMPRESA,
+                new DescripcionPoblacion(0, List.of()),
+                new ConcentracionRiesgo(List.of(), sinGrupos, sinGrupos, sinGrupos, sinGrupos),
+                new ResultadosExtralaborales(List.of(), sinGrupos, sinGrupos),
+                new SintomasEstres(3, List.of(), List.of(new SintomasDimension(43L, "Síntomas fisiológicos", items))),
+                ConclusionesInforme.VACIAS);
+
+        byte[] word = new DocxInformeEmpresaGenerator().generar(informe, null, LocalDate.of(2026, 10, 17));
+
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(word));
+             XWPFWordExtractor extractor = new XWPFWordExtractor(doc)) {
+            String texto = extractor.getText();
+            assertTrue(texto.contains("4. SÍNTOMAS DE ESTRÉS POR ÍTEM"), texto);
+            assertTrue(texto.contains("SÍNTOMAS FISIOLÓGICOS"));
+            assertTrue(texto.indexOf("SÍNTOMAS DE ESTRÉS POR ÍTEM") < texto.indexOf("INTERPRETACIÓN DE LOS NIVELES"),
+                    "al final de los análisis, antes de la interpretación");
+            XWPFTable tabla = doc.getTables().stream()
+                    .filter(t -> t.getRow(0).getCell(0).getText().equals("Síntoma")).findFirst().orElseThrow();
+            assertEquals(List.of("Síntoma", "Personas", "Siempre", "Nunca"),
+                    tabla.getRow(0).getTableCells().stream().map(c -> c.getText()).toList());
+            assertEquals(List.of("Dolor de cabeza", "3", "66,7 %", "33,3 %"),
+                    tabla.getRow(1).getTableCells().stream().map(c -> c.getText()).toList(), "en el orden del ranking");
+            assertEquals(4, tabla.getNumberOfRows());
+            assertEquals("E53935", tabla.getRow(0).getCell(2).getColor(), "Siempre en rojo");
+
+            assertEquals(2, doc.getCharts().size(), "3 síntomas de a 2 por gráfico");
+            List<List<String>> categorias = doc.getCharts().stream().map(DocxInformeEmpresaGeneratorTest::categorias).toList();
+            assertTrue(categorias.contains(List.of("Dolor de cabeza (3)",
+                    "Dolores en el cuello y espalda o tensión muscular. (3)")), categorias.toString());
+            assertTrue(categorias.contains(List.of("Problemas respiratorios. (2)")), categorias.toString());
+            List<String> titulos = doc.getCharts().stream()
+                    .map(g -> g.getTitle().getBody().getParagraph(0).getText()).toList();
+            assertTrue(titulos.containsAll(List.of("Síntomas fisiológicos – gráfico 1 de 2",
+                    "Síntomas fisiológicos – gráfico 2 de 2")), titulos.toString());
         }
     }
 

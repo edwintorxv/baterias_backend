@@ -12,6 +12,7 @@ import com.riesgopsicosocial.domain.model.informe.empresa.CuestionarioInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.DimensionInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.DominioInforme;
 import com.riesgopsicosocial.domain.model.informe.empresa.FichaPersona;
+import com.riesgopsicosocial.domain.model.informe.empresa.ItemSintoma;
 import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
 import com.riesgopsicosocial.domain.model.informe.empresa.PersonaCargada;
 import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
@@ -46,6 +47,7 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadoclie
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.informeempresa.InformeEmpresaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.opcionrespuesta.OpcionRespuestaJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.pregunta.PreguntaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.respuesta.RespuestaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultado.CatalogoCalculoLoader;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadocuestionario.ResultadoCuestionarioEntity;
@@ -84,6 +86,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
     private final DimensionJpaRespository dimensionRepository;
     private final CiudadMunicipioJpaResository ciudadRepository;
     private final OpcionRespuestaJpaRepository opcionRespuestaRepository;
+    private final PreguntaJpaRepository preguntaRepository;
     private final BaremoCuestionarioJpaRepository baremoCuestionarioRepository;
     private final FichasPersonaLoader fichasPersona;
     private final InformeEmpresaJpaRepository informeEmpresaRepository;
@@ -105,6 +108,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                                             DimensionJpaRespository dimensionRepository,
                                             CiudadMunicipioJpaResository ciudadRepository,
                                             OpcionRespuestaJpaRepository opcionRespuestaRepository,
+                                            PreguntaJpaRepository preguntaRepository,
                                             BaremoCuestionarioJpaRepository baremoCuestionarioRepository,
                                             FichasPersonaLoader fichasPersona,
                                             InformeEmpresaJpaRepository informeEmpresaRepository,
@@ -125,6 +129,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         this.dimensionRepository = dimensionRepository;
         this.ciudadRepository = ciudadRepository;
         this.opcionRespuestaRepository = opcionRespuestaRepository;
+        this.preguntaRepository = preguntaRepository;
         this.baremoCuestionarioRepository = baremoCuestionarioRepository;
         this.fichasPersona = fichasPersona;
         this.informeEmpresaRepository = informeEmpresaRepository;
@@ -265,6 +270,25 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
     public List<OpcionFrecuencia> buscarOpcionesEstres() {
         return opcionRespuestaRepository.buscarPorMetodoCalculo(MetodoCalculo.PROMEDIO_PONDERADO).stream()
                 .map(o -> new OpcionFrecuencia(o.getId(), o.getNombre()))
+                .toList();
+    }
+
+    /** Preguntas de las dimensiones del cuestionario de estrés (el de promedio ponderado). */
+    @Override
+    public List<ItemSintoma> buscarItemsEstres() {
+        Set<Long> estres = cuestionarioRepository.findAll().stream()
+                .filter(c -> c.getMetodoCalculo() == MetodoCalculo.PROMEDIO_PONDERADO)
+                .map(CuestionarioEntity::getId)
+                .collect(Collectors.toSet());
+        Set<Long> dimensiones = dimensionCuestionarioRepository.findAll().stream()
+                .filter(dc -> estres.contains(dc.getFkCuestionario()))
+                .map(DimensionCuestionarioEntity::getId)
+                .collect(Collectors.toSet());
+        if (dimensiones.isEmpty()) {
+            return List.of();
+        }
+        return preguntaRepository.findByFkDimensionCuestionarioIn(dimensiones).stream()
+                .map(p -> new ItemSintoma(p.getId(), p.getFkDimensionCuestionario(), p.getNumero(), p.getDescripcion()))
                 .toList();
     }
 

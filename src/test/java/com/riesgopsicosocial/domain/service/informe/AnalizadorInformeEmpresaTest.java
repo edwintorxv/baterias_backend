@@ -300,7 +300,8 @@ class AnalizadorInformeEmpresaTest {
                 new RespuestaSintoma(100L, 3L, 46L, 2L), new RespuestaSintoma(200L, 3L, 46L, 5L),
                 new RespuestaSintoma(999L, 3L, 46L, 1L));   // otra aplicación (p. ej. una anterior): no cuenta
 
-        SintomasEstres sintomas = conEstres.sintomasEstres(participantes, respuestas, List.of(siempre, casiSiempre, nunca));
+        SintomasEstres sintomas = conEstres.sintomasEstres(participantes, respuestas, List.of(siempre, casiSiempre, nunca),
+                List.of());
 
         assertEquals(2, sintomas.personas());
         // Fisiológicos tiene "Siempre": va primero aunque psicoemocionales tenga más "Casi siempre".
@@ -320,10 +321,58 @@ class AnalizadorInformeEmpresaTest {
     @Test
     void sintomasEstres_sinResultadosDeEstres_quedaVacio() {
         SintomasEstres sintomas = analizador.sintomasEstres(
-                List.of(participante(1L, null, resultado(intra(FORMA_A, ALTO, ALTO, ALTO)))), List.of(), List.of());
+                List.of(participante(1L, null, resultado(intra(FORMA_A, ALTO, ALTO, ALTO)))), List.of(), List.of(),
+                List.of());
 
         assertEquals(0, sintomas.personas());
         assertTrue(sintomas.dimensiones().isEmpty());
+        assertTrue(sintomas.porItem().isEmpty());
+    }
+
+    @Test
+    void sintomasEstres_porItem_enOrdenDelCuestionarioYSintomasDelMasFrecuente() {
+        DimensionInforme fisiologicos = new DimensionInforme(43L, "Síntomas fisiológicos", null);
+        DimensionInforme social = new DimensionInforme(44L, "Síntomas de comportamiento social", null);
+        DimensionInforme psicoemocionales = new DimensionInforme(46L, "Síntomas psicoemocionales", null);
+        CuestionarioInforme estres = new CuestionarioInforme(4L, "D", MetodoCalculo.PROMEDIO_PONDERADO,
+                List.of(new DominioInforme(10L, 6L, "Estrés", List.of(fisiologicos, social, psicoemocionales))));
+        AnalizadorInformeEmpresa conEstres = new AnalizadorInformeEmpresa(List.of(estres), NIVELES);
+        OpcionFrecuencia siempre = new OpcionFrecuencia(1L, "Siempre");
+        OpcionFrecuencia nunca = new OpcionFrecuencia(5L, "Nunca");
+        List<ParticipanteEmpresa> participantes = List.of(
+                participante(1L, null, new ResultadoAplicacion(100L, 1L, null, List.of(total(estres, ALTO)), null)),
+                participante(2L, null, new ResultadoAplicacion(200L, 1L, null, List.of(total(estres, BAJO)), null)));
+        List<ItemSintoma> items = List.of(
+                new ItemSintoma(1L, 43L, 1, "Dolores en el cuello y espalda"),
+                new ItemSintoma(2L, 43L, 2, "Problemas gastrointestinales"),
+                new ItemSintoma(4L, 43L, 4, "Dolor de cabeza"),
+                new ItemSintoma(3L, 43L, 3, "Problemas respiratorios"),
+                new ItemSintoma(9L, 44L, 9, "Dificultad en las relaciones familiares"),
+                new ItemSintoma(23L, 46L, 23, "Sentimiento de soledad y miedo"));
+        List<RespuestaSintoma> respuestas = List.of(
+                new RespuestaSintoma(100L, 1L, 43L, 5L), new RespuestaSintoma(200L, 1L, 43L, 5L),
+                new RespuestaSintoma(100L, 2L, 43L, 1L), new RespuestaSintoma(200L, 2L, 43L, 5L),
+                new RespuestaSintoma(100L, 3L, 43L, 5L), new RespuestaSintoma(200L, 3L, 43L, 5L),
+                new RespuestaSintoma(100L, 4L, 43L, 1L),   // dolor de cabeza: solo una persona lo respondió
+                new RespuestaSintoma(100L, 23L, 46L, 5L), new RespuestaSintoma(200L, 23L, 46L, 1L),
+                new RespuestaSintoma(999L, 9L, 44L, 1L));  // otra aplicación: no cuenta, y social queda sin ítems
+
+        SintomasEstres sintomas = conEstres.sintomasEstres(participantes, respuestas, List.of(siempre, nunca), items);
+
+        // Orden del cuestionario, no del ranking; social no aparece porque nadie de los evaluados lo respondió.
+        assertEquals(List.of("Síntomas fisiológicos", "Síntomas psicoemocionales"),
+                sintomas.porItem().stream().map(SintomasDimension::nombre).toList());
+        List<FrecuenciaItem> fisiologicosPorItem = sintomas.porItem().get(0).items();
+        // Dolor de cabeza (100 % Siempre) antes que gastrointestinales (50 %); cuello y respiratorios
+        // empatan (0 %) y quedan en el orden del cuestionario.
+        assertEquals(List.of(4, 2, 1, 3), fisiologicosPorItem.stream().map(FrecuenciaItem::numero).toList());
+        FrecuenciaItem cabeza = fisiologicosPorItem.get(0);
+        assertEquals("Dolor de cabeza", cabeza.descripcion());
+        assertEquals(1, cabeza.respuestas());
+        FrecuenciaItem gastro = fisiologicosPorItem.get(1);
+        assertEquals(2, gastro.respuestas(), "la base es el número de personas que respondieron el ítem");
+        assertEquals(List.of(bd("50.0"), bd("50.0")),
+                gastro.frecuencias().stream().map(ConteoFrecuencia::porcentaje).toList());
     }
 
     @Test

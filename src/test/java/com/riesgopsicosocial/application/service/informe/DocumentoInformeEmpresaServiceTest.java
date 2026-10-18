@@ -72,7 +72,7 @@ class DocumentoInformeEmpresaServiceTest {
                 new DescripcionPoblacion(0, List.of()),
                 new ConcentracionRiesgo(List.of(), sinGrupos, sinGrupos, sinGrupos, sinGrupos),
                 new ResultadosExtralaborales(List.of(), sinGrupos, sinGrupos),
-                new SintomasEstres(0, List.of()), conclusiones);
+                new SintomasEstres(0, List.of(), List.of()), conclusiones);
     }
 
 }

@@ -15,20 +15,9 @@ import java.util.List;
 public record FrecuenciaDimension(Long idDimensionCuestionario, String nombre, int personas, int items,
                                   int respuestas, List<ConteoFrecuencia> frecuencias) {
 
-    /**
-     * Orden sin sumar opciones: primero la de mayor porcentaje en "Siempre"; en empate, la de mayor
-     * porcentaje en "Casi siempre", y así hacia abajo.
-     */
+    /** Sin sumar opciones ({@link ConteoFrecuencia#compararMasFrecuentePrimero}). */
     public static Comparator<FrecuenciaDimension> masFrecuentePrimero() {
-        return (a, b) -> {
-            for (int i = 0; i < a.frecuencias().size(); i++) {
-                int comparacion = b.frecuencias().get(i).porcentaje().compareTo(a.frecuencias().get(i).porcentaje());
-                if (comparacion != 0) {
-                    return comparacion;
-                }
-            }
-            return 0;
-        };
+        return (a, b) -> ConteoFrecuencia.compararMasFrecuentePrimero(a.frecuencias(), b.frecuencias());
     }
 
 }

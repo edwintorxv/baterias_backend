@@ -60,6 +60,10 @@ public final class InformeEmpresaResponseMapper {
                 new SintomasEstresResponse(
                         sintomas.personas(),
                         sintomas.dimensiones().stream().map(InformeEmpresaResponseMapper::frecuencia).toList(),
+                        sintomas.porItem().stream()
+                                .map(s -> new SintomasDimensionResponse(s.idDimensionCuestionario(), s.nombre(),
+                                        s.items().stream().map(InformeEmpresaResponseMapper::frecuencia).toList()))
+                                .toList(),
                         desglose(concentracion.estresPorCiudad(), ESTRES),
                         desglose(concentracion.estresPorArea(), ESTRES)),
                 conclusiones(informe.conclusiones()));
@@ -119,9 +123,18 @@ public final class InformeEmpresaResponseMapper {
 
     private static FrecuenciaDimensionResponse frecuencia(FrecuenciaDimension dimension) {
         return new FrecuenciaDimensionResponse(dimension.idDimensionCuestionario(), dimension.nombre(),
-                dimension.personas(), dimension.items(), dimension.respuestas(), dimension.frecuencias().stream()
+                dimension.personas(), dimension.items(), dimension.respuestas(), conteos(dimension.frecuencias()));
+    }
+
+    private static FrecuenciaItemResponse frecuencia(FrecuenciaItem item) {
+        return new FrecuenciaItemResponse(item.idPregunta(), item.numero(), item.descripcion(), item.respuestas(),
+                conteos(item.frecuencias()));
+    }
+
+    private static List<ConteoFrecuenciaResponse> conteos(List<ConteoFrecuencia> frecuencias) {
+        return frecuencias.stream()
                 .map(f -> new ConteoFrecuenciaResponse(f.opcion().id(), f.opcion().nombre(), f.cantidad(), f.porcentaje()))
-                .toList());
+                .toList();
     }
 
     private static DistribucionNivelesResponse distribucion(DistribucionNiveles distribucion,

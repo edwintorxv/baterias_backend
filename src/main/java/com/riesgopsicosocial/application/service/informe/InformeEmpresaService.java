@@ -57,7 +57,8 @@ public class InformeEmpresaService implements ConsultarInformeEmpresaUseCase {
                 analizador.describirPoblacion(participantes, fichas, anio),
                 analizador.concentracionRiesgo(participantes),
                 analizador.extralaboral(participantes),
-                analizador.sintomasEstres(participantes, respuestasEstres, informeEmpresaPort.buscarOpcionesEstres()),
+                analizador.sintomasEstres(participantes, respuestasEstres, informeEmpresaPort.buscarOpcionesEstres(),
+                        informeEmpresaPort.buscarItemsEstres()),
                 informeEmpresaPort.buscarConclusiones(idCliente, anio).orElse(ConclusionesInforme.VACIAS));
     }
 
