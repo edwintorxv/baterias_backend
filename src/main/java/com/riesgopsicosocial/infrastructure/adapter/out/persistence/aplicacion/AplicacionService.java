@@ -1,5 +1,6 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion;
 
+import com.riesgopsicosocial.infrastructure.security.UsuarioActual;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorJpaRepository;
@@ -46,6 +47,7 @@ public class AplicacionService {
         if (entidad.getFkEvaluador() != null) {
             validarEvaluadorActivo(entidad.getFkEvaluador());
         }
+        entidad.setUsuarioCrea(UsuarioActual.nombre());
         return repository.save(entidad);
     }
 
@@ -79,6 +81,8 @@ public class AplicacionService {
             existente.setFkEvaluador(datos.getFkEvaluador());
         }
 
+        existente.setFechaModificado(LocalDateTime.now());
+        existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
     }
 

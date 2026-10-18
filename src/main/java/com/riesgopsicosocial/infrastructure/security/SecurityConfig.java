@@ -2,6 +2,7 @@ package com.riesgopsicosocial.infrastructure.security;
 
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.Rol;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.config.Customizer;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -43,6 +44,7 @@ public class SecurityConfig {
     public SecurityFilterChain filtroSeguridad(HttpSecurity http, UsuarioJwtConverter converter,
                                                RespuestasSeguridad respuestas) throws Exception {
         http
+                .cors(Customizer.withDefaults()) // CorsConfig: va antes de pedir token, para el preflight
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .httpBasic(AbstractHttpConfigurer::disable)

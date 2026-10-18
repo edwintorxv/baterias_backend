@@ -1,5 +1,6 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario;
 
+import com.riesgopsicosocial.infrastructure.security.UsuarioActual;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cliente.ClienteJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluado.EvaluadoJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorEntity;
@@ -50,6 +51,7 @@ public class UsuarioService {
         if (entidad.getActivo() == null) {
             entidad.setActivo(true);
         }
+        entidad.setUsuarioCrea(UsuarioActual.nombre());
         return repository.save(entidad);
     }
 
@@ -79,6 +81,7 @@ public class UsuarioService {
             existente.setActivo(datos.getActivo());
         }
         existente.setFechaModificado(LocalDateTime.now());
+        existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
     }
 
@@ -88,6 +91,7 @@ public class UsuarioService {
         UsuarioEntity existente = obtenerPorId(id);
         existente.setContrasenaHash(passwordEncoder.encode(contrasena));
         existente.setFechaModificado(LocalDateTime.now());
+        existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
     }
 
@@ -105,7 +109,11 @@ public class UsuarioService {
             throw new ResourceNotFoundException("Clientes no encontrados con id: " + inexistentes);
         }
         usuarioClienteRepository.borrarDeUsuario(id);
-        usuarioClienteRepository.saveAll(clientes.stream().map(c -> new UsuarioClienteEntity(id, c)).toList());
+        usuarioClienteRepository.saveAll(clientes.stream().map(c -> {
+            UsuarioClienteEntity asignacion = new UsuarioClienteEntity(id, c);
+            asignacion.setUsuarioCrea(UsuarioActual.nombre());
+            return asignacion;
+        }).toList());
         return List.copyOf(clientes);
     }
 

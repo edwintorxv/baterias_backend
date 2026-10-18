@@ -1,9 +1,11 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente;
 
+import com.riesgopsicosocial.infrastructure.security.UsuarioActual;
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -28,6 +30,7 @@ public class EvaluadoClienteService {
                     "El evaluado ya tiene una relación activa con este cliente. Actualice el registro existente en lugar de crear uno nuevo.");
         }
 
+        entidad.setUsuarioCrea(UsuarioActual.nombre());
         return repository.save(entidad);
     }
 
@@ -58,6 +61,8 @@ public class EvaluadoClienteService {
         existente.setFkTipoSalario(datos.getFkTipoSalario());
         existente.setActivo(quedaActiva);
 
+        existente.setFechaModificado(LocalDateTime.now());
+        existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
     }
 

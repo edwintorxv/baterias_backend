@@ -50,7 +50,6 @@ public class PrimerAdministrador implements ApplicationRunner {
         admin.setUsuario(usuario);
         admin.setNombre("Administrador");
         admin.setRol(Rol.ADMIN);
-        admin.setUsuarioCrea("sistema");
         service.crear(admin, contrasena);
         log.info("Primer administrador creado: {}", usuario);
     }

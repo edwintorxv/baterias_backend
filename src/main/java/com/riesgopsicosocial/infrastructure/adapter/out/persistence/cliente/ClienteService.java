@@ -1,9 +1,11 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.cliente;
 
+import com.riesgopsicosocial.infrastructure.security.UsuarioActual;
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -20,6 +22,7 @@ public class ClienteService {
             throw new BusinessException("Ya existe un clinte con NIT: " + entidad.getNit());
         }
 
+        entidad.setUsuarioCrea(UsuarioActual.nombre());
         return repository.save(entidad);
 
     }
@@ -42,6 +45,8 @@ public class ClienteService {
         existente.setCargoContacto(datos.getCargoContacto());
         existente.setTelefonoContacto(datos.getTelefonoContacto());
 
+        existente.setFechaModificado(LocalDateTime.now());
+        existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
     }
 

@@ -1,5 +1,6 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.informeempresa;
 
+import com.riesgopsicosocial.infrastructure.security.UsuarioActual;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cliente.ClienteJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteEntity;
@@ -67,6 +68,9 @@ public class ConclusionesInformeEmpresaService {
         informe.setFkEvaluador(datos.getFkEvaluador());
         if (informe.getId() != null) {
             informe.setFechaModificado(LocalDateTime.now());
+            informe.setUsuarioModifica(UsuarioActual.nombre());
+        } else {
+            informe.setUsuarioCrea(UsuarioActual.nombre());
         }
         return repository.save(informe);
     }

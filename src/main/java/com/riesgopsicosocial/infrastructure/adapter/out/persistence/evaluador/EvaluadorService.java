@@ -1,10 +1,12 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador;
 
+import com.riesgopsicosocial.infrastructure.security.UsuarioActual;
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import com.riesgopsicosocial.shared.exception.ValidationException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -28,6 +30,7 @@ public class EvaluadorService {
         if (entidad.getActivo() == null) {
             entidad.setActivo(true);
         }
+        entidad.setUsuarioCrea(UsuarioActual.nombre());
         return repository.save(entidad);
     }
 
@@ -52,6 +55,8 @@ public class EvaluadorService {
             existente.setActivo(datos.getActivo());
         }
 
+        existente.setFechaModificado(LocalDateTime.now());
+        existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
     }
 
@@ -69,6 +74,8 @@ public class EvaluadorService {
         }
         existente.setFirma(imagen);
         existente.setFirmaTipoContenido(tipoContenido);
+        existente.setFechaModificado(LocalDateTime.now());
+        existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
     }
 

@@ -1,9 +1,11 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluado;
 
+import com.riesgopsicosocial.infrastructure.security.UsuarioActual;
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -20,6 +22,7 @@ public class EvaluadoService {
             throw new BusinessException(
                     "Ya existe un evaluado con número de identificación: " + entidad.getNumeroIdentificacion());
         }
+        entidad.setUsuarioCrea(UsuarioActual.nombre());
         return repository.save(entidad);
     }
 
@@ -45,6 +48,8 @@ public class EvaluadoService {
         existente.setOcupacionProfesion(datos.getOcupacionProfesion());
         existente.setFamiliaresDependientesEconomicamente(datos.getFamiliaresDependientesEconomicamente());
 
+        existente.setFechaModificado(LocalDateTime.now());
+        existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
     }
 

@@ -10,7 +10,7 @@
 - **Los datos maestros NO están en las migraciones** (catálogos, cuestionarios, preguntas, escalas, baremos y datos de prueba viven solo en la BD local). En otra máquina: `pg_dump -F c` + `pg_restore` (trae `flyway_schema_history`; el `.dump` tiene datos de evaluados: **no subirlo a git**). Pendiente: migración `V16__datos_maestros.sql` (V14 y V15 ya se usaron) con los datos ya corregidos (incluidas las comas de la V14) y `setval` de secuencias.
 - **La app la arranca el usuario en IntelliJ (8080)**: no levantar/detener instancias sin avisar. Tiene **spring-boot-devtools**: un `mvnw compile`/`test` la reinicia sola y Flyway aplica migraciones nuevas en la BD local; `@SpringBootTest` también corre contra la BD local. Avisar antes de compilar si hay una migración nueva.
 - **Dependencia nueva en el `pom.xml`** → devtools no la carga y la app queda caída: el usuario recarga Maven y reinicia en IntelliJ (avisarle).
-- Tests: `sh mvnw test` → **109** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
+- Tests: `sh mvnw test` → **116** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
 - Manuales y Res. 2764 de 2022 en PDF (fuera del repo): `/Users/edwingacha/proyectos/Documentacion/baterias/` (texto en macOS con `osascript -l JavaScript` + PDFKit). El `.pptx` de ejemplo de informe de empresa tiene datos reales: no subirlo.
 
 ## 1. Stack y arquitectura
@@ -81,20 +81,21 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 
 **Datos de prueba (BD local)**: cliente 1 "CALZADO CARDINS", 200 personas, 162 evaluadas en 2026 (aplicaciones 196, 197 y 200 sin calcular a propósito); evaluador 1 "Psicóloga de Prueba" activo con firma. Nivel de la empresa: A 27,8 y B 30,0 (medio) → cada dos años. "EAF" es un área de prueba de texto libre.
 
-## 5. Autenticación — 🚧 pasos 1–6 de 9 hechos
+## 5. Autenticación — ✅ completa (verificada contra la app con los tres roles)
 
 - **JWT propio** (Spring Security + `oauth2-resource-server`, HS256): `POST /auth/login` → token de 8 h; `GET /auth/yo`; `PUT /auth/contrasena`. Secreto en `APP_SEGURIDAD_JWT_SECRETO` (≥ 32 caracteres; sin él no arranca; solo el perfil dev trae uno). BCrypt. Login fallido: mismo mensaje y mismo tiempo exista o no el usuario.
 - El rol y `activo` se leen **de la BD en cada petición** (`UsuarioJwtConverter`), no del token. 401/403 en formato `ApiError` (`UNAUTHORIZED`/`FORBIDDEN`). Swagger con "Authorize".
 - **Usuarios** (V15): CRUD `/usuarios` (solo ADMIN, sin DELETE), `PUT /usuarios/{id}/contrasena`, `GET/PUT /usuarios/{id}/clientes`. Vínculo por rol: PSICOLOGO → `fk_evaluador` (activo, uno por evaluador), CLIENTE → `fk_cliente`, EVALUADO → `fk_evaluado`, ADMIN sin vínculo. Primer admin: `APP_SEGURIDAD_ADMIN_USUARIO`/`_CONTRASENA` si la tabla está vacía (`PrimerAdministrador`).
 - **Permisos por rol** (`SecurityConfig`, tabla aprobada por el usuario; test `PermisosPorRolTest`): ADMIN usuarios, configuración, clientes y evaluadores, **no ve informes ni datos de trabajadores**; PSICOLOGO todo el trabajo e informes; CLIENTE solo el informe de empresa (JSON, Word, conclusiones en lectura); EVALUADO nada (previsto para responder en línea a futuro). **Ruta no clasificada = denegada.**
 - **Alcance por cliente** (`AlcanceUsuario` + `AlcanceClienteInterceptor` sobre `/clientes`, `/evaluado-clientes`, `/aplicaciones`, `/respuestas`, `/evaluados`; cuerpos y listados en cada controlador): el psicólogo solo sus clientes asignados, el cliente solo su empresa; lo ajeno responde **404** igual que si no existiera. Evaluado visible si tiene relación con un cliente suyo o ninguna; búsqueda exacta por documento sin filtro (para vincular). Firmante (`fkEvaluador` en aplicaciones y conclusiones): vacío, el propio o el que ya tenía (403 si otro). Firma del evaluador: solo la propia (ADMIN cualquiera).
-- **Faltan**: 7 CORS para el front · 8 auditoría `usuario_crea`/`usuario_modifica` con el usuario del token (hoy ningún servicio la llena) · 9 verificación final.
+- **CORS global** (`CorsConfig`, ningún controlador lo declara): orígenes en `APP_CORS_ORIGENES` (coma; admite patrones); sin valor, ninguno; dev acepta cualquier puerto de localhost. Sin credenciales (el token va en `Authorization`); expone `Content-Disposition` para el nombre de los archivos.
+- **Auditoría manual** (decisión del usuario, sin listener ni `@EnableJpaAuditing`): cada servicio pone `usuario_crea` al crear y `usuario_modifica` + `fecha_modificado` al actualizar con `UsuarioActual.nombre()` (usuario de la sesión; "sistema" sin sesión). Un servicio nuevo debe hacer lo mismo. Marca "modificado" en cada PUT aunque no cambie nada.
 - Usuarios de prueba en la BD local: `admin`, `psicologa` (evaluador 1, cliente 1 asignado), `rrhh.cardins` (CLIENTE del 1). En la BD hay 1.835 evaluados sin relación con ninguna empresa (carga del 2026-09-22): revisar.
 
 ## 6. Pendientes
 
 **Antes de producción**
-1. Terminar la autenticación (pasos 7–9). Pendiente menor: límite de intentos de login.
+1. Seguridad: límite de intentos de login (fuerza bruta); revisar los 1.835 evaluados sin empresa.
 2. Migración `V16__datos_maestros.sql` para arrancar sobre una BD vacía.
 3. Front (no existe): clientes → informe de empresa por año, o empleados → informe individual; diligenciar conclusiones y las tres acciones antes de descargar el Word de empresa.
 
