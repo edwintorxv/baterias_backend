@@ -1,0 +1,158 @@
+package com.riesgopsicosocial.infrastructure.security;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.riesgopsicosocial.infrastructure.adapter.in.rest.auth.AuthController;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.Rol;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioEntity;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.respuesta.RespuestaJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioClienteJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioService;
+import com.riesgopsicosocial.shared.config.ContrasenaConfig;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+/** Seguridad real (filtros, JWT, respuestas 401) con el repositorio simulado: no toca la BD. */
+@WebMvcTest(AuthController.class)
+@Import({SecurityConfig.class, JwtConfig.class, TokenService.class, UsuarioJwtConverter.class,
+        RespuestasSeguridad.class, AutenticacionService.class, ContrasenaConfig.class, AlcanceUsuario.class})
+class SeguridadTest {
+
+    @Autowired
+    private MockMvc mvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private JwtEncoder jwtEncoder;
+    @Autowired
+    private TokenService tokenService;
+
+    @MockitoBean
+    private UsuarioJpaRepository repository;
+    @MockitoBean
+    private UsuarioService usuarioService;
+    @MockitoBean
+    private UsuarioClienteJpaRepository usuarioClienteRepository;
+    @MockitoBean
+    private EvaluadoClienteJpaRepository evaluadoClienteRepository;
+    @MockitoBean
+    private AplicacionJpaRepository aplicacionRepository;
+    @MockitoBean
+    private RespuestaJpaRepository respuestaRepository;
+
+    private UsuarioEntity psicologa;
+
+    @BeforeEach
+    void usuarioPsicologa() {
+        psicologa = new UsuarioEntity();
+        psicologa.setId(2L);
+        psicologa.setUsuario("psicologa");
+        psicologa.setNombre("Psicóloga de Prueba");
+        psicologa.setRol(Rol.PSICOLOGO);
+        psicologa.setFkEvaluador(1L);
+        psicologa.setActivo(true);
+        psicologa.setContrasenaHash(passwordEncoder.encode("secreta123"));
+        when(repository.findByUsuarioIgnoreCase("psicologa")).thenReturn(Optional.of(psicologa));
+        when(repository.findById(2L)).thenReturn(Optional.of(psicologa));
+    }
+
+    private String login(String usuario, String contrasena) throws Exception {
+        return mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"usuario\":\"" + usuario + "\",\"contrasena\":\"" + contrasena + "\"}"))
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void sinToken_401ConFormatoApiError() throws Exception {
+        mvc.perform(get("/auth/yo"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("WWW-Authenticate", "Bearer"))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void login_devuelveTokenQueSirveParaLasPeticiones() throws Exception {
+        JsonNode respuesta = objectMapper.readTree(login(" psicologa ", "secreta123"));
+        assertEquals("Bearer", respuesta.at("/data/tipo").asText());
+        assertEquals(8 * 3600, respuesta.at("/data/expiraEn").asLong());
+        assertEquals("PSICOLOGO", respuesta.at("/data/usuario/rol").asText());
+        String token = respuesta.at("/data/token").asText();
+
+        mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.usuario").value("psicologa"))
+                .andExpect(jsonPath("$.data.idEvaluador").value(1));
+    }
+
+    @Test
+    void login_fallido_mismoMensajeSinDecirQueFallo() throws Exception {
+        String malaContrasena = login("psicologa", "otra-clave");
+        String noExiste = login("nadie", "secreta123");
+        psicologa.setActivo(false);
+        String inactivo = login("psicologa", "secreta123");
+
+        for (String respuesta : new String[]{malaContrasena, noExiste, inactivo}) {
+            JsonNode json = objectMapper.readTree(respuesta);
+            assertEquals("UNAUTHORIZED", json.at("/errorCode").asText(), respuesta);
+            assertEquals(AutenticacionService.CREDENCIALES_INVALIDAS, json.at("/message").asText());
+        }
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"usuario\":\"psicologa\",\"contrasena\":\"x\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void tokenMalFirmado_401() throws Exception {
+        String token = tokenService.emitir(psicologa).valor();
+        String alterado = token.substring(0, token.length() - 4) + (token.endsWith("AAAA") ? "BBBB" : "AAAA");
+
+        mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + alterado))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void tokenVencido_401() throws Exception {
+        Clock hace9Horas = Clock.fixed(Instant.now().minus(Duration.ofHours(9)), ZoneOffset.UTC);
+        String vencido = new TokenService(jwtEncoder, Duration.ofHours(8), hace9Horas).emitir(psicologa).valor();
+
+        mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + vencido))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void usuarioDesactivadoConTokenVigente_401() throws Exception {
+        String token = tokenService.emitir(psicologa).valor();
+        psicologa.setActivo(false);
+
+        mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+    }
+
+}

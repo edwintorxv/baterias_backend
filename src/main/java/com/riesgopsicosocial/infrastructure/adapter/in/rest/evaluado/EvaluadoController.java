@@ -4,6 +4,7 @@ import com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluado.dto.Evaluad
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluado.dto.EvaluadoResponse;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluado.EvaluadoEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluado.EvaluadoService;
+import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import jakarta.validation.Valid;
@@ -12,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -19,9 +22,11 @@ import java.util.stream.Collectors;
 public class EvaluadoController {
 
     private final EvaluadoService service;
+    private final AlcanceUsuario alcance;
 
-    public EvaluadoController(EvaluadoService service) {
+    public EvaluadoController(EvaluadoService service, AlcanceUsuario alcance) {
         this.service = service;
+        this.alcance = alcance;
     }
 
     private EvaluadoResponse toResponse(EvaluadoEntity evaluadoEntity) {
@@ -85,6 +90,10 @@ public class EvaluadoController {
         );
     }
 
+    /**
+     * Por documento exacto se encuentra aunque sea de otra empresa (decisión del usuario: para poder
+     * vincularlo a su cliente). El listado general solo trae los de sus clientes.
+     */
     @GetMapping
     public ResponseEntity<ApiResponse<List<EvaluadoResponse>>> listarTodos(
             @RequestParam(required = false) String numeroIdentificacion) {
@@ -95,7 +104,9 @@ public class EvaluadoController {
             return ResponseEntity.ok(ResponseBuilder.success("Evaluado encontrado", List.of(encontrado)));
         }
 
+        Optional<Set<Long>> visibles = alcance.evaluadosVisibles();
         List<EvaluadoResponse> data = service.listarTodos().stream()
+                .filter(e -> visibles.map(v -> v.contains(e.getId())).orElse(true))
                 .map(this::toResponse).collect(Collectors.toList());
         return ResponseEntity.ok(ResponseBuilder.success("Listado de evaluados", data));
     }

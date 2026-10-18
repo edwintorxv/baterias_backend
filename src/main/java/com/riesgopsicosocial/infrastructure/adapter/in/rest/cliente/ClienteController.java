@@ -4,6 +4,7 @@ import com.riesgopsicosocial.infrastructure.adapter.in.rest.cliente.dto.ClienteR
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.cliente.dto.ClienteResponse;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cliente.ClienteEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cliente.ClienteService;
+import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import jakarta.validation.Valid;
@@ -19,9 +20,11 @@ import java.util.stream.Collectors;
 public class ClienteController {
 
     private final ClienteService service;
+    private final AlcanceUsuario alcance;
 
-    public ClienteController(ClienteService service) {
+    public ClienteController(ClienteService service, AlcanceUsuario alcance) {
         this.service = service;
+        this.alcance = alcance;
     }
 
     private ClienteResponse toResponse(ClienteEntity e) {
@@ -64,10 +67,12 @@ public class ClienteController {
         return ResponseEntity.ok(ResponseBuilder.success("Cliente actualizado exitosamente", toResponse(actualizado)));
     }
 
+    /** El psicólogo solo ve sus clientes asignados ({@code GET /clientes/{id}} lo revisa el interceptor). */
     @GetMapping
     public ResponseEntity<ApiResponse<List<ClienteResponse>>> listarTodos() {
         List<ClienteResponse> data = service.listarTodos()
                 .stream()
+                .filter(c -> alcance.puedeVerCliente(c.getId()))
                 .map(this::toResponse)
                 .collect(Collectors.toList()
                 );

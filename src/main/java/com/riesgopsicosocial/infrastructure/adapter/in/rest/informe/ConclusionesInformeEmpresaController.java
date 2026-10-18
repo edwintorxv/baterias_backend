@@ -4,6 +4,7 @@ import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.Conclusi
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.ConclusionesInformeResponse;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.informeempresa.ConclusionesInformeEmpresaService;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.informeempresa.InformeEmpresaEntity;
+import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import org.springframework.http.ResponseEntity;
@@ -18,9 +19,11 @@ import org.springframework.web.bind.annotation.*;
 public class ConclusionesInformeEmpresaController {
 
     private final ConclusionesInformeEmpresaService service;
+    private final AlcanceUsuario alcance;
 
-    public ConclusionesInformeEmpresaController(ConclusionesInformeEmpresaService service) {
+    public ConclusionesInformeEmpresaController(ConclusionesInformeEmpresaService service, AlcanceUsuario alcance) {
         this.service = service;
+        this.alcance = alcance;
     }
 
     private static ConclusionesInformeResponse toResponse(InformeEmpresaEntity informe) {
@@ -43,6 +46,7 @@ public class ConclusionesInformeEmpresaController {
     public ResponseEntity<ApiResponse<ConclusionesInformeResponse>> guardar(@PathVariable Long idCliente,
                                                                            @RequestParam int anio,
                                                                            @RequestBody ConclusionesInformeRequest request) {
+        alcance.exigirFirmante(request.fkEvaluador(), service.consultar(idCliente, anio).getFkEvaluador());
         InformeEmpresaEntity datos = new InformeEmpresaEntity();
         datos.setConclusiones(request.conclusiones());
         datos.setAccionesCortoPlazo(request.accionesCortoPlazo());

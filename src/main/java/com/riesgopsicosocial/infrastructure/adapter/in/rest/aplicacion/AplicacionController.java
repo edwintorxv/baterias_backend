@@ -4,6 +4,7 @@ import com.riesgopsicosocial.infrastructure.adapter.in.rest.aplicacion.dto.Aplic
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.aplicacion.dto.AplicacionResponse;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionService;
+import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import jakarta.validation.Valid;
@@ -12,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -19,9 +22,11 @@ import java.util.stream.Collectors;
 public class AplicacionController {
 
     private final AplicacionService service;
+    private final AlcanceUsuario alcance;
 
-    public AplicacionController(AplicacionService service) {
+    public AplicacionController(AplicacionService service, AlcanceUsuario alcance) {
         this.service = service;
+        this.alcance = alcance;
     }
 
     private AplicacionResponse toResponse(AplicacionEntity aplicacionEntity) {
@@ -55,6 +60,8 @@ public class AplicacionController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<AplicacionResponse>> crear(@Valid @RequestBody AplicacionRequest request) {
+        alcance.exigirRelacion(request.fkEvaluadoCliente());
+        alcance.exigirFirmante(request.fkEvaluador(), null);
         AplicacionEntity creado = service.crear(toEntity(request));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ResponseBuilder.success(
@@ -65,6 +72,8 @@ public class AplicacionController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<AplicacionResponse>> actualizar(
             @PathVariable Long id, @Valid @RequestBody AplicacionRequest request) {
+        alcance.exigirRelacion(request.fkEvaluadoCliente()); // la aplicación actual la revisa AlcanceClienteInterceptor
+        alcance.exigirFirmante(request.fkEvaluador(), service.obtenerPorId(id).getFkEvaluador());
         AplicacionEntity actualizado = service.actualizar(id, toEntity(request));
         return ResponseEntity.ok(
                 ResponseBuilder.success(
@@ -87,7 +96,9 @@ public class AplicacionController {
             resultado = service.listarTodos();
         }
 
+        Optional<Set<Long>> relaciones = alcance.relacionesVisibles();
         List<AplicacionResponse> data = resultado.stream()
+                .filter(a -> relaciones.map(r -> r.contains(a.getFkEvaluadoCliente())).orElse(true))
                 .map(this::toResponse)
                 .collect(Collectors
                         .toList());

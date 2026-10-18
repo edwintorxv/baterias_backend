@@ -4,6 +4,7 @@ import com.riesgopsicosocial.infrastructure.adapter.in.rest.respuesta.dto.Respue
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.respuesta.dto.RespuestaResponse;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.respuesta.RespuestaEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.respuesta.RespuestaService;
+import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import jakarta.validation.Valid;
@@ -19,9 +20,11 @@ import java.util.stream.Collectors;
 public class RespuestaController {
 
     private final RespuestaService service;
+    private final AlcanceUsuario alcance;
 
-    public RespuestaController(RespuestaService service) {
+    public RespuestaController(RespuestaService service, AlcanceUsuario alcance) {
         this.service = service;
+        this.alcance = alcance;
     }
 
     private RespuestaResponse toResponse(RespuestaEntity entidad) {
@@ -44,6 +47,7 @@ public class RespuestaController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<RespuestaResponse>> crear(@Valid @RequestBody RespuestaRequest request) {
+        alcance.exigirAplicacion(request.fkAplicacion());
         RespuestaEntity creado = service.crear(toEntity(request));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ResponseBuilder.success("Respuesta registrada exitosamente", toResponse(creado)));
@@ -52,6 +56,7 @@ public class RespuestaController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<RespuestaResponse>>> listarPorAplicacion(
             @RequestParam Long fkAplicacion) {
+        alcance.exigirAplicacion(fkAplicacion);
 
         List<RespuestaResponse> data = service.listarPorAplicacion(fkAplicacion).stream()
                 .map(this::toResponse)

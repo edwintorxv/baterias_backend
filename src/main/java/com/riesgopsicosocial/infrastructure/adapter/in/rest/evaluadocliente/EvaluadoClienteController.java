@@ -4,6 +4,7 @@ import com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluadocliente.dto.
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluadocliente.dto.EvaluadoClienteResponse;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteService;
+import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import jakarta.validation.Valid;
@@ -19,9 +20,11 @@ import java.util.stream.Collectors;
 public class EvaluadoClienteController {
 
     private final EvaluadoClienteService service;
+    private final AlcanceUsuario alcance;
 
-    public EvaluadoClienteController(EvaluadoClienteService service) {
+    public EvaluadoClienteController(EvaluadoClienteService service, AlcanceUsuario alcance) {
         this.service = service;
+        this.alcance = alcance;
     }
 
     private EvaluadoClienteResponse toResponse(EvaluadoClienteEntity evaluadoClienteEntity) {
@@ -61,6 +64,7 @@ public class EvaluadoClienteController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<EvaluadoClienteResponse>> crear(@Valid @RequestBody EvaluadoClienteRequest request) {
+        alcance.exigirCliente(request.fkCliente());
         EvaluadoClienteEntity creado = service.crear(toEntity(request));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ResponseBuilder
@@ -73,6 +77,7 @@ public class EvaluadoClienteController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<EvaluadoClienteResponse>> actualizar(@PathVariable Long id, @Valid
     @RequestBody EvaluadoClienteRequest request) {
+        alcance.exigirCliente(request.fkCliente()); // la relación actual la revisa AlcanceClienteInterceptor
         EvaluadoClienteEntity actualizado = service.actualizar(id, toEntity(request));
 
         return ResponseEntity.ok(
@@ -100,6 +105,7 @@ public class EvaluadoClienteController {
         }
 
         List<EvaluadoClienteResponse> data = resultado.stream()
+                .filter(r -> alcance.puedeVerCliente(r.getFkCliente()))
                 .map(this::toResponse)
                 .collect(Collectors.toList());
 

@@ -4,6 +4,7 @@ import com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluador.dto.Evalua
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluador.dto.EvaluadorResponse;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorService;
+import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.exception.ValidationException;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
@@ -22,9 +23,11 @@ import java.util.List;
 public class EvaluadorController {
 
     private final EvaluadorService service;
+    private final AlcanceUsuario alcance;
 
-    public EvaluadorController(EvaluadorService service) {
+    public EvaluadorController(EvaluadorService service, AlcanceUsuario alcance) {
         this.service = service;
+        this.alcance = alcance;
     }
 
     private EvaluadorResponse toResponse(EvaluadorEntity evaluadorEntity) {
@@ -89,10 +92,11 @@ public class EvaluadorController {
         return ResponseEntity.ok(ResponseBuilder.success("Evaluador encontrado", toResponse(service.obtenerPorId(id))));
     }
 
-    /** Imagen PNG o JPG de hasta 1 MB, en el campo multipart {@code archivo}. */
+    /** Imagen PNG o JPG de hasta 1 MB, en el campo multipart {@code archivo}. El psicólogo solo sube la suya. */
     @PutMapping(value = "/{id}/firma", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<EvaluadorResponse>> guardarFirma(
             @PathVariable Long id, @RequestParam("archivo") MultipartFile archivo) {
+        alcance.exigirEvaluadorPropio(id);
         byte[] imagen;
         try {
             imagen = archivo.getBytes();
