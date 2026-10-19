@@ -21,60 +21,22 @@ public class EvaluadoClienteService {
         this.repository = repository;
     }
 
-    public EvaluadoClienteEntity crear(EvaluadoClienteEntity entidad) {
-
-        if (entidad.getActivo() == null) {
-            entidad.setActivo(true);
-        }
-        if (entidad.getFechaVinculacion() == null) {
-            entidad.setFechaVinculacion(LocalDate.now(ZONA));
-        }
-        entidad.setFechaRetiro(fechaRetiro(entidad.getActivo(), entidad.getFechaRetiro(), null));
-        validarVigencia(entidad);
-
-        if (Boolean.TRUE.equals(entidad.getActivo())
-                && repository.existsByFkEvaluadoAndFkClienteAndActivoTrue(
-                entidad.getFkEvaluado(), entidad.getFkCliente())) {
-            throw new BusinessException(
-                    "El evaluado ya tiene una relación activa con este cliente. Actualice el registro existente en lugar de crear uno nuevo.");
-        }
-
-        entidad.setUsuarioCrea(UsuarioActual.nombre());
-        return repository.save(entidad);
-    }
-
+    /** Edita los datos o activa/inactiva. Crear: solo por {@link VinculacionPersonaService}. */
     public EvaluadoClienteEntity actualizar(Long id, EvaluadoClienteEntity datos) {
         EvaluadoClienteEntity existente = obtenerPorId(id);
 
         boolean cambioRelacion = !existente.getFkEvaluado().equals(datos.getFkEvaluado())
                 || !existente.getFkCliente().equals(datos.getFkCliente());
         boolean quedaActiva = datos.getActivo() != null ? datos.getActivo() : existente.getActivo();
+        boolean seActiva = !Boolean.TRUE.equals(existente.getActivo()) || cambioRelacion;
 
-        if (cambioRelacion && Boolean.TRUE.equals(quedaActiva)
-                && repository.existsByFkEvaluadoAndFkClienteAndActivoTrue(
-                datos.getFkEvaluado(), datos.getFkCliente())) {
-            throw new BusinessException(
-                    "El evaluado ya tiene una relación activa con este cliente. Actualice el registro existente en lugar de crear uno nuevo.");
+        if (Boolean.TRUE.equals(quedaActiva) && seActiva) {
+            validarUnaSolaActiva(id, datos.getFkEvaluado(), datos.getFkCliente());
         }
 
         existente.setFkEvaluado(datos.getFkEvaluado());
         existente.setFkCliente(datos.getFkCliente());
-        existente.setFkCiudadTrabajo(datos.getFkCiudadTrabajo());
-        existente.setAntiguedadEmpresa(datos.getAntiguedadEmpresa());
-        existente.setNombreCargo(datos.getNombreCargo());
-        existente.setFkTipoCargo(datos.getFkTipoCargo());
-        existente.setFkTiempoCargo(datos.getFkTiempoCargo());
-        existente.setNombreArea(datos.getNombreArea());
-        existente.setFkTipoContrato(datos.getFkTipoContrato());
-        existente.setFkHorasLabor(datos.getFkHorasLabor());
-        existente.setFkTipoSalario(datos.getFkTipoSalario());
-        existente.setFkEstadoCivil(datos.getFkEstadoCivil());
-        existente.setFkNivelAcademico(datos.getFkNivelAcademico());
-        existente.setFkCiudadResidencia(datos.getFkCiudadResidencia());
-        existente.setFkEstratoSocioeconomico(datos.getFkEstratoSocioeconomico());
-        existente.setFkTipoVivienda(datos.getFkTipoVivienda());
-        existente.setOcupacionProfesion(datos.getOcupacionProfesion());
-        existente.setFamiliaresDependientesEconomicamente(datos.getFamiliaresDependientesEconomicamente());
+        copiarFoto(datos, existente);
         if (datos.getFechaVinculacion() != null) {
             existente.setFechaVinculacion(datos.getFechaVinculacion());
         }
@@ -85,6 +47,44 @@ public class EvaluadoClienteService {
         existente.setFechaModificado(LocalDateTime.now());
         existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
+    }
+
+    /**
+     * Datos laborales y datos de la persona que cambian: la foto de la vinculación. No toca persona,
+     * cliente, vigencia ni auditoría.
+     */
+    static void copiarFoto(EvaluadoClienteEntity origen, EvaluadoClienteEntity destino) {
+        destino.setFkCiudadTrabajo(origen.getFkCiudadTrabajo());
+        destino.setAntiguedadEmpresa(origen.getAntiguedadEmpresa());
+        destino.setNombreCargo(origen.getNombreCargo());
+        destino.setFkTipoCargo(origen.getFkTipoCargo());
+        destino.setFkTiempoCargo(origen.getFkTiempoCargo());
+        destino.setNombreArea(origen.getNombreArea());
+        destino.setFkTipoContrato(origen.getFkTipoContrato());
+        destino.setFkHorasLabor(origen.getFkHorasLabor());
+        destino.setFkTipoSalario(origen.getFkTipoSalario());
+        destino.setFkEstadoCivil(origen.getFkEstadoCivil());
+        destino.setFkNivelAcademico(origen.getFkNivelAcademico());
+        destino.setFkCiudadResidencia(origen.getFkCiudadResidencia());
+        destino.setFkEstratoSocioeconomico(origen.getFkEstratoSocioeconomico());
+        destino.setFkTipoVivienda(origen.getFkTipoVivienda());
+        destino.setOcupacionProfesion(origen.getOcupacionProfesion());
+        destino.setFamiliaresDependientesEconomicamente(origen.getFamiliaresDependientesEconomicamente());
+    }
+
+    /**
+     * Una persona solo tiene una relación activa. Para moverla de empresa se usa la vinculación, que
+     * cierra la anterior; aquí solo se avisa (sin decir cuál es la otra empresa).
+     */
+    private void validarUnaSolaActiva(Long id, Long fkEvaluado, Long fkCliente) {
+        for (EvaluadoClienteEntity activa : repository.findByFkEvaluadoAndActivoTrue(fkEvaluado)) {
+            if (activa.getId().equals(id)) {
+                continue;
+            }
+            throw new BusinessException(activa.getFkCliente().equals(fkCliente)
+                    ? "El evaluado ya tiene una relación activa con este cliente. Actualice esa relación en lugar de activar otra."
+                    : "El evaluado tiene una relación activa en otra empresa. Para cambiarlo de empresa, vincúlelo desde el cliente nuevo.");
+        }
     }
 
     /**

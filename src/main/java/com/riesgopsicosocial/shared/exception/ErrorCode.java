@@ -5,6 +5,7 @@ public enum ErrorCode {
     RESOURCE_NOT_FOUND,
 
     VALIDATION_ERROR,
+    METHOD_NOT_ALLOWED,
 
     BUSINESS_ERROR,
 

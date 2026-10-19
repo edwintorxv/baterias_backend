@@ -14,6 +14,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -97,6 +98,14 @@ public class GlobalExceptionHandler {
      * Cuerpo que no se puede leer: JSON mal formado o un valor que no es del tipo del campo (p. ej.
      * un rol que no existe). Para los enums dice los valores aceptados.
      */
+    /** Método que la ruta no tiene (p. ej. POST /evaluados, que se quitó): 405, no 500. */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        ApiError error = ResponseBuilder.error("El método " + ex.getMethod() + " no está disponible en esta ruta",
+                ErrorCode.METHOD_NOT_ALLOWED.name(), null);
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(error);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleMessageNotReadable(HttpMessageNotReadableException ex) {
         String mensaje = "El cuerpo de la petición no es un JSON válido";

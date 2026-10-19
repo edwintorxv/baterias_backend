@@ -17,15 +17,7 @@ public class EvaluadoService {
         this.repository = repository;
     }
 
-    public EvaluadoEntity crear(EvaluadoEntity entidad) {
-        if (repository.existsByNumeroIdentificacion(entidad.getNumeroIdentificacion())) {
-            throw new BusinessException(
-                    "Ya existe un evaluado con número de identificación: " + entidad.getNumeroIdentificacion());
-        }
-        entidad.setUsuarioCrea(UsuarioActual.nombre());
-        return repository.save(entidad);
-    }
-
+    /** Corrige los datos que no cambian. Crear: solo por VinculacionPersonaService (siempre con un cliente). */
     public EvaluadoEntity actualizar(Long id, EvaluadoEntity datos) {
         EvaluadoEntity existente = obtenerPorId(id);
 

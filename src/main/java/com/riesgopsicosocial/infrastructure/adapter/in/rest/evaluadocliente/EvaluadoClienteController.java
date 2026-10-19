@@ -8,7 +8,6 @@ import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,7 +26,7 @@ public class EvaluadoClienteController {
         this.alcance = alcance;
     }
 
-    private EvaluadoClienteResponse toResponse(EvaluadoClienteEntity evaluadoClienteEntity) {
+    static EvaluadoClienteResponse toResponse(EvaluadoClienteEntity evaluadoClienteEntity) {
         return new EvaluadoClienteResponse(
                 evaluadoClienteEntity.getId(),
                 evaluadoClienteEntity.getFkEvaluado(),
@@ -81,18 +80,6 @@ public class EvaluadoClienteController {
         return evaluadoClienteEntity;
     }
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<EvaluadoClienteResponse>> crear(@Valid @RequestBody EvaluadoClienteRequest request) {
-        alcance.exigirCliente(request.fkCliente());
-        EvaluadoClienteEntity creado = service.crear(toEntity(request));
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ResponseBuilder
-                        .success(
-                                "Relación evaluado-cliente creada exitosamente",
-                                toResponse(creado))
-                );
-    }
-
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<EvaluadoClienteResponse>> actualizar(@PathVariable Long id, @Valid
     @RequestBody EvaluadoClienteRequest request) {
@@ -125,7 +112,7 @@ public class EvaluadoClienteController {
 
         List<EvaluadoClienteResponse> data = resultado.stream()
                 .filter(r -> alcance.puedeVerCliente(r.getFkCliente()))
-                .map(this::toResponse)
+                .map(EvaluadoClienteController::toResponse)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(

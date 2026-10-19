@@ -8,7 +8,6 @@ import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,19 +47,6 @@ public class EvaluadoController {
         evaluadoEntity.setFkSexo(evaluadoRequest.fkSexo());
         evaluadoEntity.setAnioNacimiento(evaluadoRequest.anioNacimiento());
         return evaluadoEntity;
-    }
-
-    @PostMapping
-    public ResponseEntity<ApiResponse<EvaluadoResponse>> crear(@Valid @RequestBody EvaluadoRequest request) {
-        EvaluadoEntity creado = service.crear(toEntity(request));
-
-        return ResponseEntity.
-                status(HttpStatus.CREATED)
-                .body(ResponseBuilder
-                        .success(
-                                "Evaluado creado exitosamente",
-                                toResponse(creado))
-                );
     }
 
     @PutMapping("/{id}")
