@@ -7,7 +7,7 @@
 
 - **JDK 17**, **PostgreSQL 16**, `./mvnw` (en macOS: `sh mvnw`). Repo `https://github.com/edwintorxv/baterias_backend.git`, rama `main`.
 - BD `bateria_psicosocial` (postgres/1234, `application-dev.properties`). API `http://localhost:8080/api`, Swagger `/api/swagger-ui.html`.
-- **Los datos maestros NO están en las migraciones** (catálogos, cuestionarios, preguntas, escalas, baremos y datos de prueba viven solo en la BD local). En otra máquina: `pg_dump -F c` + `pg_restore` (trae `flyway_schema_history`; el `.dump` tiene datos de evaluados: **no subirlo a git**). Pendiente: migración `V16__datos_maestros.sql` (V14 y V15 ya se usaron) con los datos ya corregidos (incluidas las comas de la V14) y `setval` de secuencias.
+- **Datos maestros en la V16** (catálogos, geografía, cuestionarios, preguntas, escalas y baremos; idempotente con `ON CONFLICT DO NOTHING`): una BD vacía queda lista con V1..V16 y arranca con el primer admin. Los **datos de prueba** (cliente, evaluados, aplicaciones, respuestas, resultados, evaluador, usuarios) viven solo en la BD local: para llevarlos a otra máquina, `pg_dump -F c` + `pg_restore` (el `.dump` tiene datos de evaluados: **no subirlo a git**). Si cambia un dato maestro, va en una migración nueva (no editar la V16).
 - **La app la arranca el usuario en IntelliJ (8080)**: no levantar/detener instancias sin avisar. Tiene **spring-boot-devtools**: un `mvnw compile`/`test` la reinicia sola y Flyway aplica migraciones nuevas en la BD local; `@SpringBootTest` también corre contra la BD local. Avisar antes de compilar si hay una migración nueva.
 - **Dependencia nueva en el `pom.xml`** → devtools no la carga y la app queda caída: el usuario recarga Maven y reinicia en IntelliJ (avisarle).
 - Tests: `sh mvnw test` → **123** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
@@ -47,7 +47,7 @@ Reglas ArchUnit (`ArquitecturaHexagonalTest`): domain solo `java..`; application
 - Etiquetas de estrés: mismos `nivel_riesgo` 1–5 mostrados como Muy bajo…Muy alto (`domain.model.resultado.NivelEstres`), título "Nivel de síntomas de estrés".
 - Toda la configuración (escalas, ítems, factores, dominios, dimensiones y baremos de A, B, C y D) quedó verificada contra los manuales (V3–V6).
 
-**Migraciones**: V1 esquema · V2 grupo ocupacional/método de cálculo · V3 escalas invertidas e ítems de C · V4 baremos de C y D · V5 secuencias · V6 retroalimentación A/B · V7 preguntas filtro · V8 condiciones y tolerancias · V9 total general · V10 evaluador · V11 guion U+0096 · V12 errata "Bachillerato incompleto" · V13 `informe_empresa` (conclusiones) · V14 comas que habían quedado como puntos en 13 preguntas (A, B y D) · V15 `usuario` + `usuario_cliente`. Siguiente libre: **V16**.
+**Migraciones**: V1 esquema · V2 grupo ocupacional/método de cálculo · V3 escalas invertidas e ítems de C · V4 baremos de C y D · V5 secuencias · V6 retroalimentación A/B · V7 preguntas filtro · V8 condiciones y tolerancias · V9 total general · V10 evaluador · V11 guion U+0096 · V12 errata "Bachillerato incompleto" · V13 `informe_empresa` (conclusiones) · V14 comas que habían quedado como puntos en 13 preguntas (A, B y D) · V15 `usuario` + `usuario_cliente` · V16 datos maestros (28 tablas, verificada sobre BD vacía y sobre copia de la local). Siguiente libre: **V17**.
 
 ## 3. Informe individual — ✅ completo y verificado por el usuario (Word y PDF)
 
@@ -91,19 +91,19 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 - **Alcance por cliente** (`AlcanceUsuario` + `AlcanceClienteInterceptor` sobre `/clientes`, `/evaluado-clientes`, `/aplicaciones`, `/respuestas`, `/evaluados`; cuerpos y listados en cada controlador): el psicólogo solo sus clientes asignados, el cliente solo su empresa; lo ajeno responde **404** igual que si no existiera. Evaluado visible si tiene relación con un cliente suyo o ninguna; búsqueda exacta por documento sin filtro (para vincular). Firmante (`fkEvaluador` en aplicaciones y conclusiones): vacío, el propio o el que ya tenía (403 si otro). Firma del evaluador: solo la propia (ADMIN cualquiera).
 - **CORS global** (`CorsConfig`, ningún controlador lo declara): orígenes en `APP_CORS_ORIGENES` (coma; admite patrones); sin valor, ninguno; dev acepta cualquier puerto de localhost. Sin credenciales (el token va en `Authorization`); expone `Content-Disposition` para el nombre de los archivos.
 - **Auditoría manual** (decisión del usuario, sin listener ni `@EnableJpaAuditing`): cada servicio pone `usuario_crea` al crear y `usuario_modifica` + `fecha_modificado` al actualizar con `UsuarioActual.nombre()` (usuario de la sesión; "sistema" sin sesión). Un servicio nuevo debe hacer lo mismo. Marca "modificado" en cada PUT aunque no cambie nada.
-- Usuarios de prueba en la BD local: `admin`, `psicologa` (evaluador 1, cliente 1 asignado), `rrhh.cardins` (CLIENTE del 1). En la BD hay 1.835 evaluados sin relación con ninguna empresa (carga del 2026-09-22): revisar.
+- Usuarios de prueba en la BD local: `admin`, `psicologa` (evaluador 1, cliente 1 asignado), `rrhh.cardins` (CLIENTE del 1). Los 1.835 evaluados sin relación con ninguna empresa (carga del 2026-09-22) son **a propósito**: datos para pruebas futuras (no tocarlos; no van en la V16).
 
 ## 6. Pendientes
 
 **Antes de producción**
-1. Revisar los 1.835 evaluados sin empresa. Al desplegar detrás de un proxy: `server.forward-headers-strategy=native` (si no, el límite por IP ve la del proxy).
-2. Migración `V16__datos_maestros.sql` para arrancar sobre una BD vacía.
-3. Front (no existe): clientes → informe de empresa por año, o empleados → informe individual; diligenciar conclusiones y las tres acciones antes de descargar el Word de empresa.
+1. Al desplegar detrás de un proxy: `server.forward-headers-strategy=native` (si no, el límite por IP ve la del proxy).
+2. Front (no existe): clientes → informe de empresa por año, o empleados → informe individual; diligenciar conclusiones y las tres acciones antes de descargar el Word de empresa.
 
 **Menores / por decidir**
-4. `aplicacion.estado`: ¿catálogo cerrado (FINALIZADA, EN_PROGRESO, ANULADA…) o texto libre?
-5. Dimensión de C "Tiempo fuera del trabajo" vs "Balance entre la vida laboral y familiar" (Anexo 2): lo decide el psicólogo.
-6. `PUT /aplicaciones` no permite volver `atiendeClientes`/`esJefe` a `NULL` (solo por SQL).
-7. Mensajes de bean validation en inglés ("must not be blank").
+3. `aplicacion.estado`: ¿catálogo cerrado (FINALIZADA, EN_PROGRESO, ANULADA…) o texto libre?
+4. Dimensión de C "Tiempo fuera del trabajo" vs "Balance entre la vida laboral y familiar" (Anexo 2): lo decide el psicólogo.
+5. `PUT /aplicaciones` no permite volver `atiendeClientes`/`esJefe` a `NULL` (solo por SQL).
+6. Mensajes de bean validation en inglés ("must not be blank").
+7. `tiempo_cargo` 2 "Mas de un año" sin tilde (se corrige a mano).
 
 **Opcionales del informe de empresa**: puntaje promedio del grupo con su nivel por baremo (como el ejemplo); fecha de inicio de la intervención para calcular la próxima evaluación; guardar la periodicidad como registro histórico; evolución entre años; exponer `AnalizadorInformeEmpresa.analizarPorArea`.
