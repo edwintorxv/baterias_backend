@@ -1,5 +1,6 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluado;
 
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.VinculacionPersonaService;
 import com.riesgopsicosocial.infrastructure.security.UsuarioActual;
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
@@ -20,6 +21,12 @@ public class EvaluadoService {
     /** Corrige los datos que no cambian. Crear: solo por VinculacionPersonaService (siempre con un cliente). */
     public EvaluadoEntity actualizar(Long id, EvaluadoEntity datos) {
         EvaluadoEntity existente = obtenerPorId(id);
+        // Misma regla de edad que al vincular (si viene el año).
+        if (datos.getAnioNacimiento() != null) {
+            VinculacionPersonaService.errorAnioNacimiento(datos.getAnioNacimiento()).ifPresent(error -> {
+                throw new BusinessException(error);
+            });
+        }
 
         if (!existente.getNumeroIdentificacion().equalsIgnoreCase(datos.getNumeroIdentificacion())
                 && repository.existsByNumeroIdentificacion(datos.getNumeroIdentificacion())) {

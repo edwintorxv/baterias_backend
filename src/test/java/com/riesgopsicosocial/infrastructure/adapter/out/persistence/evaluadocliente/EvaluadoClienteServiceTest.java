@@ -69,6 +69,21 @@ class EvaluadoClienteServiceTest {
     }
 
     @Test
+    void relacionInactiva_noSeEditaSoloSeActiva() {
+        existe(relacion(7L, 1L, false, LocalDate.of(2025, 6, 1)));
+
+        EvaluadoClienteEntity datos = datos(1L, false, null);
+        datos.setNombreArea("Otra área");
+        BusinessException error = assertThrows(BusinessException.class, () -> service.actualizar(7L, datos));
+        assertTrue(error.getMessage().contains("inactiva"));
+
+        EvaluadoClienteEntity sinActivo = datos(1L, false, null);
+        sinActivo.setActivo(null);
+        assertThrows(BusinessException.class, () -> service.actualizar(7L, sinActivo));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void retiroAnteriorALaVinculacion_409() {
         existe(relacion(7L, 1L, true, null));
 

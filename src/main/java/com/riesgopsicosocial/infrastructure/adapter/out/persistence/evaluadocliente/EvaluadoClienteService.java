@@ -21,9 +21,16 @@ public class EvaluadoClienteService {
         this.repository = repository;
     }
 
-    /** Edita los datos o activa/inactiva. Crear: solo por {@link VinculacionPersonaService}. */
+    /**
+     * Edita los datos o activa/inactiva. Una relación inactiva no se edita (conserva la foto con que se
+     * evaluó): solo se puede activar. Crear: solo por {@link VinculacionPersonaService}.
+     */
     public EvaluadoClienteEntity actualizar(Long id, EvaluadoClienteEntity datos) {
         EvaluadoClienteEntity existente = obtenerPorId(id);
+        if (!Boolean.TRUE.equals(existente.getActivo()) && !Boolean.TRUE.equals(datos.getActivo())) {
+            throw new BusinessException("La relación está inactiva y no se modifica: conserva los datos con que se "
+                    + "evaluó. Si la persona volvió a la empresa, actívela primero.");
+        }
 
         boolean cambioRelacion = !existente.getFkEvaluado().equals(datos.getFkEvaluado())
                 || !existente.getFkCliente().equals(datos.getFkCliente());
