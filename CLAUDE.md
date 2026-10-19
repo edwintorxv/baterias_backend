@@ -10,7 +10,7 @@
 - **Datos maestros en la V16** (catálogos, geografía, cuestionarios, preguntas, escalas y baremos; idempotente con `ON CONFLICT DO NOTHING`): una BD vacía queda lista con V1..V16 y arranca con el primer admin. Los **datos de prueba** (cliente, evaluados, aplicaciones, respuestas, resultados, evaluador, usuarios) viven solo en la BD local: para llevarlos a otra máquina, `pg_dump -F c` + `pg_restore` (el `.dump` tiene datos de evaluados: **no subirlo a git**). Si cambia un dato maestro, va en una migración nueva (no editar la V16).
 - **La app la arranca el usuario en IntelliJ (8080)**: no levantar/detener instancias sin avisar. Tiene **spring-boot-devtools**: un `mvnw compile`/`test` la reinicia sola y Flyway aplica migraciones nuevas en la BD local; `@SpringBootTest` también corre contra la BD local. Avisar antes de compilar si hay una migración nueva.
 - **Dependencia nueva en el `pom.xml`** → devtools no la carga y la app queda caída: el usuario recarga Maven y reinicia en IntelliJ (avisarle).
-- Tests: `sh mvnw test` → **123** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
+- Tests: `sh mvnw test` → **126** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
 - Manuales y Res. 2764 de 2022 en PDF (fuera del repo): `/Users/edwingacha/proyectos/Documentacion/baterias/` (texto en macOS con `osascript -l JavaScript` + PDFKit). El `.pptx` de ejemplo de informe de empresa tiene datos reales: no subirlo.
 
 ## 1. Stack y arquitectura
@@ -29,6 +29,8 @@ shared/            catalogo (CRUD genérico), exception, response (ApiResponse/A
 Reglas ArchUnit (`ArquitecturaHexagonalTest`): domain solo `java..`; application sin infrastructure/JPA/Spring Data; puertos solo con modelos del dominio; adaptadores de entrada usan `port.in` (los CRUD quedan fuera a propósito).
 
 **Moldes CRUD**: (a) *catálogo simple* (`CatalogoCrudService<T extends Identificable & Nombrable>` + `CatalogoJpaRepository`) solo si hay un `nombre` único real; (b) *entidad plana* (Entity, `JpaRepository` directo, Service propio con su validación de unicidad, Controller, Request/Response records).
+
+**Endpoints para el front**: `GET /clientes/{idCliente}/personas` (solo PSICOLOGO; consulta nativa `EvaluadoClienteJpaRepository.listarPersonasPorCliente` → proyección `PersonaClienteFila`): una fila por relación evaluado-cliente con datos del evaluado, cargo/área/ciudad y la última aplicación (`conRespuestas`, `conResultados`). `/industrias` devuelve `IndustriaResponse` con `fkSectorEconomico` (cascada sector → industria, como ciudad → departamento). **El NIT del cliente no se modifica**: el `PUT /clientes/{id}` debe traer el mismo NIT (409 si no).
 
 **Convenciones**: camelCase ↔ snake_case con `@Column`; filtros por `@RequestParam` opcional (búsqueda única devuelta como `List.of(x)`); FKs inválidas las ataja Postgres + handler `DataIntegrityViolationException` → 409; sin `DELETE` en tablas de negocio; auditoría (`fecha_creado` por DEFAULT, el resto manual) sin `@EnableJpaAuditing` (decisión del usuario).
 
@@ -97,7 +99,7 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 
 **Antes de producción**
 1. Al desplegar detrás de un proxy: `server.forward-headers-strategy=native` (si no, el límite por IP ve la del proxy).
-2. Front (no existe): clientes → informe de empresa por año, o empleados → informe individual; diligenciar conclusiones y las tres acciones antes de descargar el Word de empresa.
+2. Front: ver sección 7.
 
 **Menores / por decidir**
 3. `aplicacion.estado`: ¿catálogo cerrado (FINALIZADA, EN_PROGRESO, ANULADA…) o texto libre?
@@ -105,5 +107,13 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 5. `PUT /aplicaciones` no permite volver `atiendeClientes`/`esJefe` a `NULL` (solo por SQL).
 6. Mensajes de bean validation en inglés ("must not be blank").
 7. `tiempo_cargo` 2 "Mas de un año" sin tilde (se corrige a mano).
+
+## 7. Front — `/Users/edwingacha/proyectos/frontend/baterias_front` (repo git local, sin remoto aún)
+
+Angular 19 + PrimeNG 19 (Aura) + primeflex, **pnpm** (`pnpm run dev`, puerto 4200). Sigue los patrones de `control_documental_front` del usuario (detalle en el `CLAUDE.md` del front).
+- ✅ Base: menú lateral fijo con todo visible (sin filtrar por rol), auto-login en desarrollo (`environment.development.ts`, en `.gitignore`) y selector "Usuario de prueba"; interceptor (token, 401 → reingresa en dev, avisos 403/sin conexión).
+- ✅ Clientes paso 1: listado, buscador, crear/editar (solo ADMIN; NIT bloqueado al editar), cascadas sector → industria y departamento → ciudad, validadores en español.
+- ✅ Clientes paso 2: pantalla Personas (solo PSICOLOGO) con resumen por situación y filtros.
+- ⬜ **Siguiente: Clientes paso 3 — informe de empresa** (año, resumen, conclusiones + tres acciones + firmante, descarga del Word cuando `faltantes` esté vacío). Luego: vincular/editar personas, informe individual por fila, Evaluados, Aplicaciones (digitar respuestas, calcular), Administración, y al final filtro de menú por rol + login real.
 
 **Opcionales del informe de empresa**: puntaje promedio del grupo con su nivel por baremo (como el ejemplo); fecha de inicio de la intervención para calcular la próxima evaluación; guardar la periodicidad como registro histórico; evolución entre años; exponer `AnalizadorInformeEmpresa.analizarPorArea`.

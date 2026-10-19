@@ -19,7 +19,7 @@ public class ClienteService {
 
     public ClienteEntity crear(ClienteEntity entidad) {
         if (repository.existsByNit(entidad.getNit())) {
-            throw new BusinessException("Ya existe un clinte con NIT: " + entidad.getNit());
+            throw new BusinessException("Ya existe un cliente con NIT: " + entidad.getNit());
         }
 
         entidad.setUsuarioCrea(UsuarioActual.nombre());
@@ -27,17 +27,16 @@ public class ClienteService {
 
     }
 
+    /** El NIT identifica al cliente y no se modifica: el request lo trae y debe ser el mismo (409 si no). */
     public ClienteEntity actualizar(Long id, ClienteEntity datos) {
         ClienteEntity existente = obtenerPorId(id);
 
-        if (!existente.getNit().equalsIgnoreCase(datos.getNit())
-                && repository.existsByNit(datos.getNit())) {
-            throw new BusinessException("Ya existe un cliente con NIT: " + datos.getNit());
+        if (!existente.getNit().equalsIgnoreCase(datos.getNit().trim())) {
+            throw new BusinessException("El NIT del cliente no se puede modificar (actual: " + existente.getNit() + ")");
         }
 
         existente.setFkIndustria(datos.getFkIndustria());
         existente.setFkCiudadMunicipio(datos.getFkCiudadMunicipio());
-        existente.setNit(datos.getNit());
         existente.setNombre(datos.getNombre());
         existente.setDireccion(datos.getDireccion());
         existente.setTelefono(datos.getTelefono());

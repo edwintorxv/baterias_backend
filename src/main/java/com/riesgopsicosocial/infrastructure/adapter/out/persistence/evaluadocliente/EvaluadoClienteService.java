@@ -90,4 +90,8 @@ public class EvaluadoClienteService {
         return repository.findByFkCliente(fkCliente);
     }
 
+    public List<PersonaClienteFila> listarPersonasPorCliente(Long fkCliente) {
+        return repository.listarPersonasPorCliente(fkCliente);
+    }
+
 }

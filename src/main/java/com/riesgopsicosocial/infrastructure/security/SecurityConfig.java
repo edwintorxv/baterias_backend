@@ -63,6 +63,7 @@ public class SecurityConfig {
                         // Informes: el individual es historia clínica (solo el psicólogo); el de empresa
                         // también lo ve el cliente, pero las conclusiones las escribe el psicólogo.
                         .requestMatchers("/clientes/*/evaluados/**").hasRole(PSICOLOGO)
+                        .requestMatchers(HttpMethod.GET, "/clientes/*/personas").hasRole(PSICOLOGO)
                         .requestMatchers(HttpMethod.GET, "/clientes/*/informe/**").hasAnyRole(PSICOLOGO, CLIENTE)
                         .requestMatchers(HttpMethod.PUT, "/clientes/*/informe/conclusiones").hasRole(PSICOLOGO)
                         .requestMatchers(HttpMethod.GET, "/clientes", "/clientes/*").hasAnyRole(ADMIN, PSICOLOGO)
