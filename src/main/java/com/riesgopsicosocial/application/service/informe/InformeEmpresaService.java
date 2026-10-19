@@ -11,6 +11,8 @@ import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +21,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class InformeEmpresaService implements ConsultarInformeEmpresaUseCase {
+
+    private static final ZoneId ZONA = ZoneId.of("America/Bogota");
 
     private final InformeEmpresaPort informeEmpresaPort;
 
@@ -41,7 +45,11 @@ public class InformeEmpresaService implements ConsultarInformeEmpresaUseCase {
 
         Map<Long, List<AplicacionEmpresa>> porPersona = aplicaciones.stream()
                 .collect(Collectors.groupingBy(AplicacionEmpresa::idEvaluadoCliente));
+        // Cuenta quien se evaluó en el año (aunque hoy esté retirado o en otra empresa) y quien estaba
+        // vigente al corte: el informe de un año que ya pasó no cambia porque la gente se mueva después.
+        LocalDate corte = PersonaCargada.corteDelAnio(anio, LocalDate.now(ZONA));
         List<ParticipanteEmpresa> participantes = personas.stream()
+                .filter(p -> porPersona.containsKey(p.idEvaluadoCliente()) || p.vigenteAl(corte))
                 .map(p -> participante(p, porPersona.getOrDefault(p.idEvaluadoCliente(), List.of())))
                 .toList();
 

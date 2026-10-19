@@ -41,6 +41,15 @@ public class EvaluadoClienteController {
                 evaluadoClienteEntity.getFkTipoContrato(),
                 evaluadoClienteEntity.getFkHorasLabor(),
                 evaluadoClienteEntity.getFkTipoSalario(),
+                evaluadoClienteEntity.getFkEstadoCivil(),
+                evaluadoClienteEntity.getFkNivelAcademico(),
+                evaluadoClienteEntity.getFkCiudadResidencia(),
+                evaluadoClienteEntity.getFkEstratoSocioeconomico(),
+                evaluadoClienteEntity.getFkTipoVivienda(),
+                evaluadoClienteEntity.getOcupacionProfesion(),
+                evaluadoClienteEntity.getFamiliaresDependientesEconomicamente(),
+                evaluadoClienteEntity.getFechaVinculacion(),
+                evaluadoClienteEntity.getFechaRetiro(),
                 evaluadoClienteEntity.getActivo()
         );
     }
@@ -58,6 +67,16 @@ public class EvaluadoClienteController {
         evaluadoClienteEntity.setFkTipoContrato(evaluadoClienteRequest.fkTipoContrato());
         evaluadoClienteEntity.setFkHorasLabor(evaluadoClienteRequest.fkHorasLabor());
         evaluadoClienteEntity.setFkTipoSalario(evaluadoClienteRequest.fkTipoSalario());
+        evaluadoClienteEntity.setFkEstadoCivil(evaluadoClienteRequest.fkEstadoCivil());
+        evaluadoClienteEntity.setFkNivelAcademico(evaluadoClienteRequest.fkNivelAcademico());
+        evaluadoClienteEntity.setFkCiudadResidencia(evaluadoClienteRequest.fkCiudadResidencia());
+        evaluadoClienteEntity.setFkEstratoSocioeconomico(evaluadoClienteRequest.fkEstratoSocioeconomico());
+        evaluadoClienteEntity.setFkTipoVivienda(evaluadoClienteRequest.fkTipoVivienda());
+        evaluadoClienteEntity.setOcupacionProfesion(evaluadoClienteRequest.ocupacionProfesion());
+        evaluadoClienteEntity.setFamiliaresDependientesEconomicamente(
+                evaluadoClienteRequest.familiaresDependientesEconomicamente());
+        evaluadoClienteEntity.setFechaVinculacion(evaluadoClienteRequest.fechaVinculacion());
+        evaluadoClienteEntity.setFechaRetiro(evaluadoClienteRequest.fechaRetiro());
         evaluadoClienteEntity.setActivo(evaluadoClienteRequest.activo());
         return evaluadoClienteEntity;
     }

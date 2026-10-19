@@ -36,14 +36,7 @@ public class EvaluadoController {
                 evaluadoEntity.getNombre(),
                 evaluadoEntity.getApellido(),
                 evaluadoEntity.getFkSexo(),
-                evaluadoEntity.getAnioNacimiento(),
-                evaluadoEntity.getFkEstadoCivil(),
-                evaluadoEntity.getFkNivelAcademico(),
-                evaluadoEntity.getFkCiudadResidencia(),
-                evaluadoEntity.getFkEstratoSocioeconomico(),
-                evaluadoEntity.getFkTipoVivienda(),
-                evaluadoEntity.getOcupacionProfesion(),
-                evaluadoEntity.getFamiliaresDependientesEconomicamente()
+                evaluadoEntity.getAnioNacimiento()
         );
     }
 
@@ -54,13 +47,6 @@ public class EvaluadoController {
         evaluadoEntity.setApellido(evaluadoRequest.apellido());
         evaluadoEntity.setFkSexo(evaluadoRequest.fkSexo());
         evaluadoEntity.setAnioNacimiento(evaluadoRequest.anioNacimiento());
-        evaluadoEntity.setFkEstadoCivil(evaluadoRequest.fkEstadoCivil());
-        evaluadoEntity.setFkNivelAcademico(evaluadoRequest.fkNivelAcademico());
-        evaluadoEntity.setFkCiudadResidencia(evaluadoRequest.fkCiudadResidencia());
-        evaluadoEntity.setFkEstratoSocioeconomico(evaluadoRequest.fkEstratoSocioeconomico());
-        evaluadoEntity.setFkTipoVivienda(evaluadoRequest.fkTipoVivienda());
-        evaluadoEntity.setOcupacionProfesion(evaluadoRequest.ocupacionProfesion());
-        evaluadoEntity.setFamiliaresDependientesEconomicamente(evaluadoRequest.familiaresDependientesEconomicamente());
         return evaluadoEntity;
     }
 

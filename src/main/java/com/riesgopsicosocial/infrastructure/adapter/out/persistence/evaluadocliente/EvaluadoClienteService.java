@@ -5,11 +5,15 @@ import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
 public class EvaluadoClienteService {
+
+    private static final ZoneId ZONA = ZoneId.of("America/Bogota");
 
     private final EvaluadoClienteJpaRepository repository;
 
@@ -22,6 +26,11 @@ public class EvaluadoClienteService {
         if (entidad.getActivo() == null) {
             entidad.setActivo(true);
         }
+        if (entidad.getFechaVinculacion() == null) {
+            entidad.setFechaVinculacion(LocalDate.now(ZONA));
+        }
+        entidad.setFechaRetiro(fechaRetiro(entidad.getActivo(), entidad.getFechaRetiro(), null));
+        validarVigencia(entidad);
 
         if (Boolean.TRUE.equals(entidad.getActivo())
                 && repository.existsByFkEvaluadoAndFkClienteAndActivoTrue(
@@ -59,11 +68,43 @@ public class EvaluadoClienteService {
         existente.setFkTipoContrato(datos.getFkTipoContrato());
         existente.setFkHorasLabor(datos.getFkHorasLabor());
         existente.setFkTipoSalario(datos.getFkTipoSalario());
+        existente.setFkEstadoCivil(datos.getFkEstadoCivil());
+        existente.setFkNivelAcademico(datos.getFkNivelAcademico());
+        existente.setFkCiudadResidencia(datos.getFkCiudadResidencia());
+        existente.setFkEstratoSocioeconomico(datos.getFkEstratoSocioeconomico());
+        existente.setFkTipoVivienda(datos.getFkTipoVivienda());
+        existente.setOcupacionProfesion(datos.getOcupacionProfesion());
+        existente.setFamiliaresDependientesEconomicamente(datos.getFamiliaresDependientesEconomicamente());
+        if (datos.getFechaVinculacion() != null) {
+            existente.setFechaVinculacion(datos.getFechaVinculacion());
+        }
+        existente.setFechaRetiro(fechaRetiro(quedaActiva, datos.getFechaRetiro(), existente.getFechaRetiro()));
         existente.setActivo(quedaActiva);
+        validarVigencia(existente);
 
         existente.setFechaModificado(LocalDateTime.now());
         existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
+    }
+
+    /**
+     * Activa: sin fecha de retiro (se reactiva). Inactiva: la que venga, si no la que ya tenía, si no hoy.
+     */
+    private static LocalDate fechaRetiro(Boolean activa, LocalDate solicitada, LocalDate anterior) {
+        if (Boolean.TRUE.equals(activa)) {
+            return null;
+        }
+        if (solicitada != null) {
+            return solicitada;
+        }
+        return anterior != null ? anterior : LocalDate.now(ZONA);
+    }
+
+    private static void validarVigencia(EvaluadoClienteEntity relacion) {
+        if (relacion.getFechaRetiro() != null && relacion.getFechaRetiro().isBefore(relacion.getFechaVinculacion())) {
+            throw new BusinessException("La fecha de retiro no puede ser anterior a la fecha de vinculación ("
+                    + relacion.getFechaVinculacion() + ")");
+        }
     }
 
     public EvaluadoClienteEntity obtenerPorId(Long id) {

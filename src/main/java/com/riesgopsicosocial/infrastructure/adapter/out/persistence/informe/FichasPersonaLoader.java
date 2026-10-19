@@ -22,7 +22,8 @@ import java.util.stream.Collectors;
 /**
  * Datos generales de las personas de una empresa para describir la población del informe, cargados
  * en bloque: los evaluados de las relaciones y los catálogos (sexo, nivel académico, tipo de cargo y
- * tipo de contrato).
+ * tipo de contrato). Sexo y edad salen de la persona; nivel académico, cargo y contrato, de la relación
+ * (la foto de esa vinculación).
  */
 @Component
 class FichasPersonaLoader {
@@ -59,7 +60,7 @@ class FichasPersonaLoader {
             return new FichaPersona(
                     evaluado == null ? null : buscar(sexos, evaluado.getFkSexo()),
                     evaluado == null ? null : evaluado.getAnioNacimiento(),
-                    evaluado == null ? null : buscar(niveles, evaluado.getFkNivelAcademico()),
+                    buscar(niveles, ec.getFkNivelAcademico()),
                     buscar(cargos, ec.getFkTipoCargo()),
                     buscar(contratos, ec.getFkTipoContrato()));
         }));

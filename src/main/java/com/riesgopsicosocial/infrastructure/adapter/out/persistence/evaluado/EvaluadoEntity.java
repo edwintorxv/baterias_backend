@@ -7,6 +7,11 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/**
+ * La persona: solo los datos que no cambian. Los que cambian con el tiempo (estado civil, nivel académico,
+ * residencia, estrato, vivienda, ocupación, dependientes) están en {@code evaluado_cliente}, uno por
+ * vinculación (V17). Las columnas viejas siguen en la tabla, sin uso, hasta que se borren.
+ */
 @Entity
 @Table(name = "evaluado")
 @Data
@@ -32,27 +37,6 @@ public class EvaluadoEntity {
 
     @Column(name = "anio_nacimiento")
     private Integer anioNacimiento;
-
-    @Column(name = "fk_estado_civil")
-    private Long fkEstadoCivil;
-
-    @Column(name = "fk_nivel_academico")
-    private Long fkNivelAcademico;
-
-    @Column(name = "fk_ciudad_residencia")
-    private Long fkCiudadResidencia;
-
-    @Column(name = "fk_estrato_socioeconomico")
-    private Long fkEstratoSocioeconomico;
-
-    @Column(name = "fk_tipo_vivienda")
-    private Long fkTipoVivienda;
-
-    @Column(name = "ocupacion_profesion", length = 200)
-    private String ocupacionProfesion;
-
-    @Column(name = "familiares_dependientes_economicamente")
-    private Integer familiaresDependientesEconomicamente;
 
     @Column(name = "fecha_creado", insertable = false, updatable = false)
     private LocalDateTime fechaCreado;

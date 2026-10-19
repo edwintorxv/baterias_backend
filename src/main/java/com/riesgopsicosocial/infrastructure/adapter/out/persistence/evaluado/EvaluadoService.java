@@ -40,13 +40,6 @@ public class EvaluadoService {
         existente.setApellido(datos.getApellido());
         existente.setFkSexo(datos.getFkSexo());
         existente.setAnioNacimiento(datos.getAnioNacimiento());
-        existente.setFkEstadoCivil(datos.getFkEstadoCivil());
-        existente.setFkNivelAcademico(datos.getFkNivelAcademico());
-        existente.setFkCiudadResidencia(datos.getFkCiudadResidencia());
-        existente.setFkEstratoSocioeconomico(datos.getFkEstratoSocioeconomico());
-        existente.setFkTipoVivienda(datos.getFkTipoVivienda());
-        existente.setOcupacionProfesion(datos.getOcupacionProfesion());
-        existente.setFamiliaresDependientesEconomicamente(datos.getFamiliaresDependientesEconomicamente());
 
         existente.setFechaModificado(LocalDateTime.now());
         existente.setUsuarioModifica(UsuarioActual.nombre());

@@ -14,6 +14,7 @@ import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -60,7 +61,7 @@ class InformeEmpresaServiceTest {
     }
 
     @Test
-    void aplicacionesDeRelacionesInactivas_noCuentan() {
+    void aplicacionesDeRelacionesDeOtroCliente_noCuentan() {
         puerto.personas.add(new PersonaCargada(10L, "A", null, FichaPersona.SIN_DATOS));
         puerto.aplicaciones.add(aplicacion(1L, 99L, "2026-03-01T08:00", true, intralaboral(ALTO)));
 
@@ -68,6 +69,32 @@ class InformeEmpresaServiceTest {
 
         assertEquals(new Cobertura(1, 0, new BigDecimal("0.0")), general.cobertura());
         assertEquals(0, general.intralaboral().total());
+    }
+
+    @Test
+    void retiradoQueSeEvaluoEnElAnio_sigueContando() {
+        puerto.personas.add(persona(10L, "2024-01-15", "2025-08-01")); // se evaluó y luego se fue
+        puerto.personas.add(persona(11L, "2024-01-15", null));
+        puerto.aplicaciones.add(aplicacion(1L, 10L, "2025-03-01T08:00", true, intralaboral(ALTO)));
+        puerto.aplicaciones.add(aplicacion(2L, 11L, "2025-03-01T08:00", true, intralaboral(BAJO)));
+
+        AnalisisGrupo general = service.consultar(1L, 2025).general();
+
+        assertEquals(new Cobertura(2, 2, new BigDecimal("100.0")), general.cobertura());
+        assertEquals(2, general.intralaboral().total());
+    }
+
+    @Test
+    void esperados_soloLosVigentesAlCierreDelAnio() {
+        puerto.personas.add(persona(10L, "2024-01-15", null));         // evaluada
+        puerto.personas.add(persona(11L, "2024-01-15", null));         // vigente sin evaluar: esperada
+        puerto.personas.add(persona(12L, "2024-01-15", "2025-04-30")); // se fue sin evaluarse: no se esperaba
+        puerto.personas.add(persona(13L, "2026-02-01", null));         // llegó después: no se esperaba
+        puerto.aplicaciones.add(aplicacion(1L, 10L, "2025-03-01T08:00", true, intralaboral(BAJO)));
+
+        AnalisisGrupo general = service.consultar(1L, 2025).general();
+
+        assertEquals(new Cobertura(2, 1, new BigDecimal("50.0")), general.cobertura());
     }
 
     @Test
@@ -93,6 +120,11 @@ class InformeEmpresaServiceTest {
     void anios_sinRepetirYDelMasReciente() {
         puerto.anios.addAll(List.of(2024, 2026, 2024, 2025));
         assertEquals(List.of(2026, 2025, 2024), service.consultarAnios(1L));
+    }
+
+    private static PersonaCargada persona(Long id, String vinculacion, String retiro) {
+        return new PersonaCargada(id, "A", null, FichaPersona.SIN_DATOS, LocalDate.parse(vinculacion),
+                retiro == null ? null : LocalDate.parse(retiro));
     }
 
     private static AplicacionEmpresa aplicacion(Long id, Long idEvaluadoCliente, String fecha, boolean tieneRespuestas,

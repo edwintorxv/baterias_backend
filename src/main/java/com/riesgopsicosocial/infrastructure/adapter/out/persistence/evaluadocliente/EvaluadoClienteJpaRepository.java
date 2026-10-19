@@ -16,8 +16,6 @@ public interface EvaluadoClienteJpaRepository extends JpaRepository<EvaluadoClie
 
     List<EvaluadoClienteEntity> findByFkClienteIn(Collection<Long> fksCliente);
 
-    List<EvaluadoClienteEntity> findByFkClienteAndActivoTrue(Long fkCliente);
-
     List<EvaluadoClienteEntity> findByFkEvaluadoAndFkCliente(Long fkEvaluado, Long fkCliente);
 
     boolean existsByFkEvaluadoAndFkClienteAndActivoTrue(Long fkEvaluado, Long fkCliente);

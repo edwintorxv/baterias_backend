@@ -20,7 +20,7 @@ public interface InformeEmpresaPort {
 
     Optional<DatosCliente> buscarCliente(Long idCliente);
 
-    /** Relaciones activas del cliente: las personas que se esperan evaluar. */
+    /** Todas las relaciones del cliente (vigentes o no), con su vigencia; el servicio decide quién cuenta en el año. */
     List<PersonaCargada> buscarPersonasCargadas(Long idCliente);
 
     /**

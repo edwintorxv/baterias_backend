@@ -145,7 +145,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
 
     @Override
     public List<PersonaCargada> buscarPersonasCargadas(Long idCliente) {
-        List<EvaluadoClienteEntity> relaciones = evaluadoClienteRepository.findByFkClienteAndActivoTrue(idCliente);
+        List<EvaluadoClienteEntity> relaciones = evaluadoClienteRepository.findByFkCliente(idCliente);
         Map<Long, String> ciudades = ciudadRepository.findAllById(relaciones.stream()
                         .map(EvaluadoClienteEntity::getFkCiudadTrabajo).filter(Objects::nonNull).collect(Collectors.toSet()))
                 .stream()
@@ -154,7 +154,7 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         return relaciones.stream()
                 .map(ec -> new PersonaCargada(ec.getId(), ec.getNombreArea(), ec.getFkCiudadTrabajo() == null ? null
                         : new CiudadTrabajo(ec.getFkCiudadTrabajo(), ciudades.get(ec.getFkCiudadTrabajo())),
-                        fichas.get(ec.getId())))
+                        fichas.get(ec.getId()), ec.getFechaVinculacion(), ec.getFechaRetiro()))
                 .toList();
     }
 
