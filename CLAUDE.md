@@ -1,6 +1,6 @@
 # Contexto — Sistema de Baterías de Riesgo Psicosocial (backend)
 
-> Resumen para retomar el desarrollo. Última actualización: 2026-10-18. Todo commiteado y en `origin/main`.
+> Resumen para retomar el desarrollo. Última actualización: 2026-10-19. Todo commiteado y en `origin/main`.
 > Forma de trabajo: **paso a paso** (diseño → código → el usuario revisa → commit/push cuando lo pide).
 
 ## 0. Puesta en marcha
@@ -116,4 +116,5 @@ Angular 19 + PrimeNG 19 (Aura) + primeflex, **pnpm** (`pnpm run dev`, puerto 420
 - ✅ Base: menú lateral fijo con todo visible (sin filtrar por rol), auto-login en desarrollo (`environment.development.ts`, en `.gitignore`) y selector "Usuario de prueba"; interceptor (token, 401 → reingresa en dev, avisos 403/sin conexión).
 - ✅ Clientes paso 1: listado, buscador, crear/editar (solo ADMIN; NIT bloqueado al editar), cascadas sector → industria y departamento → ciudad, validadores en español.
 - ✅ Clientes paso 2: pantalla Personas (solo PSICOLOGO) con resumen por situación y filtros.
-- ⬜ **Siguiente: Clientes paso 3 — informe de empresa** (año, resumen, conclusiones + tres acciones + firmante, descarga del Word cuando `faltantes` esté vacío). Luego: vincular/editar personas, informe individual por fila, Evaluados, Aplicaciones (digitar respuestas, calcular), Administración, y al final filtro de menú por rol + login real.
+- ✅ Clientes paso 3: informe de empresa (`/clientes/:id/informe`): año, resumen (cobertura, nivel de la empresa y periodicidad, resultados globales), conclusiones + tres acciones + firmante, descarga del Word cuando `faltantes` está vacío; el cliente lo ve en solo lectura. **El CLIENTE aún no tiene entrada en el menú** (no puede listar `/clientes`): llega por URL; se resuelve con el filtro de menú por rol.
+- ⬜ **Siguiente: vincular/editar personas e informe individual por fila.** Luego: Evaluados, Aplicaciones (digitar respuestas, calcular), Administración, y al final filtro de menú por rol (con entrada "Informe de empresa" para CLIENTE con su `idCliente`) + login real.
