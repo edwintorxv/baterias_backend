@@ -110,7 +110,7 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 
 **Opcionales del informe de empresa**: puntaje promedio del grupo con su nivel por baremo (como el ejemplo); fecha de inicio de la intervención para calcular la próxima evaluación; guardar la periodicidad como registro histórico; evolución entre años; exponer `AnalizadorInformeEmpresa.analizarPorArea`.
 
-## 7. Front — `/Users/edwingacha/proyectos/frontend/baterias_front` (repo git local, sin remoto aún)
+## 7. Front — `/Users/edwingacha/proyectos/frontend/baterias_front` (repo `https://github.com/edwintorxv/baterias_front.git`, rama `main`)
 
 Angular 19 + PrimeNG 19 (Aura) + primeflex, **pnpm** (`pnpm run dev`, puerto 4200). Sigue los patrones de `control_documental_front` del usuario (detalle en el `CLAUDE.md` del front).
 - ✅ Base: menú lateral fijo con todo visible (sin filtrar por rol), auto-login en desarrollo (`environment.development.ts`, en `.gitignore`) y selector "Usuario de prueba"; interceptor (token, 401 → reingresa en dev, avisos 403/sin conexión).
