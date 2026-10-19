@@ -95,7 +95,7 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 - **Alcance por cliente** (`AlcanceUsuario` + `AlcanceClienteInterceptor` sobre `/clientes`, `/evaluado-clientes`, `/aplicaciones`, `/respuestas`, `/evaluados`; cuerpos y listados en cada controlador): el psicólogo solo sus clientes asignados, el cliente solo su empresa; lo ajeno responde **404** igual que si no existiera. Evaluado visible si tiene relación con un cliente suyo o ninguna; búsqueda exacta por documento sin filtro (para vincular). Firmante (`fkEvaluador` en aplicaciones y conclusiones): vacío, el propio o el que ya tenía (403 si otro). Firma del evaluador: solo la propia (ADMIN cualquiera).
 - **CORS global** (`CorsConfig`, ningún controlador lo declara): orígenes en `APP_CORS_ORIGENES` (coma; admite patrones); sin valor, ninguno; dev acepta cualquier puerto de localhost. Sin credenciales (el token va en `Authorization`); expone `Content-Disposition` para el nombre de los archivos.
 - **Auditoría manual** (decisión del usuario, sin listener ni `@EnableJpaAuditing`): cada servicio pone `usuario_crea` al crear y `usuario_modifica` + `fecha_modificado` al actualizar con `UsuarioActual.nombre()` (usuario de la sesión; "sistema" sin sesión). Un servicio nuevo debe hacer lo mismo. Marca "modificado" en cada PUT aunque no cambie nada.
-- Usuarios de prueba en la BD local: `admin`, `psicologa` (evaluador 1, cliente 1 asignado), `rrhh.cardins` (CLIENTE del 1). Los 1.835 evaluados sin relación con ninguna empresa (carga del 2026-09-22) son **a propósito**: datos para pruebas futuras (no tocarlos; no van en la V16).
+- Usuarios de prueba en la BD local: `admin`, `psicologa` (evaluador 1, clientes 1 y 3 asignados), `rrhh.cardins` (CLIENTE del 1). Cliente 3 "INDUSTRIA MANUFACTURERA DEL VALLE": 200 personas cargadas el 2026-10-19 por archivo (prueba punta a punta: 200 *Vincula*, laborales inventados, 30 % forma A), sin aplicaciones. Quedan **1.635** evaluados sin relación con ninguna empresa (carga del 2026-09-22): datos para pruebas futuras, a propósito (no tocarlos sin que el usuario lo pida; no van en la V16).
 
 ## 6. Pendientes
 
@@ -109,6 +109,7 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 5. `PUT /aplicaciones` no permite volver `atiendeClientes`/`esJefe` a `NULL` (solo por SQL).
 6. Mensajes de bean validation en inglés ("must not be blank").
 7. `tiempo_cargo` 2 "Mas de un año" sin tilde (se corrige a mano).
+8. Departamentos con guion bajo en el catálogo: `N_DE_SANTANDER`, `SAN_ANDRES`, `VALLE_DEL_CAUCA` (salen así en la plantilla y en los informes): corregir con una migración nueva (V18), no en la V16.
 
 **Opcionales del informe de empresa**: puntaje promedio del grupo con su nivel por baremo (como el ejemplo); fecha de inicio de la intervención para calcular la próxima evaluación; guardar la periodicidad como registro histórico; evolución entre años; exponer `AnalizadorInformeEmpresa.analizarPorArea`.
 
@@ -119,4 +120,5 @@ Angular 19 + PrimeNG 19 (Aura) + primeflex, **pnpm** (`pnpm run dev`, puerto 420
 - ✅ Clientes paso 1: listado, buscador, crear/editar (solo ADMIN; NIT bloqueado al editar), cascadas sector → industria y departamento → ciudad, validadores en español.
 - ✅ Clientes paso 2: pantalla Personas (solo PSICOLOGO) con resumen por situación y filtros.
 - ✅ Clientes paso 3: informe de empresa (`/clientes/:id/informe`): año, resumen (cobertura, nivel de la empresa y periodicidad, resultados globales), conclusiones + tres acciones + firmante, descarga del Word cuando `faltantes` está vacío; el cliente lo ve en solo lectura. **El CLIENTE aún no tiene entrada en el menú** (no puede listar `/clientes`): llega por URL; se resuelve con el filtro de menú por rol.
-- ⬜ **Siguiente: vincular/editar personas e informe individual por fila.** Luego: Evaluados, Aplicaciones (digitar respuestas, calcular), Administración, y al final filtro de menú por rol (con entrada "Informe de empresa" para CLIENTE con su `idCliente`) + login real.
+- ✅ Carga de personas por archivo en la pantalla Personas (plantilla, vista previa por fila, confirmar todo o nada); probada punta a punta con 200 personas.
+- ⬜ **Siguiente: vincular persona (formulario), editar/inactivar e informe individual por fila.** Luego: Evaluados, Aplicaciones (digitar respuestas, calcular), Administración, y al final filtro de menú por rol (con entrada "Informe de empresa" para CLIENTE con su `idCliente`) + login real.
