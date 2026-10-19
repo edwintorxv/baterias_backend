@@ -3,6 +3,11 @@
 > Resumen para retomar el desarrollo. Última actualización: 2026-10-19. Todo commiteado y en `origin/main`.
 > Forma de trabajo: **paso a paso** (diseño → código → el usuario revisa → commit/push cuando lo pide).
 
+**Para retomar (2026-10-19)**: backend y front commiteados y en `origin/main` (back `5d7ebe8`+, front `36a7af0`+), 161 tests, migraciones hasta V18.
+- Hecho hoy: V17 (datos por relación + vigencia), vincular persona / una sola empresa activa, carga por archivo (plantilla Excel), relación inactiva no se edita, V18 (departamentos); en el front: carga por archivo, vincular, editar/inactivar/activar, Administración → Usuarios (clientes asignados).
+- **Siguiente (a elegir por el usuario)**: crear/editar usuarios y contraseña, o administración de evaluadores (datos profesionales, activo, firma).
+- **En pausa**: informe individual por fila, hasta que el usuario valide la confidencialidad (sección 7).
+
 ## 0. Puesta en marcha
 
 - **JDK 17**, **PostgreSQL 16**, `./mvnw` (en macOS: `sh mvnw`). Repo `https://github.com/edwintorxv/baterias_backend.git`, rama `main`.
@@ -124,4 +129,4 @@ Angular 19 + PrimeNG 19 (Aura) + primeflex, **pnpm** (`pnpm run dev`, puerto 420
 - ✅ Editar (diálogo de vincular en modo edición; corrige también la persona si cambió) e inactivar/activar (fecha de retiro) desde el ⚙️ de cada fila; tarjeta "Inactivas" en el resumen.
 - ✅ Administración → Usuarios: listado y clientes asignados a cada psicólogo (casillas con búsqueda).
 - ⏸️ Informe individual por fila: en pausa mientras el usuario valida la confidencialidad (¿basta estar asignado al cliente o solo el evaluador que firmó lo ve?; ¿evaluador y observaciones se completan en el diálogo del informe o en Aplicaciones?). Hoy solo 1 de 200 aplicaciones de CARDINS tiene evaluador: casi todos los informes individuales dan 409.
-- ⬜ **Siguiente: crear/editar usuarios y contraseña, o administración de evaluadores (firma).** Luego: Evaluados, Aplicaciones (digitar respuestas, calcular), Administración, y al final filtro de menú por rol (con entrada "Informe de empresa" para CLIENTE con su `idCliente`) + login real.
+- ⬜ **Siguiente: crear/editar usuarios y contraseña, o administración de evaluadores (firma).** Luego: Evaluados, Aplicaciones (digitar respuestas, calcular, asignar evaluador, observaciones), el resto de Administración, y al final filtro de menú por rol (con entrada "Informe de empresa" para CLIENTE con su `idCliente`) + login real.
