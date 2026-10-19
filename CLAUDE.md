@@ -108,6 +108,8 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 6. Mensajes de bean validation en inglés ("must not be blank").
 7. `tiempo_cargo` 2 "Mas de un año" sin tilde (se corrige a mano).
 
+**Opcionales del informe de empresa**: puntaje promedio del grupo con su nivel por baremo (como el ejemplo); fecha de inicio de la intervención para calcular la próxima evaluación; guardar la periodicidad como registro histórico; evolución entre años; exponer `AnalizadorInformeEmpresa.analizarPorArea`.
+
 ## 7. Front — `/Users/edwingacha/proyectos/frontend/baterias_front` (repo git local, sin remoto aún)
 
 Angular 19 + PrimeNG 19 (Aura) + primeflex, **pnpm** (`pnpm run dev`, puerto 4200). Sigue los patrones de `control_documental_front` del usuario (detalle en el `CLAUDE.md` del front).
@@ -115,5 +117,3 @@ Angular 19 + PrimeNG 19 (Aura) + primeflex, **pnpm** (`pnpm run dev`, puerto 420
 - ✅ Clientes paso 1: listado, buscador, crear/editar (solo ADMIN; NIT bloqueado al editar), cascadas sector → industria y departamento → ciudad, validadores en español.
 - ✅ Clientes paso 2: pantalla Personas (solo PSICOLOGO) con resumen por situación y filtros.
 - ⬜ **Siguiente: Clientes paso 3 — informe de empresa** (año, resumen, conclusiones + tres acciones + firmante, descarga del Word cuando `faltantes` esté vacío). Luego: vincular/editar personas, informe individual por fila, Evaluados, Aplicaciones (digitar respuestas, calcular), Administración, y al final filtro de menú por rol + login real.
-
-**Opcionales del informe de empresa**: puntaje promedio del grupo con su nivel por baremo (como el ejemplo); fecha de inicio de la intervención para calcular la próxima evaluación; guardar la periodicidad como registro histórico; evolución entre años; exponer `AnalizadorInformeEmpresa.analizarPorArea`.
