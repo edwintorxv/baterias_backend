@@ -1,6 +1,6 @@
 # Contexto — Sistema de Baterías de Riesgo Psicosocial (backend)
 
-> Resumen para retomar el desarrollo. Última actualización: 2026-10-17. Todo commiteado y en `origin/main`.
+> Resumen para retomar el desarrollo. Última actualización: 2026-10-18. Todo commiteado y en `origin/main`.
 > Forma de trabajo: **paso a paso** (diseño → código → el usuario revisa → commit/push cuando lo pide).
 
 ## 0. Puesta en marcha
@@ -10,7 +10,7 @@
 - **Los datos maestros NO están en las migraciones** (catálogos, cuestionarios, preguntas, escalas, baremos y datos de prueba viven solo en la BD local). En otra máquina: `pg_dump -F c` + `pg_restore` (trae `flyway_schema_history`; el `.dump` tiene datos de evaluados: **no subirlo a git**). Pendiente: migración `V16__datos_maestros.sql` (V14 y V15 ya se usaron) con los datos ya corregidos (incluidas las comas de la V14) y `setval` de secuencias.
 - **La app la arranca el usuario en IntelliJ (8080)**: no levantar/detener instancias sin avisar. Tiene **spring-boot-devtools**: un `mvnw compile`/`test` la reinicia sola y Flyway aplica migraciones nuevas en la BD local; `@SpringBootTest` también corre contra la BD local. Avisar antes de compilar si hay una migración nueva.
 - **Dependencia nueva en el `pom.xml`** → devtools no la carga y la app queda caída: el usuario recarga Maven y reinicia en IntelliJ (avisarle).
-- Tests: `sh mvnw test` → **116** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
+- Tests: `sh mvnw test` → **123** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
 - Manuales y Res. 2764 de 2022 en PDF (fuera del repo): `/Users/edwingacha/proyectos/Documentacion/baterias/` (texto en macOS con `osascript -l JavaScript` + PDFKit). El `.pptx` de ejemplo de informe de empresa tiene datos reales: no subirlo.
 
 ## 1. Stack y arquitectura
@@ -84,6 +84,7 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 ## 5. Autenticación — ✅ completa (verificada contra la app con los tres roles)
 
 - **JWT propio** (Spring Security + `oauth2-resource-server`, HS256): `POST /auth/login` → token de 8 h; `GET /auth/yo`; `PUT /auth/contrasena`. Secreto en `APP_SEGURIDAD_JWT_SECRETO` (≥ 32 caracteres; sin él no arranca; solo el perfil dev trae uno). BCrypt. Login fallido: mismo mensaje y mismo tiempo exista o no el usuario.
+- **Fuerza bruta** (`LimiteIntentosLogin`, en memoria, una sola instancia): 5 fallos por usuario o 20 por IP → bloqueo de 15 min desde el último fallo (`app.seguridad.login.*`); se revisa antes de BD/BCrypt → **429** `TOO_MANY_REQUESTS` con `Retry-After`. El éxito reinicia solo el usuario, no la IP. Verificado contra la app.
 - El rol y `activo` se leen **de la BD en cada petición** (`UsuarioJwtConverter`), no del token. 401/403 en formato `ApiError` (`UNAUTHORIZED`/`FORBIDDEN`). Swagger con "Authorize".
 - **Usuarios** (V15): CRUD `/usuarios` (solo ADMIN, sin DELETE), `PUT /usuarios/{id}/contrasena`, `GET/PUT /usuarios/{id}/clientes`. Vínculo por rol: PSICOLOGO → `fk_evaluador` (activo, uno por evaluador), CLIENTE → `fk_cliente`, EVALUADO → `fk_evaluado`, ADMIN sin vínculo. Primer admin: `APP_SEGURIDAD_ADMIN_USUARIO`/`_CONTRASENA` si la tabla está vacía (`PrimerAdministrador`).
 - **Permisos por rol** (`SecurityConfig`, tabla aprobada por el usuario; test `PermisosPorRolTest`): ADMIN usuarios, configuración, clientes y evaluadores, **no ve informes ni datos de trabajadores**; PSICOLOGO todo el trabajo e informes; CLIENTE solo el informe de empresa (JSON, Word, conclusiones en lectura); EVALUADO nada (previsto para responder en línea a futuro). **Ruta no clasificada = denegada.**
@@ -95,7 +96,7 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 ## 6. Pendientes
 
 **Antes de producción**
-1. Seguridad: límite de intentos de login (fuerza bruta); revisar los 1.835 evaluados sin empresa.
+1. Revisar los 1.835 evaluados sin empresa. Al desplegar detrás de un proxy: `server.forward-headers-strategy=native` (si no, el límite por IP ve la del proxy).
 2. Migración `V16__datos_maestros.sql` para arrancar sobre una BD vacía.
 3. Front (no existe): clientes → informe de empresa por año, o empleados → informe individual; diligenciar conclusiones y las tres acciones antes de descargar el Word de empresa.
 

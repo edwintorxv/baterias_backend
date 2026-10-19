@@ -8,6 +8,7 @@ import com.riesgopsicosocial.infrastructure.security.AutenticacionService;
 import com.riesgopsicosocial.infrastructure.security.UsuarioAutenticado;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,8 +31,10 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
-        AutenticacionService.Sesion sesion = service.iniciarSesion(request.usuario(), request.contrasena());
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request,
+                                                           HttpServletRequest http) {
+        AutenticacionService.Sesion sesion = service.iniciarSesion(request.usuario(), request.contrasena(),
+                http.getRemoteAddr());
         return ResponseEntity.ok(ResponseBuilder.success("Sesión iniciada", new LoginResponse(
                 sesion.token().valor(), "Bearer", sesion.token().segundos(), sesion.token().expira(),
                 toResponse(sesion.usuario()))));

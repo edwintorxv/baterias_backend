@@ -12,6 +12,7 @@ public enum ErrorCode {
 
     DATA_INTEGRITY_VIOLATION,
     UNAUTHORIZED,
-    FORBIDDEN
+    FORBIDDEN,
+    TOO_MANY_REQUESTS
 
 }

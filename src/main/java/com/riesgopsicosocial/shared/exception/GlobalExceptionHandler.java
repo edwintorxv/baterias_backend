@@ -7,6 +7,7 @@ import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -118,6 +119,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleAuthentication(AuthenticationException ex) {
         ApiError error = ResponseBuilder.error(ex.getMessage(), ErrorCode.UNAUTHORIZED.name(), null);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    /** Inicio de sesión bloqueado por fuerza bruta: Retry-After dice cuántos segundos esperar. */
+    @ExceptionHandler(DemasiadosIntentosException.class)
+    public ResponseEntity<ApiError> handleDemasiadosIntentos(DemasiadosIntentosException ex) {
+        ApiError error = ResponseBuilder.error(ex.getMessage(), ErrorCode.TOO_MANY_REQUESTS.name(), null);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.segundos()))
+                .body(error);
     }
 
     /**
