@@ -49,7 +49,7 @@ Reglas ArchUnit (`ArquitecturaHexagonalTest`): domain solo `java..`; application
 - Etiquetas de estrés: mismos `nivel_riesgo` 1–5 mostrados como Muy bajo…Muy alto (`domain.model.resultado.NivelEstres`), título "Nivel de síntomas de estrés".
 - Toda la configuración (escalas, ítems, factores, dominios, dimensiones y baremos de A, B, C y D) quedó verificada contra los manuales (V3–V6).
 
-**Migraciones**: V1 esquema · V2 grupo ocupacional/método de cálculo · V3 escalas invertidas e ítems de C · V4 baremos de C y D · V5 secuencias · V6 retroalimentación A/B · V7 preguntas filtro · V8 condiciones y tolerancias · V9 total general · V10 evaluador · V11 guion U+0096 · V12 errata "Bachillerato incompleto" · V13 `informe_empresa` (conclusiones) · V14 comas que habían quedado como puntos en 13 preguntas (A, B y D) · V15 `usuario` + `usuario_cliente` · V16 datos maestros (28 tablas, verificada sobre BD vacía y sobre copia de la local) · V17 datos que cambian por relación + vigencia. Siguiente libre: **V18**.
+**Migraciones**: V1 esquema · V2 grupo ocupacional/método de cálculo · V3 escalas invertidas e ítems de C · V4 baremos de C y D · V5 secuencias · V6 retroalimentación A/B · V7 preguntas filtro · V8 condiciones y tolerancias · V9 total general · V10 evaluador · V11 guion U+0096 · V12 errata "Bachillerato incompleto" · V13 `informe_empresa` (conclusiones) · V14 comas que habían quedado como puntos en 13 preguntas (A, B y D) · V15 `usuario` + `usuario_cliente` · V16 datos maestros (28 tablas, verificada sobre BD vacía y sobre copia de la local) · V17 datos que cambian por relación + vigencia · V18 nombres de departamentos sin guion bajo (NORTE DE SANTANDER, VALLE DEL CAUCA, SAN ANDRES). Siguiente libre: **V19**.
 
 **Persona vs. relación (V17)**: `evaluado` guarda solo lo que no cambia (documento, nombre, apellido, sexo, año de nacimiento); estado civil, nivel académico, residencia, estrato, vivienda, ocupación y dependientes son una **foto por vinculación** en `evaluado_cliente`, junto a los datos laborales. Las columnas viejas de `evaluado` siguen en la tabla sin uso (los 1.835 sin relación conservan sus datos); se borrarán en una migración posterior. Vigencia: `fecha_vinculacion` (obligatoria, por defecto hoy) y `fecha_retiro` (se llena al inactivar, se borra al reactivar; no puede ser anterior a la vinculación). Una relación cerrada no se modifica: conserva la foto con que se evaluó.
 
@@ -109,7 +109,6 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 5. `PUT /aplicaciones` no permite volver `atiendeClientes`/`esJefe` a `NULL` (solo por SQL).
 6. Mensajes de bean validation en inglés ("must not be blank").
 7. `tiempo_cargo` 2 "Mas de un año" sin tilde (se corrige a mano).
-8. Departamentos con guion bajo en el catálogo: `N_DE_SANTANDER`, `SAN_ANDRES`, `VALLE_DEL_CAUCA` (salen así en la plantilla y en los informes): corregir con una migración nueva (V18), no en la V16.
 
 **Opcionales del informe de empresa**: puntaje promedio del grupo con su nivel por baremo (como el ejemplo); fecha de inicio de la intervención para calcular la próxima evaluación; guardar la periodicidad como registro histórico; evolución entre años; exponer `AnalizadorInformeEmpresa.analizarPorArea`.
 
