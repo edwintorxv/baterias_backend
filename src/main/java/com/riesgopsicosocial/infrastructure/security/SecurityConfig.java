@@ -65,6 +65,8 @@ public class SecurityConfig {
                         .requestMatchers("/clientes/*/evaluados/**").hasRole(PSICOLOGO)
                         .requestMatchers(HttpMethod.GET, "/clientes/*/personas").hasRole(PSICOLOGO)
                         .requestMatchers(HttpMethod.POST, "/clientes/*/personas").hasRole(PSICOLOGO)
+                        .requestMatchers(HttpMethod.GET, "/clientes/*/personas/plantilla").hasRole(PSICOLOGO)
+                        .requestMatchers(HttpMethod.POST, "/clientes/*/personas/carga").hasRole(PSICOLOGO)
                         .requestMatchers(HttpMethod.GET, "/clientes/*/informe/**").hasAnyRole(PSICOLOGO, CLIENTE)
                         .requestMatchers(HttpMethod.PUT, "/clientes/*/informe/conclusiones").hasRole(PSICOLOGO)
                         .requestMatchers(HttpMethod.GET, "/clientes", "/clientes/*").hasAnyRole(ADMIN, PSICOLOGO)

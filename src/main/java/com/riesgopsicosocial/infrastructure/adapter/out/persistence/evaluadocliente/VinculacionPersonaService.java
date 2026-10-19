@@ -29,8 +29,8 @@ import java.util.Optional;
 public class VinculacionPersonaService {
 
     private static final ZoneId ZONA = ZoneId.of("America/Bogota");
-    static final int EDAD_MINIMA = 14;
-    static final int EDAD_MAXIMA = 90;
+    public static final int EDAD_MINIMA = 14;
+    public static final int EDAD_MAXIMA = 90;
 
     private final EvaluadoJpaRepository evaluadoRepository;
     private final EvaluadoClienteJpaRepository relacionRepository;
@@ -60,7 +60,9 @@ public class VinculacionPersonaService {
         if (!clienteRepository.existsById(idCliente)) {
             throw new ResourceNotFoundException("Cliente no encontrado con id: " + idCliente);
         }
-        validarAnioNacimiento(persona.getAnioNacimiento());
+        errorAnioNacimiento(persona.getAnioNacimiento()).ifPresent(error -> {
+            throw new BusinessException(error);
+        });
 
         Optional<EvaluadoEntity> existente = evaluadoRepository.findByNumeroIdentificacion(
                 persona.getNumeroIdentificacion().trim());
@@ -115,8 +117,7 @@ public class VinculacionPersonaService {
     private void cerrarEnOtrasEmpresas(Long idEvaluado, LocalDate retiro) {
         for (EvaluadoClienteEntity anterior : activas(idEvaluado)) {
             if (retiro.isBefore(anterior.getFechaVinculacion())) {
-                throw new BusinessException("La fecha de vinculación (" + retiro + ") es anterior a la de su "
-                        + "vínculo activo en otra empresa (" + anterior.getFechaVinculacion() + ")");
+                throw new BusinessException(mensajeFechaAnterior(retiro, anterior.getFechaVinculacion()));
             }
             anterior.setActivo(false);
             anterior.setFechaRetiro(retiro);
@@ -151,13 +152,34 @@ public class VinculacionPersonaService {
                 || !Objects.equals(actual.getAnioNacimiento(), datos.getAnioNacimiento());
     }
 
-    /** Edad entre 14 y 90 años en el año actual. */
-    static void validarAnioNacimiento(Integer anio) {
+    /** Edad entre 14 y 90 años en el año actual; vacío si está bien. */
+    public static Optional<String> errorAnioNacimiento(Integer anio) {
         int actual = LocalDate.now(ZONA).getYear();
         if (anio == null || anio > actual - EDAD_MINIMA || anio < actual - EDAD_MAXIMA) {
-            throw new BusinessException("El año de nacimiento debe estar entre " + (actual - EDAD_MAXIMA) + " y "
+            return Optional.of("El año de nacimiento debe estar entre " + (actual - EDAD_MAXIMA) + " y "
                     + (actual - EDAD_MINIMA) + " (edad de " + EDAD_MINIMA + " a " + EDAD_MAXIMA + " años)");
         }
+        return Optional.empty();
+    }
+
+    /**
+     * Si la persona cambiaría de empresa con esa fecha de vinculación ({@code null} = hoy) y es anterior
+     * a la de su vínculo activo en la otra, el mensaje; vacío si no hay problema.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> errorFechaCambio(Long idCliente, String numeroIdentificacion, LocalDate fechaVinculacion) {
+        LocalDate vinculacion = fechaVinculacion != null ? fechaVinculacion : LocalDate.now(ZONA);
+        return evaluadoRepository.findByNumeroIdentificacion(numeroIdentificacion.trim()).stream()
+                .flatMap(persona -> activas(persona.getId()).stream())
+                .filter(r -> !r.getFkCliente().equals(idCliente))
+                .filter(r -> vinculacion.isBefore(r.getFechaVinculacion()))
+                .findFirst()
+                .map(r -> mensajeFechaAnterior(vinculacion, r.getFechaVinculacion()));
+    }
+
+    private static String mensajeFechaAnterior(LocalDate vinculacion, LocalDate anterior) {
+        return "La fecha de vinculación (" + vinculacion + ") es anterior a la de su vínculo activo en otra empresa ("
+                + anterior + ")";
     }
 
     private static void marcarModificado(EvaluadoClienteEntity relacion) {

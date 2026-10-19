@@ -3,8 +3,6 @@ package com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluadocliente;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluadocliente.dto.PersonaClienteResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluadocliente.dto.VincularPersonaRequest;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.evaluadocliente.dto.VinculacionResponse;
-import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluado.EvaluadoEntity;
-import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteService;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.PersonaClienteFila;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.ResultadoVinculacion;
@@ -41,40 +39,8 @@ public class PersonaClienteController {
         this.vinculacionService = vinculacionService;
     }
 
-    private static EvaluadoEntity toPersona(VincularPersonaRequest request) {
-        EvaluadoEntity persona = new EvaluadoEntity();
-        persona.setNumeroIdentificacion(request.numeroIdentificacion());
-        persona.setNombre(request.nombre());
-        persona.setApellido(request.apellido());
-        persona.setFkSexo(request.fkSexo());
-        persona.setAnioNacimiento(request.anioNacimiento());
-        return persona;
-    }
-
-    private static EvaluadoClienteEntity toRelacion(VincularPersonaRequest request) {
-        EvaluadoClienteEntity relacion = new EvaluadoClienteEntity();
-        relacion.setFkEstadoCivil(request.fkEstadoCivil());
-        relacion.setFkNivelAcademico(request.fkNivelAcademico());
-        relacion.setFkCiudadResidencia(request.fkCiudadResidencia());
-        relacion.setFkEstratoSocioeconomico(request.fkEstratoSocioeconomico());
-        relacion.setFkTipoVivienda(request.fkTipoVivienda());
-        relacion.setOcupacionProfesion(request.ocupacionProfesion());
-        relacion.setFamiliaresDependientesEconomicamente(request.familiaresDependientesEconomicamente());
-        relacion.setFkCiudadTrabajo(request.fkCiudadTrabajo());
-        relacion.setAntiguedadEmpresa(request.antiguedadEmpresa());
-        relacion.setNombreCargo(request.nombreCargo());
-        relacion.setFkTipoCargo(request.fkTipoCargo());
-        relacion.setFkTiempoCargo(request.fkTiempoCargo());
-        relacion.setNombreArea(request.nombreArea());
-        relacion.setFkTipoContrato(request.fkTipoContrato());
-        relacion.setFkHorasLabor(request.fkHorasLabor());
-        relacion.setFkTipoSalario(request.fkTipoSalario());
-        relacion.setFechaVinculacion(request.fechaVinculacion());
-        return relacion;
-    }
-
     /** No dice en qué empresa estaba: el psicólogo de este cliente no tiene por qué saberlo. */
-    private static String mensaje(Vinculacion vinculacion) {
+    static String mensaje(Vinculacion vinculacion) {
         String mensaje = switch (vinculacion.resultado()) {
             case NUEVA -> "Persona creada y vinculada al cliente";
             case VINCULA -> "Persona vinculada al cliente";
@@ -112,7 +78,8 @@ public class PersonaClienteController {
     @PostMapping
     public ResponseEntity<ApiResponse<VinculacionResponse>> vincular(@PathVariable Long idCliente,
                                                                      @Valid @RequestBody VincularPersonaRequest request) {
-        Vinculacion vinculacion = vinculacionService.vincular(idCliente, toPersona(request), toRelacion(request));
+        Vinculacion vinculacion = vinculacionService.vincular(idCliente, VincularPersonaMapper.toPersona(request),
+                VincularPersonaMapper.toRelacion(request));
         VinculacionResponse data = new VinculacionResponse(vinculacion.resultado().name(), vinculacion.evaluado().getId(),
                 vinculacion.datosPersonaActualizados(), EvaluadoClienteController.toResponse(vinculacion.relacion()));
         HttpStatus estado = vinculacion.resultado() == ResultadoVinculacion.ACTUALIZA ? HttpStatus.OK : HttpStatus.CREATED;

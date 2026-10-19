@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
         ApiError error = ResponseBuilder.error(
                 ex.getMessage(),
                 ErrorCode.BUSINESS_ERROR.name(),
-                null
+                ex instanceof BusinessException negocio ? negocio.getDetails() : null
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
