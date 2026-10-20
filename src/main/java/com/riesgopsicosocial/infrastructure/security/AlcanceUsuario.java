@@ -169,12 +169,12 @@ public class AlcanceUsuario {
                 .orElse(false);
     }
 
-    /** La firma la sube el ADMIN o el propio psicólogo (403 si es la de otro). */
+    /** La firma la ven y la suben el ADMIN o el propio psicólogo (403 si es la de otro). */
     public void exigirEvaluadorPropio(Long idEvaluador) {
         UsuarioAutenticado usuario = actual().orElseThrow(() -> new AccessDeniedException("Sin sesión"));
         if (usuario.rol() != Rol.ADMIN
                 && !idEvaluador.equals(usuario.idEvaluador())) {
-            throw new AccessDeniedException("Solo puede modificar su propio evaluador");
+            throw new AccessDeniedException("Solo el propio evaluador o el administrador");
         }
     }
 

@@ -107,8 +107,10 @@ public class EvaluadorController {
         return ResponseEntity.ok(ResponseBuilder.success("Firma guardada exitosamente", toResponse(actualizado)));
     }
 
+    /** Solo el propio evaluador o el ADMIN (los informes la cargan por dentro, sin pasar por aquí). */
     @GetMapping("/{id}/firma")
     public ResponseEntity<byte[]> obtenerFirma(@PathVariable Long id) {
+        alcance.exigirEvaluadorPropio(id);
         EvaluadorEntity evaluador = service.obtenerConFirma(id);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(evaluador.getFirmaTipoContenido()))

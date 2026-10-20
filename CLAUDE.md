@@ -3,9 +3,9 @@
 > Resumen para retomar el desarrollo. Última actualización: 2026-10-20.
 > Forma de trabajo: **paso a paso** (diseño → código → el usuario revisa → commit/push cuando lo pide).
 
-**Para retomar (2026-10-20)**: 167 tests, migraciones hasta V18. Hoy: informe individual por fila en el front (diálogo con resultados, firmante, observaciones, recomendaciones y descarga PDF/Word) y síntomas de estrés frecuentes (Siempre/Casi siempre) en el JSON, el Word y el PDF del individual.
+**Para retomar (2026-10-20)**: 167 tests, migraciones hasta V18. Hoy: Administración → Evaluadores en el front (listado, crear/editar, firma) y firma restringida al propio evaluador o ADMIN; informe individual por fila en el front (diálogo con resultados, firmante, observaciones, recomendaciones y descarga PDF/Word) y síntomas de estrés frecuentes (Siempre/Casi siempre) en el JSON, el Word y el PDF del individual.
 - Hecho el 2026-10-19: V17 (datos por relación + vigencia), vincular persona / una sola empresa activa, carga por archivo (plantilla Excel), relación inactiva no se edita, V18 (departamentos); en el front: carga por archivo, vincular, editar/inactivar/activar, Administración → Usuarios (clientes asignados).
-- **Siguiente (a elegir por el usuario)**: crear/editar usuarios y contraseña, o administración de evaluadores (datos profesionales, activo, firma).
+- **Siguiente**: crear/editar usuarios y contraseña (Administración → Usuarios).
 
 ## 0. Puesta en marcha
 
@@ -62,7 +62,7 @@ Reglas ArchUnit (`ArquitecturaHexagonalTest`): domain solo `java..`; application
 - `GET /clientes/{idCliente}/evaluados/{idEvaluado}/informe?anio=` (JSON; sin `anio` = historial), `.../informe/anios`, `.../informe/archivo?anio=&formato=pdf|docx`.
 - Sigue los formatos modelo de la batería (Anexos 4 y 5 intralaboral, Anexo 2 extralaboral; D con la estructura de los demás). Un archivo por año, una sección por aplicación; datos del trabajador y del evaluador, resultados, interpretación, observaciones, recomendaciones y firma. Encabezado "CONFIDENCIAL – Hace parte de la historia clínica ocupacional del trabajador".
 - Aplicación sin evaluador o sin resultados → 409. PDF y Word salen de `InformeVista` (`InformeVistaMapper`).
-- **Evaluador** (V10): CRUD `/evaluadores` (sin DELETE, `activo`), firma por `PUT /evaluadores/{id}/firma` (PNG/JPG ≤ 1 MB). Solo se asignan evaluadores activos; quien ya lo tenía lo conserva aunque se inactive.
+- **Evaluador** (V10): CRUD `/evaluadores` (sin DELETE, `activo`), firma por `PUT /evaluadores/{id}/firma` (PNG/JPG ≤ 1 MB). Solo se asignan evaluadores activos; quien ya lo tenía lo conserva aunque se inactive. La firma vive en la BD (`evaluador.firma` BYTEA + `firma_tipo_contenido`), sin historial: el informe usa la firma vigente al generarse. **Ver o subir la firma** (`GET`/`PUT .../firma`): solo el propio evaluador o el ADMIN (403; decisión del usuario 2026-10-20); los informes la cargan por dentro.
 - El informe individual es del trabajador (historia clínica): para el psicólogo, no para el cliente. **Confidencialidad (decisión del usuario 2026-10-20)**: lo ve cualquier psicólogo asignado al cliente (no solo el firmante); firmante, observaciones y recomendaciones se completan en el diálogo del informe (`PUT /aplicaciones/{id}`).
 - **Síntomas de estrés frecuentes** (`SeleccionSintomasFrecuentes`, dominio): por aplicación, los ítems de D respondidos Siempre o Casi siempre (las dos primeras opciones), agrupados por dimensión en el orden del cuestionario (Siempre primero, empate por número); grupo sin síntomas = vacío. Sin puntaje ni nivel (el manual no trae baremos por dimensión de D). JSON `aplicaciones[].sintomasFrecuentes`; en el Word y el PDF, tabla bajo el resultado de estrés (grupo combinado, síntoma, frecuencia). Consultas de estrés compartidas con el informe de empresa en `SintomasEstresLoader`.
 
@@ -129,4 +129,5 @@ Angular 19 + PrimeNG 19 (Aura) + primeflex, **pnpm** (`pnpm run dev`, puerto 420
 - ✅ Editar (diálogo de vincular en modo edición; corrige también la persona si cambió) e inactivar/activar (fecha de retiro) desde el ⚙️ de cada fila; tarjeta "Inactivas" en el resumen.
 - ✅ Administración → Usuarios: listado y clientes asignados a cada psicólogo (casillas con búsqueda).
 - ✅ Informe individual por fila (⚙️ → Informe individual): año, resultados por cuestionario con detalle (dominios/dimensiones; en estrés, síntomas frecuentes), firmante + observaciones + recomendaciones por aplicación (guarda con GET + PUT `/aplicaciones/{id}`), descarga PDF/Word deshabilitada mientras falten resultados, firmante o haya cambios sin guardar (sin firma cargada: solo aviso).
-- ⬜ **Siguiente: crear/editar usuarios y contraseña, o administración de evaluadores (firma).** Luego: Evaluados, Aplicaciones (digitar respuestas, calcular, asignar evaluador, observaciones), el resto de Administración, y al final filtro de menú por rol (con entrada "Informe de empresa" para CLIENTE con su `idCliente`) + login real.
+- ✅ Administración → Evaluadores: listado (ADMIN y PSICOLOGO), crear/editar con activo (solo ADMIN), firma con vista previa (ADMIN o el propio).
+- ⬜ **Siguiente: crear/editar usuarios y contraseña.** Luego: Evaluados, Aplicaciones (digitar respuestas, calcular, asignar evaluador, observaciones), el resto de Administración, y al final filtro de menú por rol (con entrada "Informe de empresa" para CLIENTE con su `idCliente`) + login real.
