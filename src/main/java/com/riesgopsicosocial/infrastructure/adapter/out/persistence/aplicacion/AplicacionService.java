@@ -4,14 +4,17 @@ import com.riesgopsicosocial.infrastructure.security.UsuarioActual;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultado.BorradoResultados;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.tipocargo.TipoCargoEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.tipocargo.TipoCargoJpaRepository;
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -23,15 +26,18 @@ public class AplicacionService {
     private final EvaluadoClienteJpaRepository evaluadoClienteRepository;
     private final TipoCargoJpaRepository tipoCargoRepository;
     private final EvaluadorJpaRepository evaluadorRepository;
+    private final BorradoResultados borradoResultados;
 
     public AplicacionService(AplicacionJpaRepository repository,
                              EvaluadoClienteJpaRepository evaluadoClienteRepository,
                              TipoCargoJpaRepository tipoCargoRepository,
-                             EvaluadorJpaRepository evaluadorRepository) {
+                             EvaluadorJpaRepository evaluadorRepository,
+                             BorradoResultados borradoResultados) {
         this.repository = repository;
         this.evaluadoClienteRepository = evaluadoClienteRepository;
         this.tipoCargoRepository = tipoCargoRepository;
         this.evaluadorRepository = evaluadorRepository;
+        this.borradoResultados = borradoResultados;
     }
 
     public AplicacionEntity crear(AplicacionEntity entidad) {
@@ -51,8 +57,14 @@ public class AplicacionService {
         return repository.save(entidad);
     }
 
+    /**
+     * Si cambia algo de lo que salen los resultados (grupo ocupacional o preguntas filtro), se borran: la
+     * aplicación queda pendiente de cálculo.
+     */
+    @Transactional
     public AplicacionEntity actualizar(Long id, AplicacionEntity datos) {
         AplicacionEntity existente = obtenerPorId(id);
+        List<Object> antes = baseDelCalculo(existente);
 
         boolean cambioEvaluadoCliente = !existente.getFkEvaluadoCliente().equals(datos.getFkEvaluadoCliente());
         existente.setFkEvaluadoCliente(datos.getFkEvaluadoCliente());
@@ -81,9 +93,18 @@ public class AplicacionService {
             existente.setFkEvaluador(datos.getFkEvaluador());
         }
 
+        if (!antes.equals(baseDelCalculo(existente))) {
+            borradoResultados.borrar(id);
+        }
+
         existente.setFechaModificado(LocalDateTime.now());
         existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
+    }
+
+    /** Lo de la aplicación de lo que salen los resultados (además de las respuestas). */
+    private static List<Object> baseDelCalculo(AplicacionEntity aplicacion) {
+        return Arrays.asList(aplicacion.getFkGrupoOcupacional(), aplicacion.getAtiendeClientes(), aplicacion.getEsJefe());
     }
 
     public AplicacionEntity obtenerPorId(Long id) {
