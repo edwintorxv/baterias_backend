@@ -3,6 +3,10 @@ package com.riesgopsicosocial.application.service.informe;
 import com.riesgopsicosocial.application.port.out.informe.InformeEvaluadoPort;
 import com.riesgopsicosocial.application.port.out.resultado.ResultadoPort;
 import com.riesgopsicosocial.domain.model.informe.*;
+import com.riesgopsicosocial.domain.model.informe.empresa.DimensionInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.ItemSintoma;
+import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
+import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
 import com.riesgopsicosocial.domain.model.resultado.NivelRiesgo;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoCuestionario;
@@ -47,6 +51,24 @@ class InformeEvaluadoServiceTest {
         InformeEvaluado informe = service.consultar(1L, 7L, null);
 
         assertEquals(List.of(34, 36), informe.aplicaciones().stream().map(AplicacionEvaluado::edad).toList());
+    }
+
+    @Test
+    void sintomasFrecuentes_porAplicacionYGrupo() {
+        puerto.aplicaciones.add(aplicacion(1L, "2026-03-01T08:00"));
+        puerto.aplicaciones.add(aplicacion(2L, "2026-06-01T08:00"));
+        puerto.respuestasEstres.addAll(List.of(
+                new RespuestaSintoma(1L, 501L, 50L, 1L),   // Siempre
+                new RespuestaSintoma(1L, 502L, 50L, 4L),   // Nunca: no es frecuente
+                new RespuestaSintoma(1L, 503L, 51L, 2L))); // Casi siempre
+
+        InformeEvaluado informe = service.consultar(1L, 7L, null);
+
+        List<GrupoSintomas> primera = informe.aplicaciones().get(0).sintomasFrecuentes();
+        assertEquals(List.of("Fisiológicos", "Comportamiento social"), primera.stream().map(GrupoSintomas::nombre).toList());
+        assertEquals(List.of(new SintomaFrecuente(1, "Dolor de cabeza", "Siempre")), primera.get(0).sintomas());
+        assertEquals(List.of(new SintomaFrecuente(3, "Aislarse", "Casi siempre")), primera.get(1).sintomas());
+        assertTrue(informe.aplicaciones().get(1).sintomasFrecuentes().isEmpty(), "sin respuestas de estrés: vacía");
     }
 
     @Test
@@ -120,6 +142,7 @@ class InformeEvaluadoServiceTest {
 
     private static class PuertoFalso implements InformeEvaluadoPort {
         final List<DatosAplicacion> aplicaciones = new ArrayList<>();
+        final List<RespuestaSintoma> respuestasEstres = new ArrayList<>();
         boolean hayRelacion = true;
 
         @Override
@@ -145,6 +168,30 @@ class InformeEvaluadoServiceTest {
         @Override
         public Optional<FirmaEvaluador> buscarFirma(Long idEvaluador) {
             return Optional.empty();
+        }
+
+        @Override
+        public List<DimensionInforme> buscarDimensionesEstres() {
+            return List.of(new DimensionInforme(50L, "Fisiológicos", null),
+                    new DimensionInforme(51L, "Comportamiento social", null));
+        }
+
+        @Override
+        public List<ItemSintoma> buscarItemsEstres() {
+            return List.of(new ItemSintoma(501L, 50L, 1, "Dolor de cabeza"),
+                    new ItemSintoma(502L, 50L, 2, "Problemas gastrointestinales"),
+                    new ItemSintoma(503L, 51L, 3, "Aislarse"));
+        }
+
+        @Override
+        public List<OpcionFrecuencia> buscarOpcionesEstres() {
+            return List.of(new OpcionFrecuencia(1L, "Siempre"), new OpcionFrecuencia(2L, "Casi siempre"),
+                    new OpcionFrecuencia(3L, "Algunas veces"), new OpcionFrecuencia(4L, "Nunca"));
+        }
+
+        @Override
+        public List<RespuestaSintoma> buscarRespuestasEstres(Collection<Long> idsAplicacion) {
+            return respuestasEstres.stream().filter(r -> idsAplicacion.contains(r.idAplicacion())).toList();
         }
     }
 

@@ -1,12 +1,11 @@
 # Contexto — Sistema de Baterías de Riesgo Psicosocial (backend)
 
-> Resumen para retomar el desarrollo. Última actualización: 2026-10-19. Todo commiteado y en `origin/main`.
+> Resumen para retomar el desarrollo. Última actualización: 2026-10-20.
 > Forma de trabajo: **paso a paso** (diseño → código → el usuario revisa → commit/push cuando lo pide).
 
-**Para retomar (2026-10-19)**: backend y front commiteados y en `origin/main` (back `5d7ebe8`+, front `36a7af0`+), 161 tests, migraciones hasta V18.
-- Hecho hoy: V17 (datos por relación + vigencia), vincular persona / una sola empresa activa, carga por archivo (plantilla Excel), relación inactiva no se edita, V18 (departamentos); en el front: carga por archivo, vincular, editar/inactivar/activar, Administración → Usuarios (clientes asignados).
+**Para retomar (2026-10-20)**: 166 tests, migraciones hasta V18. Hoy: informe individual por fila en el front (diálogo con resultados, firmante, observaciones, recomendaciones y descarga PDF/Word) y síntomas de estrés frecuentes (Siempre/Casi siempre) en el JSON y el Word del individual.
+- Hecho el 2026-10-19: V17 (datos por relación + vigencia), vincular persona / una sola empresa activa, carga por archivo (plantilla Excel), relación inactiva no se edita, V18 (departamentos); en el front: carga por archivo, vincular, editar/inactivar/activar, Administración → Usuarios (clientes asignados).
 - **Siguiente (a elegir por el usuario)**: crear/editar usuarios y contraseña, o administración de evaluadores (datos profesionales, activo, firma).
-- **En pausa**: informe individual por fila, hasta que el usuario valide la confidencialidad (sección 7).
 
 ## 0. Puesta en marcha
 
@@ -15,7 +14,7 @@
 - **Datos maestros en la V16** (catálogos, geografía, cuestionarios, preguntas, escalas y baremos; idempotente con `ON CONFLICT DO NOTHING`): una BD vacía queda lista con V1..V16 y arranca con el primer admin. Los **datos de prueba** (cliente, evaluados, aplicaciones, respuestas, resultados, evaluador, usuarios) viven solo en la BD local: para llevarlos a otra máquina, `pg_dump -F c` + `pg_restore` (el `.dump` tiene datos de evaluados: **no subirlo a git**). Si cambia un dato maestro, va en una migración nueva (no editar la V16).
 - **La app la arranca el usuario en IntelliJ (8080)**: no levantar/detener instancias sin avisar. Tiene **spring-boot-devtools**: un `mvnw compile`/`test` la reinicia sola y Flyway aplica migraciones nuevas en la BD local; `@SpringBootTest` también corre contra la BD local. Avisar antes de compilar si hay una migración nueva.
 - **Dependencia nueva en el `pom.xml`** → devtools no la carga y la app queda caída: el usuario recarga Maven y reinicia en IntelliJ (avisarle).
-- Tests: `sh mvnw test` → **161** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
+- Tests: `sh mvnw test` → **166** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
 - Manuales y Res. 2764 de 2022 en PDF (fuera del repo): `/Users/edwingacha/proyectos/Documentacion/baterias/` (texto en macOS con `osascript -l JavaScript` + PDFKit). El `.pptx` de ejemplo de informe de empresa tiene datos reales: no subirlo.
 
 ## 1. Stack y arquitectura
@@ -64,7 +63,8 @@ Reglas ArchUnit (`ArquitecturaHexagonalTest`): domain solo `java..`; application
 - Sigue los formatos modelo de la batería (Anexos 4 y 5 intralaboral, Anexo 2 extralaboral; D con la estructura de los demás). Un archivo por año, una sección por aplicación; datos del trabajador y del evaluador, resultados, interpretación, observaciones, recomendaciones y firma. Encabezado "CONFIDENCIAL – Hace parte de la historia clínica ocupacional del trabajador".
 - Aplicación sin evaluador o sin resultados → 409. PDF y Word salen de `InformeVista` (`InformeVistaMapper`).
 - **Evaluador** (V10): CRUD `/evaluadores` (sin DELETE, `activo`), firma por `PUT /evaluadores/{id}/firma` (PNG/JPG ≤ 1 MB). Solo se asignan evaluadores activos; quien ya lo tenía lo conserva aunque se inactive.
-- El informe individual es del trabajador (historia clínica): para el psicólogo, no para el cliente.
+- El informe individual es del trabajador (historia clínica): para el psicólogo, no para el cliente. **Confidencialidad (decisión del usuario 2026-10-20)**: lo ve cualquier psicólogo asignado al cliente (no solo el firmante); firmante, observaciones y recomendaciones se completan en el diálogo del informe (`PUT /aplicaciones/{id}`).
+- **Síntomas de estrés frecuentes** (`SeleccionSintomasFrecuentes`, dominio): por aplicación, los ítems de D respondidos Siempre o Casi siempre (las dos primeras opciones), agrupados por dimensión en el orden del cuestionario (Siempre primero, empate por número); grupo sin síntomas = vacío. Sin puntaje ni nivel (el manual no trae baremos por dimensión de D). JSON `aplicaciones[].sintomasFrecuentes`; en el **Word** tabla bajo el resultado de estrés; **el PDF aún no lo trae** (decisión del usuario). Consultas de estrés compartidas con el informe de empresa en `SintomasEstresLoader`.
 
 ## 4. Informe de empresa — ✅ completo (Word y JSON)
 
@@ -128,5 +128,5 @@ Angular 19 + PrimeNG 19 (Aura) + primeflex, **pnpm** (`pnpm run dev`, puerto 420
 - ✅ Vincular persona (formulario, sin prellenar por documento). Probado con un cambio real de empresa (73113561 de CARDINS → cliente 2): la relación con CARDINS quedó cerrada con su foto y el informe 2026 de CARDINS no cambió (200/162).
 - ✅ Editar (diálogo de vincular en modo edición; corrige también la persona si cambió) e inactivar/activar (fecha de retiro) desde el ⚙️ de cada fila; tarjeta "Inactivas" en el resumen.
 - ✅ Administración → Usuarios: listado y clientes asignados a cada psicólogo (casillas con búsqueda).
-- ⏸️ Informe individual por fila: en pausa mientras el usuario valida la confidencialidad (¿basta estar asignado al cliente o solo el evaluador que firmó lo ve?; ¿evaluador y observaciones se completan en el diálogo del informe o en Aplicaciones?). Hoy solo 1 de 200 aplicaciones de CARDINS tiene evaluador: casi todos los informes individuales dan 409.
+- ✅ Informe individual por fila (⚙️ → Informe individual): año, resultados por cuestionario con detalle (dominios/dimensiones; en estrés, síntomas frecuentes), firmante + observaciones + recomendaciones por aplicación (guarda con GET + PUT `/aplicaciones/{id}`), descarga PDF/Word deshabilitada mientras falten resultados, firmante o haya cambios sin guardar (sin firma cargada: solo aviso).
 - ⬜ **Siguiente: crear/editar usuarios y contraseña, o administración de evaluadores (firma).** Luego: Evaluados, Aplicaciones (digitar respuestas, calcular, asignar evaluador, observaciones), el resto de Administración, y al final filtro de menú por rol (con entrada "Informe de empresa" para CLIENTE con su `idCliente`) + login real.

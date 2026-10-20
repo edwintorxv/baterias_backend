@@ -59,6 +59,20 @@ class GeneradoresInformeEvaluadoTest {
         }
     }
 
+    @Test
+    void docx_traeLosSintomasFrecuentesPorGrupo() throws Exception {
+        byte[] docx = new DocxInformeEvaluadoGenerator(mapper).generar(informe(), Map.of(), LocalDate.of(2026, 10, 8));
+
+        try (XWPFDocument documento = new XWPFDocument(new ByteArrayInputStream(docx));
+             XWPFWordExtractor extractor = new XWPFWordExtractor(documento)) {
+            String texto = extractor.getText().replaceAll("\\s+", " ");
+            List.of("SÍNTOMAS REPORTADOS CON FRECUENCIA (SIEMPRE O CASI SIEMPRE)", "Síntomas fisiológicos",
+                            "Dolores en el cuello y espalda o tensión muscular.", "Casi siempre",
+                            "Síntomas de comportamiento social", "Ninguno con frecuencia")
+                    .forEach(esperado -> assertTrue(texto.contains(esperado), "falta en el Word: " + esperado));
+        }
+    }
+
     private static InformeEvaluado informe() {
         DatosEvaluador evaluador = new DatosEvaluador(1L, "52", "Psicóloga Uno", "Psicóloga", "Especialista SO",
                 "TP-1", "LSO-1", LocalDate.of(2020, 5, 15), false);
@@ -77,7 +91,11 @@ class GeneradoresInformeEvaluadoTest {
 
         return new InformeEvaluado(new DatosCliente(1L, "900", "Empresa X"),
                 new DatosEvaluado(7L, "123", "Ana", "Pérez", "Femenino", 1990),
-                List.of(new AplicacionEvaluado(datos, 36, resultado)));
+                List.of(new AplicacionEvaluado(datos, 36, resultado, List.of(
+                        new GrupoSintomas("Síntomas fisiológicos", List.of(
+                                new SintomaFrecuente(1, "Dolores en el cuello y espalda o tensión muscular.", "Siempre"),
+                                new SintomaFrecuente(3, "Problemas relacionados con la función de los órganos del sistema respiratorio.", "Casi siempre"))),
+                        new GrupoSintomas("Síntomas de comportamiento social", List.of())))));
     }
 
     private static BigDecimal bd(String valor) {

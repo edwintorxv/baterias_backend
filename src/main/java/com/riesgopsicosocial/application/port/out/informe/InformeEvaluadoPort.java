@@ -4,7 +4,12 @@ import com.riesgopsicosocial.domain.model.informe.DatosAplicacion;
 import com.riesgopsicosocial.domain.model.informe.DatosCliente;
 import com.riesgopsicosocial.domain.model.informe.DatosEvaluado;
 import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
+import com.riesgopsicosocial.domain.model.informe.empresa.DimensionInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.ItemSintoma;
+import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
+import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,5 +27,17 @@ public interface InformeEvaluadoPort {
 
     /** Vacío si el evaluador no ha cargado su firma. */
     Optional<FirmaEvaluador> buscarFirma(Long idEvaluador);
+
+    /** Dimensiones del cuestionario de estrés, en el orden del cuestionario (fisiológicos primero). */
+    List<DimensionInforme> buscarDimensionesEstres();
+
+    /** Ítems (síntomas) del cuestionario de estrés, con su texto. */
+    List<ItemSintoma> buscarItemsEstres();
+
+    /** Opciones del cuestionario de estrés, de la más frecuente (Siempre) a la menos (Nunca). */
+    List<OpcionFrecuencia> buscarOpcionesEstres();
+
+    /** Respuestas a los ítems de estrés de esas aplicaciones. */
+    List<RespuestaSintoma> buscarRespuestasEstres(Collection<Long> idsAplicacion);
 
 }

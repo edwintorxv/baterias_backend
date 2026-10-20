@@ -4,6 +4,10 @@ import com.riesgopsicosocial.application.port.in.informe.ConsultarInformeEvaluad
 import com.riesgopsicosocial.application.port.out.informe.GeneradorDocumentoInformePort;
 import com.riesgopsicosocial.application.port.out.informe.InformeEvaluadoPort;
 import com.riesgopsicosocial.domain.model.informe.*;
+import com.riesgopsicosocial.domain.model.informe.empresa.DimensionInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.ItemSintoma;
+import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
+import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoAplicacion;
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import org.junit.jupiter.api.Test;
@@ -63,7 +67,7 @@ class DocumentoInformeEvaluadoServiceTest {
 
     private static AplicacionEvaluado aplicacion(Long id, DatosEvaluador evaluador, ResultadoAplicacion resultado) {
         return new AplicacionEvaluado(new DatosAplicacion(id, LocalDateTime.of(2026, 3, 1, 8, 0), "Analista",
-                "Talento humano", 1L, "Grupo 1", evaluador, null, null), 36, resultado);
+                "Talento humano", 1L, "Grupo 1", evaluador, null, null), 36, resultado, List.of());
     }
 
     private class ConsultaFalsa implements ConsultarInformeEvaluadoUseCase {
@@ -103,6 +107,26 @@ class DocumentoInformeEvaluadoServiceTest {
         @Override
         public Optional<FirmaEvaluador> buscarFirma(Long idEvaluador) {
             return idEvaluador.equals(CON_FIRMA.id()) ? Optional.of(FIRMA) : Optional.empty();
+        }
+
+        @Override
+        public List<DimensionInforme> buscarDimensionesEstres() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<ItemSintoma> buscarItemsEstres() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<OpcionFrecuencia> buscarOpcionesEstres() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<RespuestaSintoma> buscarRespuestasEstres(Collection<Long> idsAplicacion) {
+            throw new UnsupportedOperationException();
         }
     }
 

@@ -33,6 +33,7 @@ public class DocxInformeEvaluadoGenerator implements GeneradorDocumentoInformePo
     private static final int[] ANCHOS_DATOS = {3876, 6324};
     private static final int[] ANCHOS_INTRALABORAL = {2244, 4182, 1326, 2448};
     private static final int[] ANCHOS_TRES_COLUMNAS = {6426, 1326, 2448};
+    private static final int[] ANCHOS_SINTOMAS = {2448, 5978, 1774};
 
     private final InformeVistaMapper vistaMapper;
 
@@ -103,7 +104,10 @@ public class DocxInformeEvaluadoGenerator implements GeneradorDocumentoInformePo
                 case INTRALABORAL -> tablaIntralaboral(doc, cuestionario);
                 case EXTRALABORAL -> tablaFilas(doc, "Dimensiones", cuestionario.tituloNivel(),
                         cuestionario.dimensiones(), cuestionario.total(), true);
-                case ESTRES -> tablaFilas(doc, "", cuestionario.tituloNivel(), List.of(), cuestionario.total(), true);
+                case ESTRES -> {
+                    tablaFilas(doc, "", cuestionario.tituloNivel(), List.of(), cuestionario.total(), true);
+                    sintomasFrecuentes(doc, aplicacion);
+                }
             }
         }
         if (aplicacion.totalGeneral() != null) {
@@ -181,6 +185,43 @@ public class DocxInformeEvaluadoGenerator implements GeneradorDocumentoInformePo
         celda(fila.getCell(0), nombre, true, ParagraphAlignment.LEFT, GRIS_TOTAL_GENERAL, anchos[0]);
         celda(fila.getCell(1), total.puntaje(), true, ParagraphAlignment.CENTER, GRIS_TOTAL_GENERAL, anchos[1]);
         celda(fila.getCell(2), total.nivel(), true, ParagraphAlignment.CENTER, COLOR_NIVEL_SUAVE.get(total.idNivel()), anchos[2]);
+        espacio(doc);
+    }
+
+    /**
+     * Síntomas que el trabajador reportó Siempre o Casi siempre, por grupo (dimensión) en el orden del
+     * cuestionario. El manual no trae baremos por dimensión de estrés: van sin puntaje ni nivel.
+     */
+    private void sintomasFrecuentes(XWPFDocument doc, AplicacionVista aplicacion) {
+        if (aplicacion.sintomasFrecuentes().isEmpty()) {
+            return;
+        }
+        subtitulo(doc, "Síntomas reportados con frecuencia (Siempre o Casi siempre)");
+        if (aplicacion.sinSintomasFrecuentes()) {
+            texto(parrafo(doc, ParagraphAlignment.LEFT, 0, 200),
+                    "El trabajador no reportó síntomas con frecuencia Siempre o Casi siempre.", 9.5, false, null);
+            return;
+        }
+        int[] anchos = ANCHOS_SINTOMAS;
+        XWPFTable tabla = tabla(doc, 1, anchos);
+        encabezado(tabla.getRow(0), anchos, "Grupo de síntomas", "Síntoma", "Frecuencia");
+        for (GrupoSintomasVista grupo : aplicacion.sintomasFrecuentes()) {
+            if (grupo.sintomas().isEmpty()) {
+                XWPFTableRow fila = tabla.createRow();
+                celda(fila.getCell(0), grupo.nombre(), true, ParagraphAlignment.LEFT, GRIS_ETIQUETA, anchos[0]);
+                celda(fila.getCell(1), "Ninguno con frecuencia", false, ParagraphAlignment.LEFT, null, anchos[1]);
+                celda(fila.getCell(2), "—", false, ParagraphAlignment.CENTER, null, anchos[2]);
+                continue;
+            }
+            for (int i = 0; i < grupo.sintomas().size(); i++) {
+                SintomaVista sintoma = grupo.sintomas().get(i);
+                XWPFTableRow fila = tabla.createRow();
+                celda(fila.getCell(0), i == 0 ? grupo.nombre() : "", true, ParagraphAlignment.LEFT, GRIS_ETIQUETA, anchos[0]);
+                combinarVertical(fila.getCell(0), i == 0);
+                celda(fila.getCell(1), sintoma.descripcion(), false, ParagraphAlignment.LEFT, null, anchos[1]);
+                celda(fila.getCell(2), sintoma.frecuencia(), false, ParagraphAlignment.CENTER, null, anchos[2]);
+            }
+        }
         espacio(doc);
     }
 

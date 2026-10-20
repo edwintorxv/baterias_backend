@@ -4,13 +4,20 @@ import com.riesgopsicosocial.application.port.in.informe.ConsultarInformeEvaluad
 import com.riesgopsicosocial.application.port.out.informe.InformeEvaluadoPort;
 import com.riesgopsicosocial.application.port.out.resultado.ResultadoPort;
 import com.riesgopsicosocial.domain.model.informe.*;
+import com.riesgopsicosocial.domain.model.informe.empresa.DimensionInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.ItemSintoma;
+import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
+import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoAplicacion;
+import com.riesgopsicosocial.domain.service.informe.SeleccionSintomasFrecuentes;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class InformeEvaluadoService implements ConsultarInformeEvaluadoUseCase {
@@ -41,10 +48,18 @@ public class InformeEvaluadoService implements ConsultarInformeEvaluadoUseCase {
                     + idCliente + " en el año " + anio);
         }
 
+        Map<Long, List<RespuestaSintoma>> respuestasEstres = informeEvaluadoPort.buscarRespuestasEstres(
+                        delPeriodo.stream().map(DatosAplicacion::idAplicacion).toList()).stream()
+                .collect(Collectors.groupingBy(RespuestaSintoma::idAplicacion));
+        ConfiguracionEstres configuracion = respuestasEstres.isEmpty() ? null : new ConfiguracionEstres(
+                informeEvaluadoPort.buscarDimensionesEstres(), informeEvaluadoPort.buscarItemsEstres(),
+                informeEvaluadoPort.buscarOpcionesEstres());
+
         // Para un solo trabajador son pocas aplicaciones: se reutiliza la consulta de resultados de cada una.
         List<AplicacionEvaluado> aplicaciones = delPeriodo.stream()
                 .map(datos -> new AplicacionEvaluado(datos, evaluado.edadEn(datos.fechaAplicacion().getYear()),
-                        buscarResultado(datos)))
+                        buscarResultado(datos),
+                        sintomasFrecuentes(configuracion, respuestasEstres.getOrDefault(datos.idAplicacion(), List.of()))))
                 .toList();
         return new InformeEvaluado(cliente, evaluado, aplicaciones);
     }
@@ -71,6 +86,20 @@ public class InformeEvaluadoService implements ConsultarInformeEvaluadoUseCase {
         if (!informeEvaluadoPort.existeRelacion(idCliente, idEvaluado)) {
             throw new ResourceNotFoundException("El evaluado " + idEvaluado + " no tiene relación con el cliente " + idCliente);
         }
+    }
+
+    private static List<GrupoSintomas> sintomasFrecuentes(ConfiguracionEstres configuracion, List<RespuestaSintoma> respuestas) {
+        if (configuracion == null) {
+            return List.of();
+        }
+        return SeleccionSintomasFrecuentes.seleccionar(configuracion.dimensiones(), configuracion.items(), respuestas,
+                configuracion.opciones());
+    }
+
+    /** Configuración del cuestionario de estrés: se carga una vez y solo si hay respuestas de estrés. */
+    private record ConfiguracionEstres(List<DimensionInforme> dimensiones,
+                                  List<ItemSintoma> items,
+                                  List<OpcionFrecuencia> opciones) {
     }
 
     private ResultadoAplicacion buscarResultado(DatosAplicacion datos) {

@@ -6,6 +6,10 @@ import com.riesgopsicosocial.domain.model.informe.DatosCliente;
 import com.riesgopsicosocial.domain.model.informe.DatosEvaluado;
 import com.riesgopsicosocial.domain.model.informe.DatosEvaluador;
 import com.riesgopsicosocial.domain.model.informe.FirmaEvaluador;
+import com.riesgopsicosocial.domain.model.informe.empresa.DimensionInforme;
+import com.riesgopsicosocial.domain.model.informe.empresa.ItemSintoma;
+import com.riesgopsicosocial.domain.model.informe.empresa.OpcionFrecuencia;
+import com.riesgopsicosocial.domain.model.informe.empresa.RespuestaSintoma;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cliente.ClienteJpaRepository;
@@ -20,6 +24,7 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.sexo.SexoEnt
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.sexo.SexoJpaRepository;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,6 +42,7 @@ public class InformeEvaluadoPersistenceAdapter implements InformeEvaluadoPort {
     private final GrupoOcupacionalJpaRepository grupoOcupacionalRepository;
     private final SexoJpaRepository sexoRepository;
     private final EvaluadorJpaRepository evaluadorRepository;
+    private final SintomasEstresLoader sintomasEstres;
 
     public InformeEvaluadoPersistenceAdapter(ClienteJpaRepository clienteRepository,
                                              EvaluadoJpaRepository evaluadoRepository,
@@ -44,7 +50,8 @@ public class InformeEvaluadoPersistenceAdapter implements InformeEvaluadoPort {
                                              AplicacionJpaRepository aplicacionRepository,
                                              GrupoOcupacionalJpaRepository grupoOcupacionalRepository,
                                              SexoJpaRepository sexoRepository,
-                                             EvaluadorJpaRepository evaluadorRepository) {
+                                             EvaluadorJpaRepository evaluadorRepository,
+                                             SintomasEstresLoader sintomasEstres) {
         this.clienteRepository = clienteRepository;
         this.evaluadoRepository = evaluadoRepository;
         this.evaluadoClienteRepository = evaluadoClienteRepository;
@@ -52,6 +59,7 @@ public class InformeEvaluadoPersistenceAdapter implements InformeEvaluadoPort {
         this.grupoOcupacionalRepository = grupoOcupacionalRepository;
         this.sexoRepository = sexoRepository;
         this.evaluadorRepository = evaluadorRepository;
+        this.sintomasEstres = sintomasEstres;
     }
 
     @Override
@@ -107,6 +115,26 @@ public class InformeEvaluadoPersistenceAdapter implements InformeEvaluadoPort {
         return evaluadorRepository.findById(idEvaluador)
                 .filter(e -> e.getFirma() != null)
                 .map(e -> new FirmaEvaluador(e.getFirma(), e.getFirmaTipoContenido()));
+    }
+
+    @Override
+    public List<DimensionInforme> buscarDimensionesEstres() {
+        return sintomasEstres.buscarDimensiones();
+    }
+
+    @Override
+    public List<ItemSintoma> buscarItemsEstres() {
+        return sintomasEstres.buscarItems();
+    }
+
+    @Override
+    public List<OpcionFrecuencia> buscarOpcionesEstres() {
+        return sintomasEstres.buscarOpciones();
+    }
+
+    @Override
+    public List<RespuestaSintoma> buscarRespuestasEstres(Collection<Long> idsAplicacion) {
+        return sintomasEstres.buscarRespuestas(idsAplicacion);
     }
 
     private static DatosEvaluador toDatosEvaluador(EvaluadorEntity e) {

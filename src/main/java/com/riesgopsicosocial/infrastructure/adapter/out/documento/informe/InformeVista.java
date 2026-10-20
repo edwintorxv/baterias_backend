@@ -22,6 +22,8 @@ public record InformeVista(
     /**
      * @param totalGeneral {@code null} si la aplicación no tiene intralaboral y extralaboral
      * @param incluyeEstres para agregar la interpretación de los niveles de estrés
+     * @param sintomasFrecuentes síntomas de estrés reportados Siempre o Casi siempre, por dimensión; vacía si
+     *                           la aplicación no tiene resultado de estrés (por ahora solo los muestra el Word)
      */
     public record AplicacionVista(
             String fechaAplicacion,
@@ -34,8 +36,21 @@ public record InformeVista(
             FilaVista totalGeneral,
             boolean incluyeEstres,
             String observaciones,
-            String recomendaciones
+            String recomendaciones,
+            List<GrupoSintomasVista> sintomasFrecuentes
     ) {
+
+        public boolean sinSintomasFrecuentes() {
+            return sintomasFrecuentes.stream().allMatch(g -> g.sintomas().isEmpty());
+        }
+
+    }
+
+    /** Dimensión del cuestionario de estrés con sus síntomas frecuentes (vacía si ninguno). */
+    public record GrupoSintomasVista(String nombre, List<SintomaVista> sintomas) {
+    }
+
+    public record SintomaVista(String descripcion, String frecuencia) {
     }
 
     /** @param firma imagen PNG/JPG; {@code null} si el evaluador no la ha cargado */

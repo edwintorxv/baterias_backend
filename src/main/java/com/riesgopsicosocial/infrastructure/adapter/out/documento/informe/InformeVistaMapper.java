@@ -58,6 +58,7 @@ public class InformeVistaMapper {
         DatosAplicacion datos = aplicacion.datos();
         ResultadoAplicacion resultado = aplicacion.resultado();
         List<CuestionarioVista> cuestionarios = resultado.cuestionarios().stream().map(this::toVista).toList();
+        boolean incluyeEstres = cuestionarios.stream().anyMatch(c -> c.tipo() == TipoCuestionario.ESTRES);
         return new AplicacionVista(
                 datos.fechaAplicacion().format(FECHA),
                 texto(datos.nombreCargo()),
@@ -67,9 +68,18 @@ public class InformeVistaMapper {
                 toVista(datos.evaluador(), firmas.get(datos.evaluador().id())),
                 cuestionarios,
                 toVista(resultado.totalGeneral()),
-                cuestionarios.stream().anyMatch(c -> c.tipo() == TipoCuestionario.ESTRES),
+                incluyeEstres,
                 datos.observaciones(),
-                datos.recomendaciones());
+                datos.recomendaciones(),
+                incluyeEstres ? sintomasFrecuentes(aplicacion.sintomasFrecuentes()) : List.of());
+    }
+
+    private static List<GrupoSintomasVista> sintomasFrecuentes(List<GrupoSintomas> grupos) {
+        return grupos.stream()
+                .map(g -> new GrupoSintomasVista(g.nombre(), g.sintomas().stream()
+                        .map(s -> new SintomaVista(s.descripcion(), s.frecuencia()))
+                        .toList()))
+                .toList();
     }
 
     private EvaluadorVista toVista(DatosEvaluador evaluador, FirmaEvaluador firma) {

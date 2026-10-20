@@ -46,8 +46,6 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadoclie
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluadocliente.EvaluadoClienteJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.informeempresa.InformeEmpresaJpaRepository;
-import com.riesgopsicosocial.infrastructure.adapter.out.persistence.opcionrespuesta.OpcionRespuestaJpaRepository;
-import com.riesgopsicosocial.infrastructure.adapter.out.persistence.pregunta.PreguntaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.respuesta.RespuestaJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultado.CatalogoCalculoLoader;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.resultadocuestionario.ResultadoCuestionarioEntity;
@@ -85,10 +83,9 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
     private final DimensionCuestionarioJpaRepository dimensionCuestionarioRepository;
     private final DimensionJpaRespository dimensionRepository;
     private final CiudadMunicipioJpaResository ciudadRepository;
-    private final OpcionRespuestaJpaRepository opcionRespuestaRepository;
-    private final PreguntaJpaRepository preguntaRepository;
     private final BaremoCuestionarioJpaRepository baremoCuestionarioRepository;
     private final FichasPersonaLoader fichasPersona;
+    private final SintomasEstresLoader sintomasEstres;
     private final InformeEmpresaJpaRepository informeEmpresaRepository;
     private final EvaluadorJpaRepository evaluadorRepository;
     private final CatalogoCalculoLoader catalogo;
@@ -107,10 +104,9 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
                                             DimensionCuestionarioJpaRepository dimensionCuestionarioRepository,
                                             DimensionJpaRespository dimensionRepository,
                                             CiudadMunicipioJpaResository ciudadRepository,
-                                            OpcionRespuestaJpaRepository opcionRespuestaRepository,
-                                            PreguntaJpaRepository preguntaRepository,
                                             BaremoCuestionarioJpaRepository baremoCuestionarioRepository,
                                             FichasPersonaLoader fichasPersona,
+                                            SintomasEstresLoader sintomasEstres,
                                             InformeEmpresaJpaRepository informeEmpresaRepository,
                                             EvaluadorJpaRepository evaluadorRepository,
                                             CatalogoCalculoLoader catalogo) {
@@ -128,10 +124,9 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
         this.dimensionCuestionarioRepository = dimensionCuestionarioRepository;
         this.dimensionRepository = dimensionRepository;
         this.ciudadRepository = ciudadRepository;
-        this.opcionRespuestaRepository = opcionRespuestaRepository;
-        this.preguntaRepository = preguntaRepository;
         this.baremoCuestionarioRepository = baremoCuestionarioRepository;
         this.fichasPersona = fichasPersona;
+        this.sintomasEstres = sintomasEstres;
         this.informeEmpresaRepository = informeEmpresaRepository;
         this.evaluadorRepository = evaluadorRepository;
         this.catalogo = catalogo;
@@ -257,39 +252,17 @@ public class InformeEmpresaPersistenceAdapter implements InformeEmpresaPort {
 
     @Override
     public List<RespuestaSintoma> buscarRespuestasEstres(Collection<Long> idsAplicacion) {
-        if (idsAplicacion.isEmpty()) {
-            return List.of();
-        }
-        return respuestaRepository.buscarPorMetodoCalculo(idsAplicacion, MetodoCalculo.PROMEDIO_PONDERADO).stream()
-                .map(r -> new RespuestaSintoma(r.getFkAplicacion(), r.getFkPregunta(), r.getFkDimensionCuestionario(),
-                        r.getFkOpcionRespuesta()))
-                .toList();
+        return sintomasEstres.buscarRespuestas(idsAplicacion);
     }
 
     @Override
     public List<OpcionFrecuencia> buscarOpcionesEstres() {
-        return opcionRespuestaRepository.buscarPorMetodoCalculo(MetodoCalculo.PROMEDIO_PONDERADO).stream()
-                .map(o -> new OpcionFrecuencia(o.getId(), o.getNombre()))
-                .toList();
+        return sintomasEstres.buscarOpciones();
     }
 
-    /** Preguntas de las dimensiones del cuestionario de estrés (el de promedio ponderado). */
     @Override
     public List<ItemSintoma> buscarItemsEstres() {
-        Set<Long> estres = cuestionarioRepository.findAll().stream()
-                .filter(c -> c.getMetodoCalculo() == MetodoCalculo.PROMEDIO_PONDERADO)
-                .map(CuestionarioEntity::getId)
-                .collect(Collectors.toSet());
-        Set<Long> dimensiones = dimensionCuestionarioRepository.findAll().stream()
-                .filter(dc -> estres.contains(dc.getFkCuestionario()))
-                .map(DimensionCuestionarioEntity::getId)
-                .collect(Collectors.toSet());
-        if (dimensiones.isEmpty()) {
-            return List.of();
-        }
-        return preguntaRepository.findByFkDimensionCuestionarioIn(dimensiones).stream()
-                .map(p -> new ItemSintoma(p.getId(), p.getFkDimensionCuestionario(), p.getNumero(), p.getDescripcion()))
-                .toList();
+        return sintomasEstres.buscarItems();
     }
 
     @Override

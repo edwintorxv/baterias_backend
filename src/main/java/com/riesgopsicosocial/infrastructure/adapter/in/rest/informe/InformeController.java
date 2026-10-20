@@ -12,7 +12,9 @@ import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.Aplicaci
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.ClienteInformeResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.EvaluadoInformeResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.EvaluadorInformeResponse;
+import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.GrupoSintomasResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.InformeEvaluadoResponse;
+import com.riesgopsicosocial.infrastructure.adapter.in.rest.informe.dto.SintomaFrecuenteResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.resultado.ResultadoResponseMapper;
 import com.riesgopsicosocial.shared.exception.ValidationException;
 import com.riesgopsicosocial.shared.response.ApiResponse;
@@ -65,7 +67,12 @@ public class InformeController {
                 datos.observaciones(),
                 datos.recomendaciones(),
                 aplicacion.tieneResultados() ? "CALCULADO" : "PENDIENTE",
-                aplicacion.tieneResultados() ? ResultadoResponseMapper.toResponse(aplicacion.resultado()) : null
+                aplicacion.tieneResultados() ? ResultadoResponseMapper.toResponse(aplicacion.resultado()) : null,
+                aplicacion.sintomasFrecuentes().stream()
+                        .map(g -> new GrupoSintomasResponse(g.nombre(), g.sintomas().stream()
+                                .map(s -> new SintomaFrecuenteResponse(s.numero(), s.descripcion(), s.frecuencia()))
+                                .toList()))
+                        .toList()
         );
     }
 
