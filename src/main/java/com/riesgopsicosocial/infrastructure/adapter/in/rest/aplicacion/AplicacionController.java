@@ -1,9 +1,12 @@
 package com.riesgopsicosocial.infrastructure.adapter.in.rest.aplicacion;
 
+import com.riesgopsicosocial.infrastructure.adapter.in.rest.aplicacion.dto.AplicacionListadoResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.aplicacion.dto.AplicacionRequest;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.aplicacion.dto.AplicacionResponse;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionEntity;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionListadoFila;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionService;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.respuesta.EstadoAplicacion;
 import com.riesgopsicosocial.infrastructure.security.AlcanceUsuario;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
@@ -103,6 +106,37 @@ public class AplicacionController {
                 .collect(Collectors
                         .toList());
         return ResponseEntity.ok(ResponseBuilder.success("Listado de aplicaciones", data));
+    }
+
+    /**
+     * Listado general: las aplicaciones de los clientes asignados (o de uno de ellos), del año si viene,
+     * con la persona, el avance y el estado calculado. Solo el psicólogo (SecurityConfig).
+     */
+    @GetMapping("/listado")
+    public ResponseEntity<ApiResponse<List<AplicacionListadoResponse>>> listado(
+            @RequestParam(required = false) Long idCliente,
+            @RequestParam(required = false) Integer anio) {
+        Set<Long> clientes;
+        if (idCliente != null) {
+            alcance.exigirCliente(idCliente);
+            clientes = Set.of(idCliente);
+        } else {
+            clientes = alcance.clientesVisibles().orElse(Set.of()); // el ADMIN no llega aquí
+        }
+        List<AplicacionListadoResponse> data = service.listado(clientes, anio).stream()
+                .map(AplicacionController::toListado)
+                .toList();
+        return ResponseEntity.ok(ResponseBuilder.success("Listado de aplicaciones", data));
+    }
+
+    private static AplicacionListadoResponse toListado(AplicacionListadoFila fila) {
+        int aplicables = fila.getAplicables().intValue();
+        int respondidas = fila.getRespondidas().intValue();
+        return new AplicacionListadoResponse(fila.getId(), fila.getFechaAplicacion(), fila.getIdCliente(), fila.getCliente(),
+                fila.getIdRelacion(), fila.getRelacionActiva(), fila.getIdEvaluado(), fila.getNumeroIdentificacion(),
+                fila.getNombre(), fila.getApellido(), fila.getForma(), fila.getIdEvaluador(), fila.getEvaluador(),
+                aplicables, respondidas,
+                EstadoAplicacion.de(fila.getConRespuestas(), fila.getConResultados(), respondidas == aplicables));
     }
 
     @GetMapping("/{id}")

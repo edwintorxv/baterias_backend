@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 @Service
@@ -38,6 +39,12 @@ public class AplicacionService {
         this.tipoCargoRepository = tipoCargoRepository;
         this.evaluadorRepository = evaluadorRepository;
         this.borradoResultados = borradoResultados;
+    }
+
+    /** Listado general de las aplicaciones de esos clientes (del año, si viene). */
+    @Transactional(readOnly = true)
+    public List<AplicacionListadoFila> listado(Collection<Long> fksCliente, Integer anio) {
+        return fksCliente.isEmpty() ? List.of() : repository.listado(fksCliente, anio);
     }
 
     public AplicacionEntity crear(AplicacionEntity entidad) {

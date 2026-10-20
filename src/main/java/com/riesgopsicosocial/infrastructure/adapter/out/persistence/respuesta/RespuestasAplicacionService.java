@@ -201,14 +201,8 @@ public class RespuestasAplicacionService {
     }
 
     private EstadoAplicacion estado(Long idAplicacion, boolean sinRespuestas, List<FormularioAplicacion.Cuestionario> cuestionarios) {
-        if (sinRespuestas) {
-            return EstadoAplicacion.SIN_RESPUESTAS;
-        }
-        if (borradoResultados.tieneResultados(idAplicacion)) {
-            return EstadoAplicacion.CALCULADA;
-        }
         boolean completa = cuestionarios.stream().allMatch(c -> c.respondidas() == c.aplicables());
-        return completa ? EstadoAplicacion.PENDIENTE_CALCULO : EstadoAplicacion.INCOMPLETA;
+        return EstadoAplicacion.de(!sinRespuestas, !sinRespuestas && borradoResultados.tieneResultados(idAplicacion), completa);
     }
 
     /** Los cuestionarios con baremos para el grupo ocupacional de la aplicación, en el orden de sus ids (A/B, C, D). */

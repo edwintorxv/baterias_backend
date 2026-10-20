@@ -16,6 +16,17 @@ public enum EstadoAplicacion {
     PENDIENTE_CALCULO,
 
     /** Con resultados calculados. */
-    CALCULADA
+    CALCULADA;
+
+    /** La misma regla para el formulario y el listado: sin respuestas primero, luego con resultados. */
+    public static EstadoAplicacion de(boolean conRespuestas, boolean conResultados, boolean completa) {
+        if (!conRespuestas) {
+            return SIN_RESPUESTAS;
+        }
+        if (conResultados) {
+            return CALCULADA;
+        }
+        return completa ? PENDIENTE_CALCULO : INCOMPLETA;
+    }
 
 }

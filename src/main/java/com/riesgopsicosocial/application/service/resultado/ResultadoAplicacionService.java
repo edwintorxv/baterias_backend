@@ -12,6 +12,7 @@ import com.riesgopsicosocial.domain.model.resultado.ResultadoAplicacion;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoCuestionario;
 import com.riesgopsicosocial.domain.model.resultado.ResultadoTotalGeneral;
 import com.riesgopsicosocial.domain.service.resultado.CalculadoraResultado;
+import com.riesgopsicosocial.domain.service.resultado.VerificadorAplicacionCompleta;
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -44,17 +45,19 @@ public class ResultadoAplicacionService implements CalcularResultadosUseCase, Co
         }
         FiltrosAplicacion filtros = datosCalculoPort.buscarFiltros(idAplicacion);
 
-        // Solo se calculan los cuestionarios que tienen al menos una respuesta (ej. A + C + D).
-        Map<Long, List<RespuestaCalculo>> porCuestionario = respuestas.stream()
-                .collect(Collectors.groupingBy(RespuestaCalculo::idCuestionario, TreeMap::new, Collectors.toList()));
-
+        // Se calculan todos los cuestionarios del grupo (A o B, C y D) y solo con la aplicación completa.
         Map<Long, ConfiguracionCuestionario> configuraciones = new TreeMap<>();
-        porCuestionario.keySet().forEach(id -> configuraciones.put(id, datosCalculoPort.cargarConfiguracion(id, idGrupo)));
+        datosCalculoPort.buscarCuestionariosDelGrupo(idGrupo)
+                .forEach(id -> configuraciones.put(id, datosCalculoPort.cargarConfiguracion(id, idGrupo)));
+        validarCuestionariosDelGrupo(idAplicacion, respuestas, configuraciones.keySet());
         validarUnSoloCuestionarioPorTipo(idAplicacion, configuraciones.values());
+        VerificadorAplicacionCompleta.exigirCompleta(configuraciones.values(), respuestas, filtros);
 
+        Map<Long, List<RespuestaCalculo>> porCuestionario = respuestas.stream()
+                .collect(Collectors.groupingBy(RespuestaCalculo::idCuestionario));
         Map<Long, ResultadoCuestionario> cuestionarios = new TreeMap<>();
-        porCuestionario.forEach((idCuestionario, suyas) ->
-                cuestionarios.put(idCuestionario, calculadora.calcular(configuraciones.get(idCuestionario), suyas, filtros)));
+        configuraciones.forEach((idCuestionario, config) -> cuestionarios.put(idCuestionario,
+                calculadora.calcular(config, porCuestionario.getOrDefault(idCuestionario, List.of()), filtros)));
 
         ResultadoAplicacion resultado = new ResultadoAplicacion(idAplicacion, idGrupo, LocalDateTime.now(),
                 List.copyOf(cuestionarios.values()), calcularTotalGeneral(configuraciones, cuestionarios));
@@ -67,6 +70,21 @@ public class ResultadoAplicacionService implements CalcularResultadosUseCase, Co
     public ResultadoAplicacion consultar(Long idAplicacion) {
         Long idGrupo = obtenerGrupo(idAplicacion);
         return resultadoPort.buscarPorAplicacion(idAplicacion, idGrupo);
+    }
+
+    /** Respuestas de un cuestionario que no es del grupo (p. ej. quedaron de antes de cambiar el grupo): no se calcula. */
+    private void validarCuestionariosDelGrupo(Long idAplicacion, List<RespuestaCalculo> respuestas, Set<Long> delGrupo) {
+        if (delGrupo.isEmpty()) {
+            throw new BusinessException("El grupo ocupacional de la aplicación " + idAplicacion + " no tiene cuestionarios configurados");
+        }
+        Set<Long> ajenos = respuestas.stream()
+                .map(RespuestaCalculo::idCuestionario)
+                .filter(id -> !delGrupo.contains(id))
+                .collect(Collectors.toCollection(TreeSet::new));
+        if (!ajenos.isEmpty()) {
+            throw new BusinessException("La aplicación " + idAplicacion + " tiene respuestas de cuestionarios que no son de su"
+                    + " grupo ocupacional (ids " + ajenos + ")");
+        }
     }
 
     /**

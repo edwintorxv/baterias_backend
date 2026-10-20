@@ -22,6 +22,9 @@ public interface DatosCalculoPort {
 
     List<RespuestaCalculo> buscarRespuestas(Long idAplicacion);
 
+    /** Cuestionarios que se le aplican al grupo ocupacional (los que tienen baremos para él), por id. */
+    List<Long> buscarCuestionariosDelGrupo(Long idGrupoOcupacional);
+
     /** Estructura del cuestionario con los baremos del grupo ocupacional indicado. */
     ConfiguracionCuestionario cargarConfiguracion(Long idCuestionario, Long idGrupoOcupacional);
 

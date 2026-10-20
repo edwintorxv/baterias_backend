@@ -4,6 +4,8 @@ import com.riesgopsicosocial.application.port.out.resultado.DatosCalculoPort;
 import com.riesgopsicosocial.domain.model.resultado.configuracion.*;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionJpaRepository;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremocuestionario.BaremoCuestionarioEntity;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.baremocuestionario.BaremoCuestionarioJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.dimensioncuestionario.DimensionCuestionarioEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.dimensioncuestionario.DimensionCuestionarioJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.pregunta.PreguntaEntity;
@@ -23,17 +25,20 @@ public class DatosCalculoPersistenceAdapter implements DatosCalculoPort {
     private final RespuestaJpaRepository respuestaRepository;
     private final PreguntaJpaRepository preguntaRepository;
     private final DimensionCuestionarioJpaRepository dimensionCuestionarioRepository;
+    private final BaremoCuestionarioJpaRepository baremoCuestionarioRepository;
     private final CatalogoCalculoLoader catalogo;
 
     public DatosCalculoPersistenceAdapter(AplicacionJpaRepository aplicacionRepository,
                                           RespuestaJpaRepository respuestaRepository,
                                           PreguntaJpaRepository preguntaRepository,
                                           DimensionCuestionarioJpaRepository dimensionCuestionarioRepository,
+                                          BaremoCuestionarioJpaRepository baremoCuestionarioRepository,
                                           CatalogoCalculoLoader catalogo) {
         this.aplicacionRepository = aplicacionRepository;
         this.respuestaRepository = respuestaRepository;
         this.preguntaRepository = preguntaRepository;
         this.dimensionCuestionarioRepository = dimensionCuestionarioRepository;
+        this.baremoCuestionarioRepository = baremoCuestionarioRepository;
         this.catalogo = catalogo;
     }
 
@@ -70,6 +75,15 @@ public class DatosCalculoPersistenceAdapter implements DatosCalculoPort {
                     DimensionCuestionarioEntity dc = dimensiones.get(pregunta.getFkDimensionCuestionario());
                     return new RespuestaCalculo(pregunta.getId(), dc.getId(), dc.getFkCuestionario(), r.getValorObtenido());
                 })
+                .toList();
+    }
+
+    @Override
+    public List<Long> buscarCuestionariosDelGrupo(Long idGrupoOcupacional) {
+        return baremoCuestionarioRepository.findByFkGrupoOcupacional(idGrupoOcupacional).stream()
+                .map(BaremoCuestionarioEntity::getFkCuestionario)
+                .distinct()
+                .sorted()
                 .toList();
     }
 

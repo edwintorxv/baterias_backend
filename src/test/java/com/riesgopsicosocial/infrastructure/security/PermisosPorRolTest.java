@@ -125,6 +125,7 @@ class PermisosPorRolTest {
 
             caso(POST, "/aplicaciones", PSICOLOGO),
             caso(POST, "/aplicaciones/1/resultados", PSICOLOGO),
+            caso(GET, "/aplicaciones/listado", PSICOLOGO),
             caso(GET, "/respuestas", PSICOLOGO),
             caso(PUT, "/evaluados/3", PSICOLOGO),
             caso(GET, "/evaluado-clientes", PSICOLOGO),
