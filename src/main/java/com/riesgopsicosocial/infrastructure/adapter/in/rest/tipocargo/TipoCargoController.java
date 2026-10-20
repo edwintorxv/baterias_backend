@@ -1,10 +1,8 @@
 package com.riesgopsicosocial.infrastructure.adapter.in.rest.tipocargo;
 
+import com.riesgopsicosocial.infrastructure.adapter.in.rest.tipocargo.dto.TipoCargoResponse;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.tipocargo.TipoCargoEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.tipocargo.TipoCargoService;
-import com.riesgopsicosocial.infrastructure.adapter.out.persistence.tipovivienda.TipoViviendaService;
-import com.riesgopsicosocial.shared.catalogo.CatalogoCrudController;
-import com.riesgopsicosocial.shared.catalogo.CatalogoResponse;
 import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import org.springframework.http.ResponseEntity;
@@ -25,18 +23,18 @@ public class TipoCargoController {
         this.service = service;
     }
 
-    private CatalogoResponse toResponse(TipoCargoEntity entity) {
-        return new CatalogoResponse(entity.getId(), entity.getNombre());
+    private TipoCargoResponse toResponse(TipoCargoEntity entity) {
+        return new TipoCargoResponse(entity.getId(), entity.getFkGrupoOcupacional(), entity.getNombre());
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<CatalogoResponse>>> listarTodos() {
-        List<CatalogoResponse> data = service.listarTodos()
+    public ResponseEntity<ApiResponse<List<TipoCargoResponse>>> listarTodos() {
+        List<TipoCargoResponse> data = service.listarTodos()
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
 
-        return ResponseEntity.ok(ResponseBuilder.success("Listado de Tipo contrato", data));
+        return ResponseEntity.ok(ResponseBuilder.success("Listado de Tipo cargo", data));
     }
 
 }
