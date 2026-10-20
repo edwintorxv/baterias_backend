@@ -4,11 +4,15 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.cliente.Clie
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluado.EvaluadoJpaRepository;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.EvaluadorJpaRepository;
+import com.riesgopsicosocial.infrastructure.security.UsuarioAutenticado;
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import com.riesgopsicosocial.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -123,6 +127,53 @@ class UsuarioServiceTest {
         assertEquals(Rol.ADMIN, actualizado.getRol());
         assertNull(actualizado.getFkEvaluador());
         verify(usuarioClienteRepository).borrarDeUsuario(5L);
+    }
+
+    @Test
+    void actualizar_aSiMismo_noSeCambiaElRolNiSeInactiva() {
+        UsuarioEntity yo = usuario("admin", Rol.ADMIN);
+        yo.setId(1L);
+        yo.setActivo(true);
+        when(repository.findById(1L)).thenReturn(Optional.of(yo));
+        when(repository.countByRolAndActivo(Rol.ADMIN, true)).thenReturn(3L);
+        iniciarSesion(1L);
+        try {
+            UsuarioEntity inactivo = usuario("admin", Rol.ADMIN);
+            inactivo.setActivo(false);
+            assertThrows(BusinessException.class, () -> service.actualizar(1L, inactivo));
+            UsuarioEntity otroRol = usuario("admin", Rol.CLIENTE);
+            otroRol.setFkCliente(1L);
+            assertThrows(BusinessException.class, () -> service.actualizar(1L, otroRol));
+
+            UsuarioEntity soloNombre = usuario("admin", Rol.ADMIN);
+            soloNombre.setNombre("Otro nombre");
+            assertEquals("Otro nombre", service.actualizar(1L, soloNombre).getNombre(), "sus datos sí los cambia");
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void actualizar_ultimoAdministradorActivo_noSeQuita() {
+        UsuarioEntity otro = usuario("admin2", Rol.ADMIN);
+        otro.setId(2L);
+        otro.setActivo(true);
+        when(repository.findById(2L)).thenReturn(Optional.of(otro));
+        UsuarioEntity inactivo = usuario("admin2", Rol.ADMIN);
+        inactivo.setActivo(false);
+
+        when(repository.countByRolAndActivo(Rol.ADMIN, true)).thenReturn(1L);
+        BusinessException error = assertThrows(BusinessException.class, () -> service.actualizar(2L, inactivo));
+        assertEquals("Debe quedar al menos un administrador activo", error.getMessage());
+
+        when(repository.countByRolAndActivo(Rol.ADMIN, true)).thenReturn(2L);
+        assertFalse(service.actualizar(2L, inactivo).getActivo(), "con otro administrador activo, sí");
+    }
+
+    private static void iniciarSesion(Long id) {
+        UsuarioAutenticado usuario = new UsuarioAutenticado(id, "u" + id, "Prueba", Rol.ADMIN, null, null, null);
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(usuario, null,
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
     }
 
     @Test

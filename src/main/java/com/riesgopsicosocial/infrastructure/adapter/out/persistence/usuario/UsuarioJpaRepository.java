@@ -21,4 +21,6 @@ public interface UsuarioJpaRepository extends JpaRepository<UsuarioEntity, Long>
 
     List<UsuarioEntity> findByRolAndActivo(Rol rol, Boolean activo);
 
+    long countByRolAndActivo(Rol rol, Boolean activo);
+
 }

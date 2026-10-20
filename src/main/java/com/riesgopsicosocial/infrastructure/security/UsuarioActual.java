@@ -20,4 +20,11 @@ public final class UsuarioActual {
                 ? usuario.usuario() : SISTEMA;
     }
 
+    /** Id del usuario de la sesión; {@code null} sin sesión. */
+    public static Long id() {
+        Authentication autenticacion = SecurityContextHolder.getContext().getAuthentication();
+        return autenticacion != null && autenticacion.getPrincipal() instanceof UsuarioAutenticado usuario
+                ? usuario.id() : null;
+    }
+
 }

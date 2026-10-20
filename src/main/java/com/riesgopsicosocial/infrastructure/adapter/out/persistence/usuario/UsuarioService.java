@@ -57,7 +57,8 @@ public class UsuarioService {
 
     /**
      * La contraseña no se toca aquí: tiene su propio endpoint. Si deja de ser psicólogo, pierde sus
-     * clientes asignados.
+     * clientes asignados. Para no quedarse sin administración: nadie se cambia el rol ni se inactiva a
+     * sí mismo, y siempre queda al menos un ADMIN activo.
      */
     @Transactional
     public UsuarioEntity actualizar(Long id, UsuarioEntity datos) {
@@ -66,6 +67,7 @@ public class UsuarioService {
         if (!existente.getUsuario().equalsIgnoreCase(usuario) && repository.existsByUsuarioIgnoreCase(usuario)) {
             throw new BusinessException("Ya existe un usuario: " + usuario);
         }
+        validarQueQuedeAdministracion(existente, datos);
         validarVinculo(datos, existente);
         if (existente.getRol() == Rol.PSICOLOGO && datos.getRol() != Rol.PSICOLOGO) {
             usuarioClienteRepository.borrarDeUsuario(id);
@@ -83,6 +85,22 @@ public class UsuarioService {
         existente.setFechaModificado(LocalDateTime.now());
         existente.setUsuarioModifica(UsuarioActual.nombre());
         return repository.save(existente);
+    }
+
+    private void validarQueQuedeAdministracion(UsuarioEntity existente, UsuarioEntity datos) {
+        boolean activoAntes = Boolean.TRUE.equals(existente.getActivo());
+        boolean activoDespues = datos.getActivo() != null ? datos.getActivo() : activoAntes;
+        boolean cambiaRol = existente.getRol() != datos.getRol();
+        boolean seInactiva = activoAntes && !activoDespues;
+
+        if ((cambiaRol || seInactiva) && existente.getId().equals(UsuarioActual.id())) {
+            throw new BusinessException("No puede cambiarse el rol ni inactivarse a sí mismo: pídaselo a otro administrador");
+        }
+        boolean dejaDeSerAdminActivo = existente.getRol() == Rol.ADMIN && activoAntes
+                && (datos.getRol() != Rol.ADMIN || !activoDespues);
+        if (dejaDeSerAdminActivo && repository.countByRolAndActivo(Rol.ADMIN, true) <= 1) {
+            throw new BusinessException("Debe quedar al menos un administrador activo");
+        }
     }
 
     /** Restablece la contraseña (la escoge el administrador). */
