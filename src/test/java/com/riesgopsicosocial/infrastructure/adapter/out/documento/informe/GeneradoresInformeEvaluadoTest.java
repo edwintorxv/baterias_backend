@@ -35,6 +35,12 @@ class GeneradoresInformeEvaluadoTest {
             "intralaboral forma A + extralaboral", "48,1",
             "Riesgo muy alto", "Riesgo bajo", "Observación 1", "Recomendación 1", "08/10/2026");
 
+    /** Síntomas de estrés frecuentes: los dos formatos los traen igual (el subtítulo va en mayúsculas). */
+    private static final List<String> TEXTOS_SINTOMAS = List.of(
+            "SÍNTOMAS REPORTADOS CON FRECUENCIA (SIEMPRE O CASI SIEMPRE)", "Síntomas fisiológicos",
+            "Dolores en el cuello y espalda o tensión muscular.", "Casi siempre",
+            "Síntomas de comportamiento social", "Ninguno con frecuencia");
+
     private final InformeVistaMapper mapper = new InformeVistaMapper();
 
     @Test
@@ -60,16 +66,23 @@ class GeneradoresInformeEvaluadoTest {
     }
 
     @Test
+    void pdf_traeLosSintomasFrecuentesPorGrupo() throws Exception {
+        byte[] pdf = new PdfInformeEvaluadoGenerator(mapper).generar(informe(), Map.of(), LocalDate.of(2026, 10, 8));
+
+        try (PDDocument documento = Loader.loadPDF(pdf)) {
+            String texto = new PDFTextStripper().getText(documento).replaceAll("\\s+", " ");
+            TEXTOS_SINTOMAS.forEach(esperado -> assertTrue(texto.contains(esperado), "falta en el PDF: " + esperado));
+        }
+    }
+
+    @Test
     void docx_traeLosSintomasFrecuentesPorGrupo() throws Exception {
         byte[] docx = new DocxInformeEvaluadoGenerator(mapper).generar(informe(), Map.of(), LocalDate.of(2026, 10, 8));
 
         try (XWPFDocument documento = new XWPFDocument(new ByteArrayInputStream(docx));
              XWPFWordExtractor extractor = new XWPFWordExtractor(documento)) {
             String texto = extractor.getText().replaceAll("\\s+", " ");
-            List.of("SÍNTOMAS REPORTADOS CON FRECUENCIA (SIEMPRE O CASI SIEMPRE)", "Síntomas fisiológicos",
-                            "Dolores en el cuello y espalda o tensión muscular.", "Casi siempre",
-                            "Síntomas de comportamiento social", "Ninguno con frecuencia")
-                    .forEach(esperado -> assertTrue(texto.contains(esperado), "falta en el Word: " + esperado));
+            TEXTOS_SINTOMAS.forEach(esperado -> assertTrue(texto.contains(esperado), "falta en el Word: " + esperado));
         }
     }
 

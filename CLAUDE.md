@@ -3,7 +3,7 @@
 > Resumen para retomar el desarrollo. Última actualización: 2026-10-20.
 > Forma de trabajo: **paso a paso** (diseño → código → el usuario revisa → commit/push cuando lo pide).
 
-**Para retomar (2026-10-20)**: 166 tests, migraciones hasta V18. Hoy: informe individual por fila en el front (diálogo con resultados, firmante, observaciones, recomendaciones y descarga PDF/Word) y síntomas de estrés frecuentes (Siempre/Casi siempre) en el JSON y el Word del individual.
+**Para retomar (2026-10-20)**: 167 tests, migraciones hasta V18. Hoy: informe individual por fila en el front (diálogo con resultados, firmante, observaciones, recomendaciones y descarga PDF/Word) y síntomas de estrés frecuentes (Siempre/Casi siempre) en el JSON, el Word y el PDF del individual.
 - Hecho el 2026-10-19: V17 (datos por relación + vigencia), vincular persona / una sola empresa activa, carga por archivo (plantilla Excel), relación inactiva no se edita, V18 (departamentos); en el front: carga por archivo, vincular, editar/inactivar/activar, Administración → Usuarios (clientes asignados).
 - **Siguiente (a elegir por el usuario)**: crear/editar usuarios y contraseña, o administración de evaluadores (datos profesionales, activo, firma).
 
@@ -14,7 +14,7 @@
 - **Datos maestros en la V16** (catálogos, geografía, cuestionarios, preguntas, escalas y baremos; idempotente con `ON CONFLICT DO NOTHING`): una BD vacía queda lista con V1..V16 y arranca con el primer admin. Los **datos de prueba** (cliente, evaluados, aplicaciones, respuestas, resultados, evaluador, usuarios) viven solo en la BD local: para llevarlos a otra máquina, `pg_dump -F c` + `pg_restore` (el `.dump` tiene datos de evaluados: **no subirlo a git**). Si cambia un dato maestro, va en una migración nueva (no editar la V16).
 - **La app la arranca el usuario en IntelliJ (8080)**: no levantar/detener instancias sin avisar. Tiene **spring-boot-devtools**: un `mvnw compile`/`test` la reinicia sola y Flyway aplica migraciones nuevas en la BD local; `@SpringBootTest` también corre contra la BD local. Avisar antes de compilar si hay una migración nueva.
 - **Dependencia nueva en el `pom.xml`** → devtools no la carga y la app queda caída: el usuario recarga Maven y reinicia en IntelliJ (avisarle).
-- Tests: `sh mvnw test` → **166** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
+- Tests: `sh mvnw test` → **167** (dominio, servicios con fakes/Mockito, generadores Word/PDF, mapper JSON, seguridad con `@WebMvcTest`, ArchUnit, contexto).
 - Manuales y Res. 2764 de 2022 en PDF (fuera del repo): `/Users/edwingacha/proyectos/Documentacion/baterias/` (texto en macOS con `osascript -l JavaScript` + PDFKit). El `.pptx` de ejemplo de informe de empresa tiene datos reales: no subirlo.
 
 ## 1. Stack y arquitectura
@@ -64,7 +64,7 @@ Reglas ArchUnit (`ArquitecturaHexagonalTest`): domain solo `java..`; application
 - Aplicación sin evaluador o sin resultados → 409. PDF y Word salen de `InformeVista` (`InformeVistaMapper`).
 - **Evaluador** (V10): CRUD `/evaluadores` (sin DELETE, `activo`), firma por `PUT /evaluadores/{id}/firma` (PNG/JPG ≤ 1 MB). Solo se asignan evaluadores activos; quien ya lo tenía lo conserva aunque se inactive.
 - El informe individual es del trabajador (historia clínica): para el psicólogo, no para el cliente. **Confidencialidad (decisión del usuario 2026-10-20)**: lo ve cualquier psicólogo asignado al cliente (no solo el firmante); firmante, observaciones y recomendaciones se completan en el diálogo del informe (`PUT /aplicaciones/{id}`).
-- **Síntomas de estrés frecuentes** (`SeleccionSintomasFrecuentes`, dominio): por aplicación, los ítems de D respondidos Siempre o Casi siempre (las dos primeras opciones), agrupados por dimensión en el orden del cuestionario (Siempre primero, empate por número); grupo sin síntomas = vacío. Sin puntaje ni nivel (el manual no trae baremos por dimensión de D). JSON `aplicaciones[].sintomasFrecuentes`; en el **Word** tabla bajo el resultado de estrés; **el PDF aún no lo trae** (decisión del usuario). Consultas de estrés compartidas con el informe de empresa en `SintomasEstresLoader`.
+- **Síntomas de estrés frecuentes** (`SeleccionSintomasFrecuentes`, dominio): por aplicación, los ítems de D respondidos Siempre o Casi siempre (las dos primeras opciones), agrupados por dimensión en el orden del cuestionario (Siempre primero, empate por número); grupo sin síntomas = vacío. Sin puntaje ni nivel (el manual no trae baremos por dimensión de D). JSON `aplicaciones[].sintomasFrecuentes`; en el Word y el PDF, tabla bajo el resultado de estrés (grupo combinado, síntoma, frecuencia). Consultas de estrés compartidas con el informe de empresa en `SintomasEstresLoader`.
 
 ## 4. Informe de empresa — ✅ completo (Word y JSON)
 

@@ -28,6 +28,7 @@
         .resultados td.puntaje { width: 13%; text-align: center; }
         .resultados td.nivel { width: 24%; text-align: center; }
         .resultados td.dominio { width: 22%; font-weight: bold; background: #f3f5f7; }
+        .sintomas td.frecuencia { width: 18%; text-align: center; }
         .fila-total td { font-weight: bold; background: #eef1f4; }
         .fila-total-general td { font-weight: bold; background: #dfe6ed; }
         .nivel-1 { background: #d9f0d3 !important; }
@@ -131,6 +132,27 @@
                 <td th:class="'nivel nivel-' + ${cuestionario.total().idNivel()}" th:text="${cuestionario.total().nivel()}"></td>
             </tr>
         </table>
+
+        <!-- Estrés (D): síntomas reportados Siempre o Casi siempre, por grupo (sin puntaje ni nivel) -->
+        <th:block th:if="${cuestionario.tipo().name() == 'ESTRES' and !aplicacion.sintomasFrecuentes().isEmpty()}">
+            <h3>Síntomas reportados con frecuencia (Siempre o Casi siempre)</h3>
+            <p th:if="${aplicacion.sinSintomasFrecuentes()}">El trabajador no reportó síntomas con frecuencia Siempre o Casi siempre.</p>
+            <table class="resultados sintomas" th:unless="${aplicacion.sinSintomasFrecuentes()}">
+                <tr><th>Grupo de síntomas</th><th>Síntoma</th><th>Frecuencia</th></tr>
+                <th:block th:each="grupo : ${aplicacion.sintomasFrecuentes()}">
+                    <tr th:if="${grupo.sintomas().isEmpty()}">
+                        <td class="dominio" th:text="${grupo.nombre()}"></td>
+                        <td>Ninguno con frecuencia</td>
+                        <td class="frecuencia">—</td>
+                    </tr>
+                    <tr th:each="sintoma, iter : ${grupo.sintomas()}">
+                        <td class="dominio" th:if="${iter.first}" th:rowspan="${grupo.sintomas().size()}" th:text="${grupo.nombre()}"></td>
+                        <td th:text="${sintoma.descripcion()}"></td>
+                        <td class="frecuencia" th:text="${sintoma.frecuencia()}"></td>
+                    </tr>
+                </th:block>
+            </table>
+        </th:block>
     </div>
 
     <div class="bloque" th:if="${aplicacion.totalGeneral() != null}">
