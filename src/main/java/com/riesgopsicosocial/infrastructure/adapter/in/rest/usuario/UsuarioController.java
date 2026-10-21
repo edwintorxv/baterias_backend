@@ -25,14 +25,14 @@ public class UsuarioController {
     }
 
     private UsuarioResponse toResponse(UsuarioEntity usuario) {
-        return new UsuarioResponse(usuario.getId(), usuario.getUsuario(), usuario.getNombre(), usuario.getRol(),
+        return new UsuarioResponse(usuario.getId(), usuario.getCorreo(), usuario.getNombre(), usuario.getRol(),
                 usuario.getFkEvaluador(), usuario.getFkCliente(), usuario.getFkEvaluado(), usuario.getActivo());
     }
 
-    private static UsuarioEntity toEntity(String usuario, String nombre, Rol rol, Long idEvaluador, Long idCliente,
+    private static UsuarioEntity toEntity(String correo, String nombre, Rol rol, Long idEvaluador, Long idCliente,
                                           Long idEvaluado, Boolean activo) {
         UsuarioEntity entidad = new UsuarioEntity();
-        entidad.setUsuario(usuario);
+        entidad.setCorreo(correo);
         entidad.setNombre(nombre);
         entidad.setRol(rol);
         entidad.setFkEvaluador(idEvaluador);
@@ -44,7 +44,7 @@ public class UsuarioController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<UsuarioResponse>> crear(@Valid @RequestBody UsuarioCrearRequest request) {
-        UsuarioEntity creado = service.crear(toEntity(request.usuario(), request.nombre(), request.rol(),
+        UsuarioEntity creado = service.crear(toEntity(request.correo(), request.nombre(), request.rol(),
                 request.idEvaluador(), request.idCliente(), request.idEvaluado(), request.activo()), request.contrasena());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ResponseBuilder.success("Usuario creado exitosamente", toResponse(creado)));
@@ -53,7 +53,7 @@ public class UsuarioController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<UsuarioResponse>> actualizar(
             @PathVariable Long id, @Valid @RequestBody UsuarioRequest request) {
-        UsuarioEntity actualizado = service.actualizar(id, toEntity(request.usuario(), request.nombre(), request.rol(),
+        UsuarioEntity actualizado = service.actualizar(id, toEntity(request.correo(), request.nombre(), request.rol(),
                 request.idEvaluador(), request.idCliente(), request.idEvaluado(), request.activo()));
         return ResponseEntity.ok(ResponseBuilder.success("Usuario actualizado exitosamente", toResponse(actualizado)));
     }
@@ -67,12 +67,12 @@ public class UsuarioController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<UsuarioResponse>>> listar(
-            @RequestParam(required = false) String usuario,
+            @RequestParam(required = false) String correo,
             @RequestParam(required = false) Rol rol,
             @RequestParam(required = false) Boolean activo) {
-        if (usuario != null && !usuario.isBlank()) {
+        if (correo != null && !correo.isBlank()) {
             return ResponseEntity.ok(ResponseBuilder.success("Usuario encontrado",
-                    List.of(toResponse(service.obtenerPorUsuario(usuario)))));
+                    List.of(toResponse(service.obtenerPorCorreo(correo)))));
         }
         List<UsuarioResponse> data = service.listar(rol, activo).stream().map(this::toResponse).toList();
         return ResponseEntity.ok(ResponseBuilder.success("Listado de usuarios", data));

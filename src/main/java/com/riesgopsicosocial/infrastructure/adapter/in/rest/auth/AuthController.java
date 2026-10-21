@@ -26,14 +26,14 @@ public class AuthController {
     }
 
     private static UsuarioSesionResponse toResponse(UsuarioAutenticado usuario) {
-        return new UsuarioSesionResponse(usuario.id(), usuario.usuario(), usuario.nombre(), usuario.rol(),
+        return new UsuarioSesionResponse(usuario.id(), usuario.correo(), usuario.nombre(), usuario.rol(),
                 usuario.idEvaluador(), usuario.idCliente());
     }
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request,
                                                            HttpServletRequest http) {
-        AutenticacionService.Sesion sesion = service.iniciarSesion(request.usuario(), request.contrasena(),
+        AutenticacionService.Sesion sesion = service.iniciarSesion(request.correo(), request.contrasena(),
                 http.getRemoteAddr());
         return ResponseEntity.ok(ResponseBuilder.success("Sesión iniciada", new LoginResponse(
                 sesion.token().valor(), "Bearer", sesion.token().segundos(), sesion.token().expira(),

@@ -74,19 +74,19 @@ class SeguridadTest {
     void usuarioPsicologa() {
         psicologa = new UsuarioEntity();
         psicologa.setId(2L);
-        psicologa.setUsuario("psicologa");
+        psicologa.setCorreo("psicologa@prueba.co");
         psicologa.setNombre("Psicóloga de Prueba");
         psicologa.setRol(Rol.PSICOLOGO);
         psicologa.setFkEvaluador(1L);
         psicologa.setActivo(true);
         psicologa.setContrasenaHash(passwordEncoder.encode("secreta123"));
-        when(repository.findByUsuarioIgnoreCase("psicologa")).thenReturn(Optional.of(psicologa));
+        when(repository.findByCorreo("psicologa@prueba.co")).thenReturn(Optional.of(psicologa));
         when(repository.findById(2L)).thenReturn(Optional.of(psicologa));
     }
 
-    private String login(String usuario, String contrasena) throws Exception {
+    private String login(String correo, String contrasena) throws Exception {
         return mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"usuario\":\"" + usuario + "\",\"contrasena\":\"" + contrasena + "\"}"))
+                        .content("{\"correo\":\"" + correo + "\",\"contrasena\":\"" + contrasena + "\"}"))
                 .andReturn().getResponse().getContentAsString();
     }
 
@@ -101,7 +101,7 @@ class SeguridadTest {
 
     @Test
     void login_devuelveTokenQueSirveParaLasPeticiones() throws Exception {
-        JsonNode respuesta = objectMapper.readTree(login(" psicologa ", "secreta123"));
+        JsonNode respuesta = objectMapper.readTree(login(" Psicologa@Prueba.co ", "secreta123"));
         assertEquals("Bearer", respuesta.at("/data/tipo").asText());
         assertEquals(8 * 3600, respuesta.at("/data/expiraEn").asLong());
         assertEquals("PSICOLOGO", respuesta.at("/data/usuario/rol").asText());
@@ -109,16 +109,16 @@ class SeguridadTest {
 
         mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.usuario").value("psicologa"))
+                .andExpect(jsonPath("$.data.correo").value("psicologa@prueba.co"))
                 .andExpect(jsonPath("$.data.idEvaluador").value(1));
     }
 
     @Test
     void login_fallido_mismoMensajeSinDecirQueFallo() throws Exception {
-        String malaContrasena = login("psicologa", "otra-clave");
-        String noExiste = login("nadie", "secreta123");
+        String malaContrasena = login("psicologa@prueba.co", "otra-clave");
+        String noExiste = login("nadie@prueba.co", "secreta123");
         psicologa.setActivo(false);
-        String inactivo = login("psicologa", "secreta123");
+        String inactivo = login("psicologa@prueba.co", "secreta123");
 
         for (String respuesta : new String[]{malaContrasena, noExiste, inactivo}) {
             JsonNode json = objectMapper.readTree(respuesta);
@@ -126,7 +126,7 @@ class SeguridadTest {
             assertEquals(AutenticacionService.CREDENCIALES_INVALIDAS, json.at("/message").asText());
         }
         mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"usuario\":\"psicologa\",\"contrasena\":\"x\"}"))
+                        .content("{\"correo\":\"psicologa@prueba.co\",\"contrasena\":\"x\"}"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -135,31 +135,31 @@ class SeguridadTest {
     void login_bloqueadoTrasCincoFallos_429AunqueLaContrasenaSeaCorrecta() throws Exception {
         UsuarioEntity rrhh = new UsuarioEntity();
         rrhh.setId(3L);
-        rrhh.setUsuario("rrhh");
+        rrhh.setCorreo("rrhh@prueba.co");
         rrhh.setNombre("Recursos Humanos");
         rrhh.setRol(Rol.CLIENTE);
         rrhh.setActivo(true);
         rrhh.setContrasenaHash(passwordEncoder.encode("secreta123"));
-        when(repository.findByUsuarioIgnoreCase("rrhh")).thenReturn(Optional.of(rrhh));
+        when(repository.findByCorreo("rrhh@prueba.co")).thenReturn(Optional.of(rrhh));
 
         for (int i = 0; i < 5; i++) {
-            loginDesde("rrhh", "mala", "10.9.9.9").andExpect(status().isUnauthorized());
+            loginDesde("rrhh@prueba.co", "mala", "10.9.9.9").andExpect(status().isUnauthorized());
         }
         clearInvocations(repository);
 
-        loginDesde("rrhh", "secreta123", "10.9.9.9")
+        loginDesde("rrhh@prueba.co", "secreta123", "10.9.9.9")
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().string("Retry-After", "900"))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.errorCode").value("TOO_MANY_REQUESTS"))
                 .andExpect(jsonPath("$.message").value("Demasiados intentos fallidos. Intente de nuevo en 15 minutos"));
-        verify(repository, never()).findByUsuarioIgnoreCase(anyString());
+        verify(repository, never()).findByCorreo(anyString());
     }
 
-    private ResultActions loginDesde(String usuario, String contrasena,
+    private ResultActions loginDesde(String correo, String contrasena,
                                       String ip) throws Exception {
         return mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"usuario\":\"" + usuario + "\",\"contrasena\":\"" + contrasena + "\"}")
+                .content("{\"correo\":\"" + correo + "\",\"contrasena\":\"" + contrasena + "\"}")
                 .with(peticion -> {
                     peticion.setRemoteAddr(ip);
                     return peticion;

@@ -40,9 +40,9 @@ class UsuarioServiceTest {
         when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
     }
 
-    private static UsuarioEntity usuario(String usuario, Rol rol) {
+    private static UsuarioEntity usuario(String correo, Rol rol) {
         UsuarioEntity entidad = new UsuarioEntity();
-        entidad.setUsuario(usuario);
+        entidad.setCorreo(correo);
         entidad.setNombre("Nombre");
         entidad.setRol(rol);
         return entidad;
@@ -56,25 +56,33 @@ class UsuarioServiceTest {
 
     @Test
     void crear_guardaLaContrasenaCifradaYActivoPorDefecto() {
-        UsuarioEntity creado = service.crear(usuario("  admin ", Rol.ADMIN), "secreta123");
+        UsuarioEntity creado = service.crear(usuario("  Admin@Prueba.CO ", Rol.ADMIN), "secreta123");
 
-        assertEquals("admin", creado.getUsuario(), "sin espacios");
+        assertEquals("admin@prueba.co", creado.getCorreo(), "en minúsculas y sin espacios");
         assertNotEquals("secreta123", creado.getContrasenaHash());
         assertTrue(passwordEncoder.matches("secreta123", creado.getContrasenaHash()));
         assertTrue(creado.getActivo());
     }
 
     @Test
-    void crear_usuarioRepetidoSinDistinguirMayusculas_409() {
-        when(repository.existsByUsuarioIgnoreCase("ADMIN")).thenReturn(true);
+    void crear_correoRepetidoSinDistinguirMayusculas_409() {
+        when(repository.existsByCorreo("admin@prueba.co")).thenReturn(true);
 
-        assertThrows(BusinessException.class, () -> service.crear(usuario("ADMIN", Rol.ADMIN), "secreta123"));
+        assertThrows(BusinessException.class, () -> service.crear(usuario("ADMIN@prueba.co", Rol.ADMIN), "secreta123"));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void crear_sinFormatoDeCorreo_400() {
+        for (String correo : new String[]{"admin", "admin@prueba", "ad min@prueba.co", "@prueba.co"}) {
+            assertThrows(ValidationException.class, () -> service.crear(usuario(correo, Rol.ADMIN), "secreta123"), correo);
+        }
         verify(repository, never()).save(any());
     }
 
     @Test
     void crear_vinculoQueNoCorrespondeAlRol_400ConCadaError() {
-        UsuarioEntity psicologo = usuario("psico", Rol.PSICOLOGO);
+        UsuarioEntity psicologo = usuario("psico@prueba.co", Rol.PSICOLOGO);
         psicologo.setFkCliente(1L);
 
         ValidationException error = assertThrows(ValidationException.class, () -> service.crear(psicologo, "secreta123"));
@@ -84,7 +92,7 @@ class UsuarioServiceTest {
 
     @Test
     void crear_psicologo_exigeEvaluadorActivoYSinOtroUsuario() {
-        UsuarioEntity psicologo = usuario("psico", Rol.PSICOLOGO);
+        UsuarioEntity psicologo = usuario("psico@prueba.co", Rol.PSICOLOGO);
         psicologo.setFkEvaluador(1L);
 
         when(evaluadorRepository.findById(1L)).thenReturn(Optional.empty());
@@ -103,11 +111,11 @@ class UsuarioServiceTest {
 
     @Test
     void actualizar_mantenerSuEvaluador_noChocaConsigoMismo() {
-        UsuarioEntity existente = usuario("psico", Rol.PSICOLOGO);
+        UsuarioEntity existente = usuario("psico@prueba.co", Rol.PSICOLOGO);
         existente.setId(5L);
         existente.setFkEvaluador(1L);
         when(repository.findById(5L)).thenReturn(Optional.of(existente));
-        UsuarioEntity datos = usuario("psico", Rol.PSICOLOGO);
+        UsuarioEntity datos = usuario("psico@prueba.co", Rol.PSICOLOGO);
         datos.setFkEvaluador(1L);
         datos.setNombre("Nuevo nombre");
 
@@ -117,12 +125,12 @@ class UsuarioServiceTest {
 
     @Test
     void actualizar_dejaDeSerPsicologo_pierdeSusClientes() {
-        UsuarioEntity existente = usuario("psico", Rol.PSICOLOGO);
+        UsuarioEntity existente = usuario("psico@prueba.co", Rol.PSICOLOGO);
         existente.setId(5L);
         existente.setFkEvaluador(1L);
         when(repository.findById(5L)).thenReturn(Optional.of(existente));
 
-        UsuarioEntity actualizado = service.actualizar(5L, usuario("psico", Rol.ADMIN));
+        UsuarioEntity actualizado = service.actualizar(5L, usuario("psico@prueba.co", Rol.ADMIN));
 
         assertEquals(Rol.ADMIN, actualizado.getRol());
         assertNull(actualizado.getFkEvaluador());
@@ -131,21 +139,21 @@ class UsuarioServiceTest {
 
     @Test
     void actualizar_aSiMismo_noSeCambiaElRolNiSeInactiva() {
-        UsuarioEntity yo = usuario("admin", Rol.ADMIN);
+        UsuarioEntity yo = usuario("admin@prueba.co", Rol.ADMIN);
         yo.setId(1L);
         yo.setActivo(true);
         when(repository.findById(1L)).thenReturn(Optional.of(yo));
         when(repository.countByRolAndActivo(Rol.ADMIN, true)).thenReturn(3L);
         iniciarSesion(1L);
         try {
-            UsuarioEntity inactivo = usuario("admin", Rol.ADMIN);
+            UsuarioEntity inactivo = usuario("admin@prueba.co", Rol.ADMIN);
             inactivo.setActivo(false);
             assertThrows(BusinessException.class, () -> service.actualizar(1L, inactivo));
-            UsuarioEntity otroRol = usuario("admin", Rol.CLIENTE);
+            UsuarioEntity otroRol = usuario("admin@prueba.co", Rol.CLIENTE);
             otroRol.setFkCliente(1L);
             assertThrows(BusinessException.class, () -> service.actualizar(1L, otroRol));
 
-            UsuarioEntity soloNombre = usuario("admin", Rol.ADMIN);
+            UsuarioEntity soloNombre = usuario("admin@prueba.co", Rol.ADMIN);
             soloNombre.setNombre("Otro nombre");
             assertEquals("Otro nombre", service.actualizar(1L, soloNombre).getNombre(), "sus datos sí los cambia");
         } finally {
@@ -155,11 +163,11 @@ class UsuarioServiceTest {
 
     @Test
     void actualizar_ultimoAdministradorActivo_noSeQuita() {
-        UsuarioEntity otro = usuario("admin2", Rol.ADMIN);
+        UsuarioEntity otro = usuario("admin2@prueba.co", Rol.ADMIN);
         otro.setId(2L);
         otro.setActivo(true);
         when(repository.findById(2L)).thenReturn(Optional.of(otro));
-        UsuarioEntity inactivo = usuario("admin2", Rol.ADMIN);
+        UsuarioEntity inactivo = usuario("admin2@prueba.co", Rol.ADMIN);
         inactivo.setActivo(false);
 
         when(repository.countByRolAndActivo(Rol.ADMIN, true)).thenReturn(1L);
@@ -178,11 +186,11 @@ class UsuarioServiceTest {
 
     @Test
     void asignarClientes_soloAPsicologosYConClientesExistentes() {
-        UsuarioEntity cliente = usuario("rrhh", Rol.CLIENTE);
+        UsuarioEntity cliente = usuario("rrhh@prueba.co", Rol.CLIENTE);
         when(repository.findById(7L)).thenReturn(Optional.of(cliente));
         assertThrows(BusinessException.class, () -> service.asignarClientes(7L, List.of(1L)));
 
-        UsuarioEntity psicologo = usuario("psico", Rol.PSICOLOGO);
+        UsuarioEntity psicologo = usuario("psico@prueba.co", Rol.PSICOLOGO);
         when(repository.findById(5L)).thenReturn(Optional.of(psicologo));
         when(clienteRepository.existsById(1L)).thenReturn(true);
         when(clienteRepository.existsById(2L)).thenReturn(true);
@@ -197,7 +205,7 @@ class UsuarioServiceTest {
 
     @Test
     void cambiarContrasena_reemplazaElHash() {
-        UsuarioEntity existente = usuario("admin", Rol.ADMIN);
+        UsuarioEntity existente = usuario("admin@prueba.co", Rol.ADMIN);
         existente.setContrasenaHash(passwordEncoder.encode("anterior123"));
         when(repository.findById(1L)).thenReturn(Optional.of(existente));
 

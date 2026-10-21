@@ -46,7 +46,7 @@ public class TokenService {
                 .subject(String.valueOf(usuario.getId()))
                 .issuedAt(ahora)
                 .expiresAt(expira)
-                .claim("usuario", usuario.getUsuario())
+                .claim("correo", usuario.getCorreo())
                 .claim("nombre", usuario.getNombre())
                 .claim("rol", usuario.getRol().name())
                 .build();

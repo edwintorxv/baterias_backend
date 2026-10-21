@@ -8,8 +8,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 /**
- * Crea el primer administrador al arrancar, solo si no hay ningún usuario. Usuario y contraseña
- * salen de variables de entorno ({@code APP_SEGURIDAD_ADMIN_USUARIO}, {@code APP_SEGURIDAD_ADMIN_CONTRASENA}),
+ * Crea el primer administrador al arrancar, solo si no hay ningún usuario. Correo y contraseña
+ * salen de variables de entorno ({@code APP_SEGURIDAD_ADMIN_CORREO}, {@code APP_SEGURIDAD_ADMIN_CONTRASENA}),
  * nunca del código: sin ellas no crea nada y lo advierte en el log. Después de creado, las variables
  * ya no se usan (cambiar la contraseña es por la API).
  */
@@ -20,15 +20,15 @@ public class PrimerAdministrador implements ApplicationRunner {
 
     private final UsuarioJpaRepository repository;
     private final UsuarioService service;
-    private final String usuario;
+    private final String correo;
     private final String contrasena;
 
     public PrimerAdministrador(UsuarioJpaRepository repository, UsuarioService service,
-                               @Value("${app.seguridad.admin.usuario:}") String usuario,
+                               @Value("${app.seguridad.admin.correo:}") String correo,
                                @Value("${app.seguridad.admin.contrasena:}") String contrasena) {
         this.repository = repository;
         this.service = service;
-        this.usuario = usuario;
+        this.correo = correo;
         this.contrasena = contrasena;
     }
 
@@ -37,8 +37,8 @@ public class PrimerAdministrador implements ApplicationRunner {
         if (repository.count() > 0) {
             return;
         }
-        if (usuario.isBlank() || contrasena.isBlank()) {
-            log.warn("No hay usuarios y no se definieron APP_SEGURIDAD_ADMIN_USUARIO / APP_SEGURIDAD_ADMIN_CONTRASENA: "
+        if (correo.isBlank() || contrasena.isBlank()) {
+            log.warn("No hay usuarios y no se definieron APP_SEGURIDAD_ADMIN_CORREO / APP_SEGURIDAD_ADMIN_CONTRASENA: "
                     + "no se creó el primer administrador");
             return;
         }
@@ -47,11 +47,11 @@ public class PrimerAdministrador implements ApplicationRunner {
             return;
         }
         UsuarioEntity admin = new UsuarioEntity();
-        admin.setUsuario(usuario);
+        admin.setCorreo(correo);
         admin.setNombre("Administrador");
         admin.setRol(Rol.ADMIN);
         service.crear(admin, contrasena);
-        log.info("Primer administrador creado: {}", usuario);
+        log.info("Primer administrador creado: {}", admin.getCorreo());
     }
 
 }

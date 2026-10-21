@@ -40,9 +40,10 @@ public class AutenticacionService {
      * dice cuál de las tres falló. Con el usuario o la IP bloqueados responde 429 sin mirar la
      * contraseña, aunque sea la correcta.
      */
-    public Sesion iniciarSesion(String usuario, String contrasena, String ip) {
+    public Sesion iniciarSesion(String correo, String contrasena, String ip) {
+        String usuario = UsuarioService.normalizarCorreo(correo);
         limiteIntentos.verificar(usuario, ip);
-        Optional<UsuarioEntity> encontrado = repository.findByUsuarioIgnoreCase(usuario.trim());
+        Optional<UsuarioEntity> encontrado = repository.findByCorreo(usuario);
         boolean coincide = passwordEncoder.matches(contrasena,
                 encontrado.map(UsuarioEntity::getContrasenaHash).orElse(hashDeRelleno));
         Optional<UsuarioEntity> valido = encontrado.filter(u -> coincide && Boolean.TRUE.equals(u.getActivo()));

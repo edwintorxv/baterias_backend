@@ -14,10 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
- * Usuarios de la API. Valida aquí lo que la BD también ataja (vínculo según el rol, usuario único),
- * para responder con un mensaje claro en vez del error genérico de integridad.
+ * Usuarios de la API. Valida aquí lo que la BD también ataja (vínculo según el rol, correo único y con
+ * formato), para responder con un mensaje claro en vez del error genérico de integridad. El correo se
+ * guarda en minúsculas y sin espacios: con él se ingresa.
  */
 @Service
 public class UsuarioService {
@@ -40,11 +42,28 @@ public class UsuarioService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    /** Formato de correo (el mismo CHECK de la V20): algo@dominio.ext, sin espacios. */
+    private static final Pattern FORMATO_CORREO = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
+    /** Correo en minúsculas y sin espacios alrededor: así se guarda y así se busca al ingresar. */
+    public static String normalizarCorreo(String correo) {
+        return correo == null ? null : correo.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** Normaliza el correo y responde 400 si no tiene formato de correo. */
+    private static String validarCorreo(String correo) {
+        String normalizado = normalizarCorreo(correo);
+        if (normalizado == null || !FORMATO_CORREO.matcher(normalizado).matches()) {
+            throw new ValidationException("El correo no es válido", List.of("correo: debe tener el formato nombre@dominio.com"));
+        }
+        return normalizado;
+    }
+
     @Transactional
     public UsuarioEntity crear(UsuarioEntity entidad, String contrasena) {
-        entidad.setUsuario(entidad.getUsuario().trim());
-        if (repository.existsByUsuarioIgnoreCase(entidad.getUsuario())) {
-            throw new BusinessException("Ya existe un usuario: " + entidad.getUsuario());
+        entidad.setCorreo(validarCorreo(entidad.getCorreo()));
+        if (repository.existsByCorreo(entidad.getCorreo())) {
+            throw new BusinessException("Ya existe un usuario con el correo " + entidad.getCorreo());
         }
         validarVinculo(entidad, null);
         entidad.setContrasenaHash(passwordEncoder.encode(contrasena));
@@ -63,9 +82,9 @@ public class UsuarioService {
     @Transactional
     public UsuarioEntity actualizar(Long id, UsuarioEntity datos) {
         UsuarioEntity existente = obtenerPorId(id);
-        String usuario = datos.getUsuario().trim();
-        if (!existente.getUsuario().equalsIgnoreCase(usuario) && repository.existsByUsuarioIgnoreCase(usuario)) {
-            throw new BusinessException("Ya existe un usuario: " + usuario);
+        String correo = validarCorreo(datos.getCorreo());
+        if (!existente.getCorreo().equals(correo) && repository.existsByCorreo(correo)) {
+            throw new BusinessException("Ya existe un usuario con el correo " + correo);
         }
         validarQueQuedeAdministracion(existente, datos);
         validarVinculo(datos, existente);
@@ -73,7 +92,7 @@ public class UsuarioService {
             usuarioClienteRepository.borrarDeUsuario(id);
         }
 
-        existente.setUsuario(usuario);
+        existente.setCorreo(correo);
         existente.setNombre(datos.getNombre());
         existente.setRol(datos.getRol());
         existente.setFkEvaluador(datos.getFkEvaluador());
@@ -148,9 +167,9 @@ public class UsuarioService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado con id: " + id));
     }
 
-    public UsuarioEntity obtenerPorUsuario(String usuario) {
-        return repository.findByUsuarioIgnoreCase(usuario.trim())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + usuario));
+    public UsuarioEntity obtenerPorCorreo(String correo) {
+        return repository.findByCorreo(normalizarCorreo(correo))
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + correo));
     }
 
     public List<UsuarioEntity> listar(Rol rol, Boolean activo) {

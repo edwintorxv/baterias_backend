@@ -20,8 +20,9 @@ public class UsuarioEntity {
     private Long id;
 
     /** Único sin distinguir mayúsculas (índice sobre LOWER). */
+    /** Con él se ingresa: en minúsculas y único (V20). */
     @Column(nullable = false, length = 100)
-    private String usuario;
+    private String correo;
 
     /** BCrypt; nunca sale en las respuestas. */
     @ToString.Exclude

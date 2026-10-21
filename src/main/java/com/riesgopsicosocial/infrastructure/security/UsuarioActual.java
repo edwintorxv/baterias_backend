@@ -17,7 +17,7 @@ public final class UsuarioActual {
     public static String nombre() {
         Authentication autenticacion = SecurityContextHolder.getContext().getAuthentication();
         return autenticacion != null && autenticacion.getPrincipal() instanceof UsuarioAutenticado usuario
-                ? usuario.usuario() : SISTEMA;
+                ? usuario.correo() : SISTEMA;
     }
 
     /** Id del usuario de la sesión; {@code null} sin sesión. */
