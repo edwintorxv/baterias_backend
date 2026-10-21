@@ -89,6 +89,8 @@ class PermisosPorRolTest {
 
             caso(GET, "/preguntas", ADMIN, PSICOLOGO),
             caso(GET, "/cuestionarios", ADMIN, PSICOLOGO),
+            caso(GET, "/cuestionarios/1/estructura", ADMIN, PSICOLOGO),
+            caso(GET, "/cuestionarios/total-general", ADMIN, PSICOLOGO),
             caso(GET, "/opcion-respueta/1", ADMIN, PSICOLOGO),
             caso(POST, "/preguntas", ADMIN),
             caso(PUT, "/baremo-dominios/3", ADMIN),

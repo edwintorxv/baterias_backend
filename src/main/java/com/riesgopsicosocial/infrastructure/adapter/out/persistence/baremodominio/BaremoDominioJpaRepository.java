@@ -11,6 +11,8 @@ public interface BaremoDominioJpaRepository extends JpaRepository<BaremoDominioE
 
     List<BaremoDominioEntity> findByFkNivelRiesgo(Long fkNivelRiesgo);
 
+    List<BaremoDominioEntity> findByFkDominioCuestionarioIn(Collection<Long> fkDominioCuestionario);
+
     List<BaremoDominioEntity> findByFkDominioCuestionarioInAndFkGrupoOcupacional(
             Collection<Long> fkDominioCuestionario, Long fkGrupoOcupacional);
 

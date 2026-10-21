@@ -11,6 +11,8 @@ public interface BaremoDimensionJpaRepository extends JpaRepository<BaremoDimens
 
     List<BaremoDimensionEntity> findByFkNivelRiesgo(Long fkNivelRiesgo);
 
+    List<BaremoDimensionEntity> findByFkDimensionCuestionarioIn(Collection<Long> fkDimensionCuestionario);
+
     List<BaremoDimensionEntity> findByFkDimensionCuestionarioInAndFkGrupoOcupacional(
             Collection<Long> fkDimensionCuestionario, Long fkGrupoOcupacional);
 
