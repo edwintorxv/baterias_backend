@@ -121,7 +121,8 @@ class PermisosPorRolTest {
 
             caso(PUT, "/evaluadores/1/firma", ADMIN, PSICOLOGO),
             caso(GET, "/evaluadores/1/firma", ADMIN, PSICOLOGO),
-            caso(GET, "/evaluadores", ADMIN, PSICOLOGO),
+            caso(GET, "/evaluadores", ADMIN),
+            caso(GET, "/evaluadores/1", ADMIN, PSICOLOGO),
             caso(POST, "/evaluadores", ADMIN),
             caso(PUT, "/evaluadores/1", ADMIN),
 

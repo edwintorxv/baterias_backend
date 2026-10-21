@@ -87,8 +87,10 @@ public class EvaluadorController {
         return ResponseEntity.ok(ResponseBuilder.success("Listado de evaluadores", data));
     }
 
+    /** El ADMIN cualquiera; el psicólogo solo el suyo (403 si es otro), como la firma. */
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<EvaluadorResponse>> obtenerPorId(@PathVariable Long id) {
+        alcance.exigirEvaluadorPropio(id);
         return ResponseEntity.ok(ResponseBuilder.success("Evaluador encontrado", toResponse(service.obtenerPorId(id))));
     }
 

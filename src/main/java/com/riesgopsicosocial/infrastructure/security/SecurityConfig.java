@@ -74,6 +74,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/clientes/*").hasRole(ADMIN)
 
                         .requestMatchers(HttpMethod.PUT, "/evaluadores/*/firma").hasAnyRole(ADMIN, PSICOLOGO)
+                        // El listado (los demás psicólogos) es solo del ADMIN; uno por id, el propio (EvaluadorController).
+                        .requestMatchers(HttpMethod.GET, "/evaluadores").hasRole(ADMIN)
                         .requestMatchers(HttpMethod.GET, "/evaluadores/**").hasAnyRole(ADMIN, PSICOLOGO)
                         .requestMatchers(HttpMethod.POST, "/evaluadores").hasRole(ADMIN)
                         .requestMatchers(HttpMethod.PUT, "/evaluadores/*").hasRole(ADMIN)

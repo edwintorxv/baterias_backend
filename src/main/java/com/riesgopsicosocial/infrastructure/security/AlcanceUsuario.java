@@ -169,7 +169,7 @@ public class AlcanceUsuario {
                 .orElse(false);
     }
 
-    /** La firma la ven y la suben el ADMIN o el propio psicólogo (403 si es la de otro). */
+    /** Un evaluador y su firma los ven (y la firma la suben) el ADMIN o el propio psicólogo (403 si es otro). */
     public void exigirEvaluadorPropio(Long idEvaluador) {
         UsuarioAutenticado usuario = actual().orElseThrow(() -> new AccessDeniedException("Sin sesión"));
         if (usuario.rol() != Rol.ADMIN
