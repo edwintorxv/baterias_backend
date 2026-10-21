@@ -25,7 +25,7 @@ public record PersonaClienteResponse(
      * @param conRespuestas la persona ya respondió (sin respuestas, la aplicación solo está creada)
      * @param conResultados ya se calcularon sus resultados (si no, el informe individual aún no sale)
      */
-    public record UltimaAplicacion(Long id, LocalDateTime fecha, String estado, boolean conRespuestas,
+    public record UltimaAplicacion(Long id, LocalDateTime fecha, boolean conRespuestas,
                                    boolean conResultados) {
     }
 

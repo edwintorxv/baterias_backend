@@ -1,8 +1,8 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.respuesta;
 
 /**
- * En qué va una aplicación, calculado (no se guarda): reemplaza en la pantalla al texto libre
- * {@code aplicacion.estado}.
+ * En qué va una aplicación, calculado de sus respuestas y resultados (no se guarda; la columna de texto
+ * libre {@code aplicacion.estado} se borró en la V21).
  */
 public enum EstadoAplicacion {
 

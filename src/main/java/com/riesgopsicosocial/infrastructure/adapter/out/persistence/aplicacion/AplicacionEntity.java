@@ -30,9 +30,6 @@ public class AplicacionEntity {
     @Column(columnDefinition = "TEXT")
     private String observaciones;
 
-    @Column(length = 20)
-    private String estado;
-
     @Column(name = "atiende_clientes")
     private Boolean atiendeClientes;
 

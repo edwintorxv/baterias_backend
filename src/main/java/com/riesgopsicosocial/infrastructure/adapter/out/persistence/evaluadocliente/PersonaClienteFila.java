@@ -34,8 +34,6 @@ public interface PersonaClienteFila {
 
     LocalDateTime getFechaUltimaAplicacion();
 
-    String getEstadoUltimaAplicacion();
-
     Boolean getUltimaConRespuestas();
 
     Boolean getUltimaConResultados();

@@ -10,7 +10,6 @@ public record AplicacionResponse(
         LocalDateTime fechaAplicacion,
         String observaciones,
         String recomendaciones,
-        String estado,
         Boolean atiendeClientes,
         Boolean esJefe,
         Long fkEvaluador

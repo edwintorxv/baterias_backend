@@ -55,7 +55,7 @@ public class PersonaClienteController {
     private static PersonaClienteResponse toResponse(PersonaClienteFila fila) {
         PersonaClienteResponse.UltimaAplicacion ultima = fila.getIdUltimaAplicacion() == null ? null
                 : new PersonaClienteResponse.UltimaAplicacion(fila.getIdUltimaAplicacion(),
-                fila.getFechaUltimaAplicacion(), fila.getEstadoUltimaAplicacion(),
+                fila.getFechaUltimaAplicacion(),
                 Boolean.TRUE.equals(fila.getUltimaConRespuestas()), Boolean.TRUE.equals(fila.getUltimaConResultados()));
         return new PersonaClienteResponse(fila.getIdRelacion(), fila.getIdEvaluado(), fila.getNumeroIdentificacion(),
                 fila.getNombre(), fila.getApellido(), fila.getNombreCargo(), fila.getTipoCargo(), fila.getNombreArea(),

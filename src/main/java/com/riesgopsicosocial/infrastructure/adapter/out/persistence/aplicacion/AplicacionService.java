@@ -21,7 +21,6 @@ import java.util.List;
 @Service
 public class AplicacionService {
 
-    private static final String ESTADO_DEFAULT = "FINALIZADA";
 
     private final AplicacionJpaRepository repository;
     private final EvaluadoClienteJpaRepository evaluadoClienteRepository;
@@ -51,9 +50,6 @@ public class AplicacionService {
         if (entidad.getFechaAplicacion() == null) {
             entidad.setFechaAplicacion(LocalDateTime.now());
         }
-        if (entidad.getEstado() == null || entidad.getEstado().isBlank()) {
-            entidad.setEstado(ESTADO_DEFAULT);
-        }
         if (entidad.getFkGrupoOcupacional() == null) {
             entidad.setFkGrupoOcupacional(resolverGrupoOcupacional(entidad.getFkEvaluadoCliente()));
         }
@@ -66,7 +62,8 @@ public class AplicacionService {
 
     /**
      * Si cambia algo de lo que salen los resultados (grupo ocupacional o preguntas filtro), se borran: la
-     * aplicación queda pendiente de cálculo.
+     * aplicación queda pendiente de cálculo. Las preguntas filtro se reemplazan tal como llegan: {@code null}
+     * = no registrada (el front siempre manda la aplicación completa: la consulta y la vuelve a enviar).
      */
     @Transactional
     public AplicacionEntity actualizar(Long id, AplicacionEntity datos) {
@@ -85,15 +82,8 @@ public class AplicacionService {
         }
         existente.setObservaciones(datos.getObservaciones());
         existente.setRecomendaciones(datos.getRecomendaciones());
-        if (datos.getEstado() != null && !datos.getEstado().isBlank()) {
-            existente.setEstado(datos.getEstado());
-        }
-        if (datos.getAtiendeClientes() != null) {
-            existente.setAtiendeClientes(datos.getAtiendeClientes());
-        }
-        if (datos.getEsJefe() != null) {
-            existente.setEsJefe(datos.getEsJefe());
-        }
+        existente.setAtiendeClientes(datos.getAtiendeClientes());
+        existente.setEsJefe(datos.getEsJefe());
         // Solo se valida al cambiarlo: si el evaluador se retiró después, la aplicación conserva el suyo.
         if (datos.getFkEvaluador() != null && !datos.getFkEvaluador().equals(existente.getFkEvaluador())) {
             validarEvaluadorActivo(datos.getFkEvaluador());
@@ -127,9 +117,6 @@ public class AplicacionService {
         return repository.findByFkEvaluadoCliente(fkEvaluadoCliente);
     }
 
-    public List<AplicacionEntity> listarPorEstado(String estado) {
-        return repository.findByEstado(estado);
-    }
 
     /** Un evaluador retirado (activo = false) no puede recibir aplicaciones nuevas. */
     private void validarEvaluadorActivo(Long fkEvaluador) {

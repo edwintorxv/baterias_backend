@@ -22,7 +22,6 @@ public interface AplicacionJpaRepository extends JpaRepository<AplicacionEntity,
                                                        @Param("desde") LocalDateTime desde,
                                                        @Param("hasta") LocalDateTime hasta);
 
-    List<AplicacionEntity> findByEstado(String estado);
 
     /**
      * Aplicaciones de los clientes indicados (y del año, si viene) con la persona, la empresa, la forma

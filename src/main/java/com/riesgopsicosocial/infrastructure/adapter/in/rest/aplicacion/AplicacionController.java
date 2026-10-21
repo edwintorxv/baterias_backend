@@ -40,7 +40,6 @@ public class AplicacionController {
                 aplicacionEntity.getFechaAplicacion(),
                 aplicacionEntity.getObservaciones(),
                 aplicacionEntity.getRecomendaciones(),
-                aplicacionEntity.getEstado(),
                 aplicacionEntity.getAtiendeClientes(),
                 aplicacionEntity.getEsJefe(),
                 aplicacionEntity.getFkEvaluador()
@@ -53,7 +52,6 @@ public class AplicacionController {
         aplicacionEntity.setFkGrupoOcupacional(aplicacionRequest.fkGrupoOcupacional());
         aplicacionEntity.setFechaAplicacion(aplicacionRequest.fechaAplicacion());
         aplicacionEntity.setObservaciones(aplicacionRequest.observaciones());
-        aplicacionEntity.setEstado(aplicacionRequest.estado());
         aplicacionEntity.setAtiendeClientes(aplicacionRequest.atiendeClientes());
         aplicacionEntity.setEsJefe(aplicacionRequest.esJefe());
         aplicacionEntity.setRecomendaciones(aplicacionRequest.recomendaciones());
@@ -87,14 +85,11 @@ public class AplicacionController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<AplicacionResponse>>> listarTodos(
-            @RequestParam(required = false) Long fkEvaluadoCliente,
-            @RequestParam(required = false) String estado) {
+            @RequestParam(required = false) Long fkEvaluadoCliente) {
 
         List<AplicacionEntity> resultado;
         if (fkEvaluadoCliente != null) {
             resultado = service.listarPorEvaluadoCliente(fkEvaluadoCliente);
-        } else if (estado != null && !estado.isBlank()) {
-            resultado = service.listarPorEstado(estado);
         } else {
             resultado = service.listarTodos();
         }
