@@ -111,6 +111,7 @@ Endpoints: `GET /clientes/{idCliente}/informe?anio=` (JSON), `.../informe/anios`
 **Antes de producción**
 1. Al desplegar detrás de un proxy: `server.forward-headers-strategy=native` (si no, el límite por IP ve la del proxy).
 2. Front: ver sección 7.
+3. Ayudas de desarrollo del front (decisión del usuario 2026-10-21: se quedan hasta producción y ahí se ajustan): selector "Usuario de prueba" en la barra, botones "entrar como" del login, auto-login y reingreso ante 401. Ya no salen con `environment.production`, pero conviene revisar si se quitan del código.
 
 **Menores / por decidir**
 3. `aplicacion.estado` (texto libre) quedó sin uso: el estado se calcula (`EstadoAplicacion`); borrar la columna en una migración futura.
