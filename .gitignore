@@ -37,3 +37,7 @@ logs/
 
 ### macOS ###
 .DS_Store
+
+### Secretos y respaldos ###
+.env
+*.dump

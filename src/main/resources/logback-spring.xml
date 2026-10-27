@@ -13,35 +13,44 @@
         </encoder>
     </appender>
 
-    <appender name="FILE"
-              class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <!-- En producción solo consola: el disco del contenedor se pierde al reiniciar y Render guarda la salida -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
 
-        <file>${LOG_PATH}/application.log</file>
+    <springProfile name="!prod">
+        <appender name="FILE"
+                  class="ch.qos.logback.core.rolling.RollingFileAppender">
 
-        <rollingPolicy
-                class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <file>${LOG_PATH}/application.log</file>
 
-            <fileNamePattern>
-                ${LOG_PATH}/application.%d{yyyy-MM-dd}.%i.log
-            </fileNamePattern>
+            <rollingPolicy
+                    class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
 
-            <maxFileSize>20MB</maxFileSize>
+                <fileNamePattern>
+                    ${LOG_PATH}/application.%d{yyyy-MM-dd}.%i.log
+                </fileNamePattern>
 
-            <maxHistory>30</maxHistory>
+                <maxFileSize>20MB</maxFileSize>
 
-        </rollingPolicy>
+                <maxHistory>30</maxHistory>
 
-        <encoder>
-            <pattern>
-                %d %-5level %logger - %msg%n
-            </pattern>
-        </encoder>
+            </rollingPolicy>
 
-    </appender>
+            <encoder>
+                <pattern>
+                    %d %-5level %logger - %msg%n
+                </pattern>
+            </encoder>
 
-    <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
-    </root>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+        </root>
+    </springProfile>
 
 </configuration>
