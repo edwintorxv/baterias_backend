@@ -19,6 +19,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +37,13 @@ public class GlobalExceptionHandler {
                 ErrorCode.RESOURCE_NOT_FOUND.name(),
                 null
         );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    /** Ruta pública que no existe (p. ej. Swagger, apagado en producción): 404, no 500. */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResourceFound(NoResourceFoundException ex) {
+        ApiError error = ResponseBuilder.error("La ruta no existe", ErrorCode.RESOURCE_NOT_FOUND.name(), null);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
