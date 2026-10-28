@@ -103,6 +103,18 @@ class LimiteIntentosLoginTest {
     }
 
     @Test
+    void primerRechazoDelBloqueo_soloUnaVezPorBloqueo() {
+        assertFalse(limite.primerRechazoDelBloqueo("psicologa", "10.0.0.1"), "sin bloqueo no hay rechazo");
+        fallar("psicologa", "10.0.0.1", 5);
+        assertTrue(limite.primerRechazoDelBloqueo("psicologa", "10.0.0.1"));
+        assertFalse(limite.primerRechazoDelBloqueo("psicologa", "10.0.0.1"));
+
+        reloj.avanzar(BLOQUEO);
+        fallar("psicologa", "10.0.0.1", 5);
+        assertTrue(limite.primerRechazoDelBloqueo("psicologa", "10.0.0.1"), "bloqueo nuevo, registro nuevo");
+    }
+
+    @Test
     void bloqueaPorIpAunqueCambieDeUsuario() {
         for (int i = 0; i < 19; i++) {
             limite.registrarFallo("usuario" + i, "10.0.0.1");

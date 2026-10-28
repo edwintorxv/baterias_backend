@@ -63,6 +63,17 @@ public class LimiteIntentosLogin {
         }
     }
 
+    /**
+     * Tras un rechazo de {@link #verificar}: true solo la primera vez en cada bloqueo (del usuario o de la
+     * IP), para registrar el bloqueo una vez y no cada reintento.
+     */
+    public boolean primerRechazoDelBloqueo(String usuario, String ip) {
+        Instant ahora = reloj.instant();
+        boolean porUsuario = marcarRechazo(claveUsuario(usuario), maxIntentosUsuario, ahora);
+        boolean porIp = marcarRechazo(claveIp(ip), maxIntentosIp, ahora);
+        return porUsuario || porIp;
+    }
+
     /** Solo se olvida el usuario: con una cuenta válida no se puede reiniciar el contador de la IP. */
     public void registrarExito(String usuario) {
         fallos.remove(claveUsuario(usuario));
@@ -70,7 +81,19 @@ public class LimiteIntentosLogin {
 
     private void sumarFallo(String clave, Instant ahora) {
         fallos.compute(clave, (k, f) -> f == null || vencido(f, ahora)
-                ? new Fallos(1, ahora) : new Fallos(f.cantidad() + 1, ahora));
+                ? new Fallos(1, ahora, false) : new Fallos(f.cantidad() + 1, ahora, false));
+    }
+
+    private boolean marcarRechazo(String clave, int maximo, Instant ahora) {
+        boolean[] primero = {false};
+        fallos.computeIfPresent(clave, (k, f) -> {
+            if (f.cantidad() < maximo || vencido(f, ahora) || f.rechazado()) {
+                return f;
+            }
+            primero[0] = true;
+            return new Fallos(f.cantidad(), f.ultimo(), true);
+        });
+        return primero[0];
     }
 
     private Duration espera(String clave, int maximo, Instant ahora) {
@@ -93,7 +116,8 @@ public class LimiteIntentosLogin {
         return "ip:" + ip;
     }
 
-    private record Fallos(int cantidad, Instant ultimo) {
+    /** {@code rechazado}: ya se registró el primer rechazo de este bloqueo. */
+    private record Fallos(int cantidad, Instant ultimo, boolean rechazado) {
     }
 
 }

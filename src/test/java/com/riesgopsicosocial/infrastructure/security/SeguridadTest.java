@@ -3,6 +3,7 @@ package com.riesgopsicosocial.infrastructure.security;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.auth.AuthController;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.registroingreso.ResultadoIngreso;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.Rol;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionJpaRepository;
@@ -31,7 +32,10 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -67,6 +71,8 @@ class SeguridadTest {
     private AplicacionJpaRepository aplicacionRepository;
     @MockitoBean
     private RespuestaJpaRepository respuestaRepository;
+    @MockitoBean
+    private RegistroIngresos registroIngresos;
 
     private UsuarioEntity psicologa;
 
@@ -106,6 +112,8 @@ class SeguridadTest {
         assertEquals(8 * 3600, respuesta.at("/data/expiraEn").asLong());
         assertEquals("PSICOLOGO", respuesta.at("/data/usuario/rol").asText());
         String token = respuesta.at("/data/token").asText();
+        verify(registroIngresos).registrar(eq("psicologa@prueba.co"), eq(2L), eq("127.0.0.1"), isNull(),
+                eq(ResultadoIngreso.EXITOSO));
 
         mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
@@ -125,6 +133,10 @@ class SeguridadTest {
             assertEquals("UNAUTHORIZED", json.at("/errorCode").asText(), respuesta);
             assertEquals(AutenticacionService.CREDENCIALES_INVALIDAS, json.at("/message").asText());
         }
+        verify(registroIngresos, times(2)).registrar(eq("psicologa@prueba.co"), eq(2L), any(), any(),
+                eq(ResultadoIngreso.FALLIDO));
+        verify(registroIngresos).registrar(eq("nadie@prueba.co"), isNull(), any(), any(),
+                eq(ResultadoIngreso.FALLIDO));
         mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"correo\":\"psicologa@prueba.co\",\"contrasena\":\"x\"}"))
                 .andExpect(status().isUnauthorized());
@@ -154,12 +166,19 @@ class SeguridadTest {
                 .andExpect(jsonPath("$.errorCode").value("TOO_MANY_REQUESTS"))
                 .andExpect(jsonPath("$.message").value("Demasiados intentos fallidos. Intente de nuevo en 15 minutos"));
         verify(repository, never()).findByCorreo(anyString());
+
+        loginDesde("rrhh@prueba.co", "secreta123", "10.9.9.9").andExpect(status().isTooManyRequests());
+        verify(registroIngresos, times(5)).registrar(eq("rrhh@prueba.co"), eq(3L), eq("10.9.9.9"), any(),
+                eq(ResultadoIngreso.FALLIDO));
+        verify(registroIngresos, times(1)).registrar(eq("rrhh@prueba.co"), isNull(), eq("10.9.9.9"), any(),
+                eq(ResultadoIngreso.BLOQUEADO));
     }
 
     private ResultActions loginDesde(String correo, String contrasena,
                                       String ip) throws Exception {
         return mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"correo\":\"" + correo + "\",\"contrasena\":\"" + contrasena + "\"}")
+                .header("User-Agent", "Prueba/1.0")
                 .with(peticion -> {
                     peticion.setRemoteAddr(ip);
                     return peticion;

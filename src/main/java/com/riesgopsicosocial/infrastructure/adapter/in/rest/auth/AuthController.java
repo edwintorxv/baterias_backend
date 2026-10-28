@@ -10,6 +10,7 @@ import com.riesgopsicosocial.shared.response.ApiResponse;
 import com.riesgopsicosocial.shared.response.ResponseBuilder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -34,7 +35,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request,
                                                            HttpServletRequest http) {
         AutenticacionService.Sesion sesion = service.iniciarSesion(request.correo(), request.contrasena(),
-                http.getRemoteAddr());
+                http.getRemoteAddr(), http.getHeader(HttpHeaders.USER_AGENT));
         return ResponseEntity.ok(ResponseBuilder.success("Sesión iniciada", new LoginResponse(
                 sesion.token().valor(), "Bearer", sesion.token().segundos(), sesion.token().expira(),
                 toResponse(sesion.usuario()))));
