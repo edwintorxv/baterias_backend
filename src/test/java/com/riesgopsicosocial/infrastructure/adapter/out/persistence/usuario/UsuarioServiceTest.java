@@ -235,6 +235,8 @@ class UsuarioServiceTest {
 
         assertTrue(passwordEncoder.matches("nueva12345", actualizado.getContrasenaHash()));
         assertFalse(passwordEncoder.matches("anterior123", actualizado.getContrasenaHash()));
+        assertNotNull(actualizado.getSesionesDesde(), "cierra todas las sesiones (quien la cambia recibe un token nuevo)");
+        assertEquals(0, actualizado.getSesionesDesde().getNano(), "truncado a segundos, como el iat");
         ArgumentCaptor<ContrasenaCambiada> aviso = ArgumentCaptor.forClass(ContrasenaCambiada.class);
         verify(eventos).publishEvent(aviso.capture());
         assertEquals("admin@prueba.co", aviso.getValue().correo());

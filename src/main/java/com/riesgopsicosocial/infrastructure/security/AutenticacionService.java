@@ -73,15 +73,26 @@ public class AutenticacionService {
         return new Sesion(tokenService.emitir(entidad), UsuarioAutenticado.de(entidad));
     }
 
-    public void cambiarContrasena(UsuarioAutenticado usuario, String actual, String nueva) {
+    /**
+     * Cambia la propia contraseña: cierra las sesiones de los demás equipos y devuelve un token nuevo para
+     * que la actual siga abierta. La contraseña actual cuenta para el mismo freno del login (por correo y
+     * por IP): adivinarla aquí o en el login suma al mismo bloqueo (429).
+     */
+    public Sesion cambiarContrasena(UsuarioAutenticado usuario, String actual, String nueva, String ip) {
+        String correo = UsuarioService.normalizarCorreo(usuario.correo());
+        limiteIntentos.verificar(correo, ip);
         UsuarioEntity entidad = usuarioService.obtenerPorId(usuario.id());
-        if (!passwordEncoder.matches(actual, entidad.getContrasenaHash())) {
+        String hash = entidad.getContrasenaHash();
+        if (hash == null || !passwordEncoder.matches(actual, hash)) {
+            limiteIntentos.registrarFallo(correo, ip);
             throw new ValidationException("La contraseña actual no es correcta");
         }
+        limiteIntentos.registrarExito(correo);
         if (actual.equals(nueva)) {
             throw new ValidationException("La contraseña nueva debe ser distinta de la actual");
         }
-        usuarioService.cambiarContrasena(usuario.id(), nueva);
+        UsuarioEntity actualizado = usuarioService.cambiarContrasena(usuario.id(), nueva);
+        return new Sesion(tokenService.emitir(actualizado), UsuarioAutenticado.de(actualizado));
     }
 
     public record Sesion(TokenService.Token token, UsuarioAutenticado usuario) {

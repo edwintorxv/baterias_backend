@@ -40,14 +40,17 @@ public class AuthController {
                 usuario.idEvaluador(), usuario.idCliente());
     }
 
+    private static LoginResponse toResponse(AutenticacionService.Sesion sesion) {
+        return new LoginResponse(sesion.token().valor(), "Bearer", sesion.token().segundos(), sesion.token().expira(),
+                toResponse(sesion.usuario()));
+    }
+
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request,
                                                            HttpServletRequest http) {
         AutenticacionService.Sesion sesion = service.iniciarSesion(request.correo(), request.contrasena(),
                 http.getRemoteAddr(), http.getHeader(HttpHeaders.USER_AGENT));
-        return ResponseEntity.ok(ResponseBuilder.success("Sesión iniciada", new LoginResponse(
-                sesion.token().valor(), "Bearer", sesion.token().segundos(), sesion.token().expira(),
-                toResponse(sesion.usuario()))));
+        return ResponseEntity.ok(ResponseBuilder.success("Sesión iniciada", toResponse(sesion)));
     }
 
     @GetMapping("/yo")
@@ -55,11 +58,19 @@ public class AuthController {
         return ResponseEntity.ok(ResponseBuilder.success("Usuario de la sesión", toResponse(usuario)));
     }
 
+    /**
+     * Cambia la propia contraseña y cierra las sesiones de los demás equipos. Devuelve un token nuevo (como el
+     * login) para que esta sesión siga abierta: el anterior ya no sirve. 400 si la actual no coincide o la
+     * nueva es igual; 429 tras varios intentos fallidos (mismo freno del login).
+     */
     @PutMapping("/contrasena")
-    public ResponseEntity<ApiResponse<Void>> cambiarContrasena(@AuthenticationPrincipal UsuarioAutenticado usuario,
-                                                               @Valid @RequestBody CambioContrasenaRequest request) {
-        service.cambiarContrasena(usuario, request.actual(), request.nueva());
-        return ResponseEntity.ok(ResponseBuilder.success("Contraseña actualizada exitosamente", null));
+    public ResponseEntity<ApiResponse<LoginResponse>> cambiarContrasena(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                                                        @Valid @RequestBody CambioContrasenaRequest request,
+                                                                        HttpServletRequest http) {
+        AutenticacionService.Sesion sesion = service.cambiarContrasena(usuario, request.actual(), request.nueva(),
+                http.getRemoteAddr());
+        return ResponseEntity.ok(ResponseBuilder.success(
+                "Contraseña actualizada. Se cerraron sus sesiones en otros equipos", toResponse(sesion)));
     }
 
     /** Público: si el enlace sirve y para quién (siempre 200; el estado dice si se puede usar). */

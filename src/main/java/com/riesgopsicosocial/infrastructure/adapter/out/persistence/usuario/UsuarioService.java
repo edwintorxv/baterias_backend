@@ -148,14 +148,15 @@ public class UsuarioService {
 
     /**
      * Cambia la contraseña del propio usuario (PUT /auth/contrasena, que antes verifica la actual). El
-     * administrador no tiene cómo escribir contraseñas: para eso genera el enlace. Le avisa por correo
-     * (después del commit, sin la contraseña).
+     * administrador no tiene cómo escribir contraseñas: para eso genera el enlace. Cierra todas sus sesiones
+     * (quien la cambia recibe un token nuevo) y le avisa por correo (después del commit, sin la contraseña).
      */
     @Transactional
     public UsuarioEntity cambiarContrasena(Long id, String contrasena) {
         UsuarioEntity existente = obtenerPorId(id);
         LocalDateTime ahora = LocalDateTime.now();
         existente.setContrasenaHash(passwordEncoder.encode(contrasena));
+        EnlaceContrasenaService.cerrarSesiones(existente, ahora);
         existente.setFechaModificado(ahora);
         existente.setUsuarioModifica(UsuarioActual.nombre());
         UsuarioEntity guardado = repository.save(existente);

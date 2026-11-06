@@ -54,6 +54,7 @@ class CorreoContrasenaCambiadaTest {
             assertEquals(!primeraVez, html.contains("Se cambió la contraseña"));
             assertTrue(html.contains("6 de noviembre de 2026, 9:05 a. m."));
             assertTrue(html.contains("¿No fue usted?"));
+            assertEquals(!primeraVez, html.contains("se cerraron"), "en la invitación no había sesiones");
         }
     }
 

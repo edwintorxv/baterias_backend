@@ -6,6 +6,7 @@
         <span th:text="${primeraVez} ? 'Se definió la contraseña' : 'Se cambió la contraseña'">Se cambió la contraseña</span>
         de su usuario <strong th:text="${correo}">correo</strong> en PsicoBatería el
         <strong th:text="${fecha}">fecha</strong>.
+        <span th:unless="${primeraVez}">Las sesiones que tenía abiertas en otros equipos se cerraron.</span>
     </p>
 
     <p style="margin:0 0 16px;padding:12px 16px;background:#fef3c7;border-radius:6px;color:#78350f;">

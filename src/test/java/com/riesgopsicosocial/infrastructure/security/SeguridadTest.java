@@ -43,6 +43,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /** Seguridad real (filtros, JWT, respuestas 401) con el repositorio simulado: no toca la BD. */
@@ -264,6 +265,85 @@ class SeguridadTest {
         mvc.perform(post("/auth/enlace").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"codigo\":\"abc\",\"contrasena\":\"corta\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ---- Cambiar la propia contraseña (usuarios e IP propios: el limitador se comparte en la clase) ----
+
+    private UsuarioEntity usuarioPropio(long id, String correo) {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setId(id);
+        usuario.setCorreo(correo);
+        usuario.setNombre("Usuario " + id);
+        usuario.setRol(Rol.ADMIN);
+        usuario.setActivo(true);
+        usuario.setContrasenaHash(passwordEncoder.encode("actual-123"));
+        when(repository.findById(id)).thenReturn(Optional.of(usuario));
+        when(repository.findByCorreo(correo)).thenReturn(Optional.of(usuario));
+        when(usuarioService.obtenerPorId(id)).thenReturn(usuario);
+        // Lo que hace el servicio real: guarda la nueva y cierra todas las sesiones.
+        when(usuarioService.cambiarContrasena(eq(id), anyString())).thenAnswer(i -> {
+            usuario.setContrasenaHash(passwordEncoder.encode(i.getArgument(1)));
+            usuario.setSesionesDesde(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+            return usuario;
+        });
+        return usuario;
+    }
+
+    private ResultActions cambiarContrasena(String token, String actual, String nueva, String ip) throws Exception {
+        return mvc.perform(put("/auth/contrasena").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"actual\":\"" + actual + "\",\"nueva\":\"" + nueva + "\"}")
+                .with(peticion -> {
+                    peticion.setRemoteAddr(ip);
+                    return peticion;
+                }));
+    }
+
+    @Test
+    void cambiarContrasena_devuelveTokenNuevo_yLasDemasSesionesSeCierran() throws Exception {
+        UsuarioEntity usuario = usuarioPropio(4L, "cambio@prueba.co");
+        Clock haceUnMinuto = Clock.fixed(Instant.now().minus(Duration.ofMinutes(1)), ZoneOffset.UTC);
+        TokenService emisorAnterior = new TokenService(jwtEncoder, Duration.ofHours(8), haceUnMinuto);
+        String estaSesion = emisorAnterior.emitir(usuario).valor();
+        String otroEquipo = emisorAnterior.emitir(usuario).valor();
+
+        String respuesta = cambiarContrasena(estaSesion, "actual-123", "nueva-clave", "10.7.7.7")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tipo").value("Bearer"))
+                .andExpect(jsonPath("$.data.usuario.correo").value("cambio@prueba.co"))
+                .andReturn().getResponse().getContentAsString();
+        String nuevo = objectMapper.readTree(respuesta).at("/data/token").asText();
+
+        mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + otroEquipo)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + estaSesion)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + nuevo)).andExpect(status().isOk());
+    }
+
+    @Test
+    void cambiarContrasena_actualIncorrecta_400_yTrasCincoFallos429TambienEnElLogin() throws Exception {
+        UsuarioEntity usuario = usuarioPropio(5L, "bloqueo@prueba.co");
+        String token = tokenService.emitir(usuario).valor();
+
+        for (int i = 0; i < 5; i++) {
+            cambiarContrasena(token, "otra-cosa", "nueva-clave", "10.6.6.6")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("La contraseña actual no es correcta"));
+        }
+        cambiarContrasena(token, "actual-123", "nueva-clave", "10.6.6.6")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.errorCode").value("TOO_MANY_REQUESTS"));
+        loginDesde("bloqueo@prueba.co", "actual-123", "10.6.6.6").andExpect(status().isTooManyRequests());
+        verify(usuarioService, never()).cambiarContrasena(eq(5L), anyString());
+    }
+
+    @Test
+    void cambiarContrasena_nuevaIgualALaActual_400() throws Exception {
+        UsuarioEntity usuario = usuarioPropio(6L, "igual@prueba.co");
+
+        cambiarContrasena(tokenService.emitir(usuario).valor(), "actual-123", "actual-123", "10.5.5.5")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("La contraseña nueva debe ser distinta de la actual"));
+        verify(usuarioService, never()).cambiarContrasena(eq(6L), anyString());
     }
 
 }
