@@ -1,6 +1,8 @@
 package com.riesgopsicosocial.infrastructure.adapter.in.rest.usuario;
 
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.usuario.dto.*;
+import com.riesgopsicosocial.infrastructure.adapter.out.correo.CorreoService;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.EnlaceContrasenaService;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.Rol;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioService;
@@ -19,9 +21,13 @@ import java.util.List;
 public class UsuarioController {
 
     private final UsuarioService service;
+    private final EnlaceContrasenaService enlaceService;
+    private final CorreoService correoService;
 
-    public UsuarioController(UsuarioService service) {
+    public UsuarioController(UsuarioService service, EnlaceContrasenaService enlaceService, CorreoService correoService) {
         this.service = service;
+        this.enlaceService = enlaceService;
+        this.correoService = correoService;
     }
 
     private UsuarioResponse toResponse(UsuarioEntity usuario) {
@@ -63,6 +69,18 @@ public class UsuarioController {
             @PathVariable Long id, @Valid @RequestBody ContrasenaRequest request) {
         UsuarioEntity actualizado = service.cambiarContrasena(id, request.contrasena());
         return ResponseEntity.ok(ResponseBuilder.success("Contraseña actualizada exitosamente", toResponse(actualizado)));
+    }
+
+    /**
+     * Genera el enlace para que el usuario defina su contraseña y se lo envía por correo. Desde ya su
+     * contraseña anterior deja de servir y sus sesiones se cierran. La respuesta no trae el enlace.
+     */
+    @PostMapping("/{id}/enlace-contrasena")
+    public ResponseEntity<ApiResponse<UsuarioResponse>> generarEnlaceContrasena(@PathVariable Long id) {
+        UsuarioEntity usuario = enlaceService.generar(id);
+        String mensaje = "Se envió el enlace para definir la contraseña a " + usuario.getCorreo()
+                + (correoService.enviaDeVerdad() ? "" : " (modo log: el enlace quedó en el log del servidor)");
+        return ResponseEntity.ok(ResponseBuilder.success(mensaje, toResponse(usuario)));
     }
 
     @GetMapping

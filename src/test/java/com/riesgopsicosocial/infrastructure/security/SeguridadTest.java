@@ -28,6 +28,8 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.time.ZoneOffset;
 import java.util.Optional;
 
@@ -211,6 +213,32 @@ class SeguridadTest {
         mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void sesionesCerradasDespuesDelToken_401_yElTokenNuevoSirve() throws Exception {
+        Clock haceUnMinuto = Clock.fixed(Instant.now().minus(Duration.ofMinutes(1)), ZoneOffset.UTC);
+        String viejo = new TokenService(jwtEncoder, Duration.ofHours(8), haceUnMinuto).emitir(psicologa).valor();
+        psicologa.setSesionesDesde(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+
+        mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + viejo))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+
+        String nuevo = tokenService.emitir(psicologa).valor();
+        mvc.perform(get("/auth/yo").header("Authorization", "Bearer " + nuevo))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void login_usuarioSinContrasena_401AunqueEscribaElTextoDelRelleno() throws Exception {
+        psicologa.setContrasenaHash(null);
+
+        for (String intento : new String[]{"secreta123", "relleno-para-usuarios-inexistentes"}) {
+            JsonNode respuesta = objectMapper.readTree(login("psicologa@prueba.co", intento));
+            assertEquals("UNAUTHORIZED", respuesta.at("/errorCode").asText(), intento);
+            assertEquals(AutenticacionService.CREDENCIALES_INVALIDAS, respuesta.at("/message").asText(), intento);
+        }
     }
 
 }

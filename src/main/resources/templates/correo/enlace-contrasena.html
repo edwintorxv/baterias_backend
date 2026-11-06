@@ -1,0 +1,33 @@
+<!--/* Enlace para definir la contraseña (invitación o restablecer). Va dentro de base.html. */-->
+<div xmlns:th="http://www.thymeleaf.org">
+    <p style="margin:0 0 16px;">Hola, <strong th:text="${nombre}">Nombre</strong>:</p>
+
+    <p th:if="${invitacion}" style="margin:0 0 16px;">
+        Se creó su usuario en PsicoBatería con el correo <strong th:text="${correo}">correo</strong>.
+        Para empezar, defina su contraseña con el siguiente botón:
+    </p>
+    <p th:unless="${invitacion}" style="margin:0 0 16px;">
+        El administrador generó un enlace para que defina una nueva contraseña de su usuario
+        <strong th:text="${correo}">correo</strong>. Su contraseña anterior ya no sirve y sus sesiones
+        abiertas se cerraron.
+    </p>
+
+    <p style="margin:24px 0;text-align:center;">
+        <a th:href="${enlace}" href="#"
+           style="display:inline-block;background:#1e3a8a;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:6px;">
+            Definir contraseña
+        </a>
+    </p>
+
+    <p style="margin:0 0 16px;">
+        El enlace sirve una sola vez y vence el <strong th:text="${vence}">fecha</strong>.
+        Si vence, comuníquese por teléfono con el administrador para que le genere uno nuevo.
+    </p>
+
+    <p style="margin:0 0 8px;color:#64748b;font-size:12px;">Si el botón no funciona, copie esta dirección en el navegador:</p>
+    <p style="margin:0 0 16px;color:#64748b;font-size:12px;word-break:break-all;" th:text="${enlace}">enlace</p>
+
+    <p style="margin:0;color:#64748b;font-size:12px;">
+        Si usted no esperaba este correo, ignórelo y avise al administrador.
+    </p>
+</div>

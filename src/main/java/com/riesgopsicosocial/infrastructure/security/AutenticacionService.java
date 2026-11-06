@@ -40,8 +40,8 @@ public class AutenticacionService {
     }
 
     /**
-     * Mismo mensaje si el usuario no existe, está inactivo o la contraseña no coincide (401): no se
-     * dice cuál de las tres falló. Con el usuario o la IP bloqueados responde 429 sin mirar la
+     * Mismo mensaje si el usuario no existe, está inactivo, aún no tiene contraseña o no coincide (401):
+     * no se dice cuál falló. Con el usuario o la IP bloqueados responde 429 sin mirar la
      * contraseña, aunque sea la correcta. Cada intento queda en registro_ingreso (el bloqueo, solo el
      * primer rechazo).
      */
@@ -56,8 +56,10 @@ public class AutenticacionService {
             throw e;
         }
         Optional<UsuarioEntity> encontrado = repository.findByCorreo(usuario);
-        boolean coincide = passwordEncoder.matches(contrasena,
-                encontrado.map(UsuarioEntity::getContrasenaHash).orElse(hashDeRelleno));
+        // Sin usuario o sin contraseña (aún no la define por el enlace) se compara contra el relleno para
+        // tardar lo mismo, pero nunca coincide: ni siquiera escribiendo el texto del relleno.
+        String hash = encontrado.map(UsuarioEntity::getContrasenaHash).orElse(null);
+        boolean coincide = passwordEncoder.matches(contrasena, hash != null ? hash : hashDeRelleno) && hash != null;
         Optional<UsuarioEntity> valido = encontrado.filter(u -> coincide && Boolean.TRUE.equals(u.getActivo()));
         Long idUsuario = encontrado.map(UsuarioEntity::getId).orElse(null);
         if (valido.isEmpty()) {

@@ -24,9 +24,12 @@ public class UsuarioEntity {
     @Column(nullable = false, length = 100)
     private String correo;
 
-    /** BCrypt; nunca sale en las respuestas. */
+    /**
+     * BCrypt; nunca sale en las respuestas. NULL mientras no la defina por el enlace (V23): sin
+     * contraseña no se ingresa.
+     */
     @ToString.Exclude
-    @Column(name = "contrasena_hash", nullable = false, length = 100)
+    @Column(name = "contrasena_hash", length = 100)
     private String contrasenaHash;
 
     @Column(nullable = false, length = 200)
@@ -50,6 +53,10 @@ public class UsuarioEntity {
 
     @Column(nullable = false)
     private Boolean activo = true;
+
+    /** Los tokens emitidos antes de este momento se rechazan (V23); NULL = sin restricción. */
+    @Column(name = "sesiones_desde")
+    private LocalDateTime sesionesDesde;
 
     @Column(name = "fecha_creado", insertable = false, updatable = false)
     private LocalDateTime fechaCreado;
