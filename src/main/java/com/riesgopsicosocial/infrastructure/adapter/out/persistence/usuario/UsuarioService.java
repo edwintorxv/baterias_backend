@@ -96,7 +96,7 @@ public class UsuarioService {
     }
 
     /**
-     * La contraseña no se toca aquí: tiene su propio endpoint. Si deja de ser psicólogo, pierde sus
+     * La contraseña no se toca aquí: la define el usuario con el enlace o la cambia él mismo. Si deja de ser psicólogo, pierde sus
      * clientes asignados. Para no quedarse sin administración: nadie se cambia el rol ni se inactiva a
      * sí mismo, y siempre queda al menos un ADMIN activo.
      */
@@ -143,7 +143,10 @@ public class UsuarioService {
         }
     }
 
-    /** Restablece la contraseña (la escoge el administrador). */
+    /**
+     * Cambia la contraseña del propio usuario (PUT /auth/contrasena, que antes verifica la actual). El
+     * administrador no tiene cómo escribir contraseñas: para eso genera el enlace.
+     */
     @Transactional
     public UsuarioEntity cambiarContrasena(Long id, String contrasena) {
         UsuarioEntity existente = obtenerPorId(id);

@@ -15,7 +15,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/** Usuarios de la API y clientes asignados a cada psicólogo. Sin DELETE: se desactivan. */
+/**
+ * Usuarios de la API y clientes asignados a cada psicólogo. Sin DELETE: se desactivan. El administrador
+ * nunca ve ni escribe contraseñas: genera el enlace y el usuario la define (POST /auth/enlace).
+ */
 @RestController
 @RequestMapping("/usuarios")
 public class UsuarioController {
@@ -64,13 +67,6 @@ public class UsuarioController {
         UsuarioEntity actualizado = service.actualizar(id, toEntity(request.correo(), request.nombre(), request.rol(),
                 request.idEvaluador(), request.idCliente(), request.idEvaluado(), request.activo()));
         return ResponseEntity.ok(ResponseBuilder.success("Usuario actualizado exitosamente", toResponse(actualizado)));
-    }
-
-    @PutMapping("/{id}/contrasena")
-    public ResponseEntity<ApiResponse<UsuarioResponse>> cambiarContrasena(
-            @PathVariable Long id, @Valid @RequestBody ContrasenaRequest request) {
-        UsuarioEntity actualizado = service.cambiarContrasena(id, request.contrasena());
-        return ResponseEntity.ok(ResponseBuilder.success("Contraseña actualizada exitosamente", toResponse(actualizado)));
     }
 
     /**
