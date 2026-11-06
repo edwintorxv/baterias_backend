@@ -121,7 +121,8 @@ public class EnlaceContrasenaService {
     }
 
     /**
-     * Guarda la contraseña que el usuario escogió, marca el enlace como usado y cierra sus sesiones. El
+     * Guarda la contraseña que el usuario escogió, marca el enlace como usado, cierra sus sesiones y le avisa
+     * por correo (después del commit, sin la contraseña). El
      * enlace se lee con bloqueo: dos envíos a la vez del mismo enlace no pasan los dos. 409 si no está
      * vigente, con un mensaje que lo remite al administrador.
      *
@@ -138,6 +139,7 @@ public class EnlaceContrasenaService {
         }
         UsuarioEntity u = usuario.get();
         EnlaceContrasenaEntity e = enlace.get();
+        boolean primeraVez = e.getProposito() == PropositoEnlace.INVITACION;
         e.setFechaUso(ahora);
         e.setFechaModificado(ahora);
         e.setUsuarioModifica(u.getCorreo());
@@ -148,6 +150,7 @@ public class EnlaceContrasenaService {
         u.setFechaModificado(ahora);
         u.setUsuarioModifica(u.getCorreo());
         usuarioRepository.save(u);
+        eventos.publishEvent(new ContrasenaCambiada(u.getCorreo(), u.getNombre(), ahora, primeraVez));
         return u;
     }
 

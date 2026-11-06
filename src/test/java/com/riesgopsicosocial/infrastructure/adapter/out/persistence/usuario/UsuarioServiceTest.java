@@ -10,6 +10,8 @@ import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import com.riesgopsicosocial.shared.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,8 +35,9 @@ class UsuarioServiceTest {
     private final EvaluadoJpaRepository evaluadoRepository = mock(EvaluadoJpaRepository.class);
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
     private final EnlaceContrasenaService enlaceService = mock(EnlaceContrasenaService.class);
+    private final ApplicationEventPublisher eventos = mock(ApplicationEventPublisher.class);
     private final UsuarioService service = new UsuarioService(repository, usuarioClienteRepository,
-            evaluadorRepository, clienteRepository, evaluadoRepository, passwordEncoder, enlaceService);
+            evaluadorRepository, clienteRepository, evaluadoRepository, passwordEncoder, enlaceService, eventos);
 
     @BeforeEach
     void guardarDevuelveLoMismo() {
@@ -232,6 +235,17 @@ class UsuarioServiceTest {
 
         assertTrue(passwordEncoder.matches("nueva12345", actualizado.getContrasenaHash()));
         assertFalse(passwordEncoder.matches("anterior123", actualizado.getContrasenaHash()));
+        ArgumentCaptor<ContrasenaCambiada> aviso = ArgumentCaptor.forClass(ContrasenaCambiada.class);
+        verify(eventos).publishEvent(aviso.capture());
+        assertEquals("admin@prueba.co", aviso.getValue().correo());
+        assertFalse(aviso.getValue().primeraVez());
+    }
+
+    @Test
+    void crear_noAvisaCambioDeContrasena() {
+        service.crear(usuario("admin@prueba.co", Rol.ADMIN), "secreta123");
+
+        verifyNoInteractions(eventos);
     }
 
 }

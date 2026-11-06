@@ -210,6 +210,16 @@ class EnlaceContrasenaServiceTest {
         assertEquals(AHORA, enlace.getFechaUso());
         verify(enlaceRepository).save(enlace);
         verify(usuarioRepository).save(usuario);
+        verify(eventos).publishEvent(new ContrasenaCambiada("ana@prueba.co", "Ana", AHORA, true));
+    }
+
+    @Test
+    void definirContrasena_conEnlaceDeRestablecer_avisaQueCambio() {
+        enlaceGuardado("codigo-1").setProposito(PropositoEnlace.RESTABLECER);
+
+        service.definirContrasena("codigo-1", "nueva-clave");
+
+        verify(eventos).publishEvent(new ContrasenaCambiada("ana@prueba.co", "Ana", AHORA, false));
     }
 
     @Test
@@ -223,6 +233,7 @@ class EnlaceContrasenaServiceTest {
         assertThrows(BusinessException.class, () -> service.definirContrasena("no-existe", "nueva-clave"));
         assertNull(enlace.getFechaUso());
         verify(usuarioRepository, never()).save(any());
+        verifyNoInteractions(eventos);
     }
 
     @Test

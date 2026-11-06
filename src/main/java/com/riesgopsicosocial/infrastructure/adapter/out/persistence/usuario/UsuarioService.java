@@ -8,6 +8,7 @@ import com.riesgopsicosocial.infrastructure.adapter.out.persistence.evaluador.Ev
 import com.riesgopsicosocial.shared.exception.BusinessException;
 import com.riesgopsicosocial.shared.exception.ResourceNotFoundException;
 import com.riesgopsicosocial.shared.exception.ValidationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,11 +32,12 @@ public class UsuarioService {
     private final EvaluadoJpaRepository evaluadoRepository;
     private final PasswordEncoder passwordEncoder;
     private final EnlaceContrasenaService enlaceService;
+    private final ApplicationEventPublisher eventos;
 
     public UsuarioService(UsuarioJpaRepository repository, UsuarioClienteJpaRepository usuarioClienteRepository,
                           EvaluadorJpaRepository evaluadorRepository, ClienteJpaRepository clienteRepository,
                           EvaluadoJpaRepository evaluadoRepository, PasswordEncoder passwordEncoder,
-                          EnlaceContrasenaService enlaceService) {
+                          EnlaceContrasenaService enlaceService, ApplicationEventPublisher eventos) {
         this.repository = repository;
         this.usuarioClienteRepository = usuarioClienteRepository;
         this.evaluadorRepository = evaluadorRepository;
@@ -43,6 +45,7 @@ public class UsuarioService {
         this.evaluadoRepository = evaluadoRepository;
         this.passwordEncoder = passwordEncoder;
         this.enlaceService = enlaceService;
+        this.eventos = eventos;
     }
 
     /** Formato de correo (el mismo CHECK de la V20): algo@dominio.ext, sin espacios. */
@@ -145,15 +148,19 @@ public class UsuarioService {
 
     /**
      * Cambia la contraseña del propio usuario (PUT /auth/contrasena, que antes verifica la actual). El
-     * administrador no tiene cómo escribir contraseñas: para eso genera el enlace.
+     * administrador no tiene cómo escribir contraseñas: para eso genera el enlace. Le avisa por correo
+     * (después del commit, sin la contraseña).
      */
     @Transactional
     public UsuarioEntity cambiarContrasena(Long id, String contrasena) {
         UsuarioEntity existente = obtenerPorId(id);
+        LocalDateTime ahora = LocalDateTime.now();
         existente.setContrasenaHash(passwordEncoder.encode(contrasena));
-        existente.setFechaModificado(LocalDateTime.now());
+        existente.setFechaModificado(ahora);
         existente.setUsuarioModifica(UsuarioActual.nombre());
-        return repository.save(existente);
+        UsuarioEntity guardado = repository.save(existente);
+        eventos.publishEvent(new ContrasenaCambiada(existente.getCorreo(), existente.getNombre(), ahora, false));
+        return guardado;
     }
 
     /** Reemplaza los clientes asignados al psicólogo por estos (vacío = ninguno). */
