@@ -10,6 +10,8 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -31,8 +33,9 @@ class EnlaceContrasenaServiceTest {
     private final UsuarioJpaRepository usuarioRepository = mock(UsuarioJpaRepository.class);
     private final EnlaceContrasenaJpaRepository enlaceRepository = mock(EnlaceContrasenaJpaRepository.class);
     private final ApplicationEventPublisher eventos = mock(ApplicationEventPublisher.class);
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
     private final EnlaceContrasenaService service = new EnlaceContrasenaService(usuarioRepository, enlaceRepository,
-            eventos, Clock.fixed(AHORA.atZone(BOGOTA).toInstant(), BOGOTA));
+            eventos, passwordEncoder, Clock.fixed(AHORA.atZone(BOGOTA).toInstant(), BOGOTA));
 
     private UsuarioEntity usuario;
 
@@ -142,6 +145,95 @@ class EnlaceContrasenaServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> service.generar(99L));
         verify(enlaceRepository, never()).save(any());
         verifyNoInteractions(eventos);
+    }
+
+    // ---- Consultar y usar el enlace (página pública, sin sesión) ----
+
+    private EnlaceContrasenaEntity enlaceGuardado(String codigo) {
+        EnlaceContrasenaEntity enlace = new EnlaceContrasenaEntity();
+        enlace.setId(7L);
+        enlace.setFkUsuario(5L);
+        enlace.setCodigoHash(EnlaceContrasenaService.hash(codigo));
+        enlace.setProposito(PropositoEnlace.INVITACION);
+        enlace.setVence(AHORA.plusHours(1));
+        when(enlaceRepository.findByCodigoHash(enlace.getCodigoHash())).thenReturn(Optional.of(enlace));
+        when(enlaceRepository.buscarParaUsar(enlace.getCodigoHash())).thenReturn(Optional.of(enlace));
+        return enlace;
+    }
+
+    @Test
+    void consultar_vigente_traeNombreYCorreo() {
+        enlaceGuardado("codigo-1");
+
+        EnlaceContrasenaService.ConsultaEnlace consulta = service.consultar(" codigo-1 ");
+
+        assertEquals(EstadoEnlace.VIGENTE, consulta.estado());
+        assertEquals("Ana", consulta.nombre());
+        assertEquals("ana@prueba.co", consulta.correo());
+        assertEquals(PropositoEnlace.INVITACION, consulta.proposito());
+    }
+
+    @Test
+    void consultar_noVigente_sinDatosDelUsuario() {
+        EnlaceContrasenaEntity enlace = enlaceGuardado("codigo-1");
+
+        enlace.setVence(AHORA);
+        assertEquals(EstadoEnlace.VENCIDO, service.consultar("codigo-1").estado(), "vence justo ahora");
+        enlace.setVence(AHORA.plusHours(1));
+        enlace.setAnulado(true);
+        assertEquals(EstadoEnlace.ANULADO, service.consultar("codigo-1").estado());
+        enlace.setFechaUso(AHORA.minusMinutes(5));
+        assertEquals(EstadoEnlace.USADO, service.consultar("codigo-1").estado(), "usado gana sobre anulado");
+        enlace.setFechaUso(null);
+        enlace.setAnulado(false);
+        usuario.setActivo(false);
+        EnlaceContrasenaService.ConsultaEnlace inactivo = service.consultar("codigo-1");
+        assertEquals(EstadoEnlace.INVALIDO, inactivo.estado(), "usuario inactivo");
+        assertNull(inactivo.nombre());
+        assertNull(inactivo.correo());
+
+        assertEquals(EstadoEnlace.INVALIDO, service.consultar("no-existe").estado());
+        assertEquals(EstadoEnlace.INVALIDO, service.consultar(" ").estado());
+    }
+
+    @Test
+    void definirContrasena_guardaCifrada_marcaUsado_yCierraSesiones() {
+        EnlaceContrasenaEntity enlace = enlaceGuardado("codigo-1");
+        usuario.setContrasenaHash(null);
+        SecurityContextHolder.clearContext();
+
+        UsuarioEntity resultado = service.definirContrasena("codigo-1", "nueva-clave");
+
+        assertTrue(passwordEncoder.matches("nueva-clave", resultado.getContrasenaHash()));
+        assertEquals(AHORA.withNano(0), resultado.getSesionesDesde());
+        assertEquals("ana@prueba.co", resultado.getUsuarioModifica(), "sin sesión, el cambio lo hace el propio usuario");
+        assertEquals(AHORA, enlace.getFechaUso());
+        verify(enlaceRepository).save(enlace);
+        verify(usuarioRepository).save(usuario);
+    }
+
+    @Test
+    void definirContrasena_noVigente_409ConElMensajeDelEstado() {
+        EnlaceContrasenaEntity enlace = enlaceGuardado("codigo-1");
+        enlace.setVence(AHORA.minusMinutes(1));
+
+        BusinessException vencido = assertThrows(BusinessException.class,
+                () -> service.definirContrasena("codigo-1", "nueva-clave"));
+        assertEquals(EstadoEnlace.VENCIDO.mensaje(), vencido.getMessage());
+        assertThrows(BusinessException.class, () -> service.definirContrasena("no-existe", "nueva-clave"));
+        assertNull(enlace.getFechaUso());
+        verify(usuarioRepository, never()).save(any());
+    }
+
+    @Test
+    void definirContrasena_dosVeces_laSegundaYaEstaUsada() {
+        enlaceGuardado("codigo-1");
+
+        service.definirContrasena("codigo-1", "nueva-clave");
+        BusinessException segunda = assertThrows(BusinessException.class,
+                () -> service.definirContrasena("codigo-1", "otra-clave"));
+        assertEquals(EstadoEnlace.USADO.mensaje(), segunda.getMessage());
+        assertTrue(passwordEncoder.matches("nueva-clave", usuario.getContrasenaHash()));
     }
 
 }

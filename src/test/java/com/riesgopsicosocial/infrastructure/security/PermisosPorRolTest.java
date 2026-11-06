@@ -159,12 +159,16 @@ class PermisosPorRolTest {
     }
 
     @Test
-    void sinSesion_401EnTodoMenosElLogin() throws Exception {
+    void sinSesion_401EnTodoMenosElLoginYElEnlace() throws Exception {
         for (Caso caso : TABLA) {
             assertEquals(401, mvc.perform(request(caso.metodo(), caso.ruta())).andReturn().getResponse().getStatus(),
                     caso.metodo() + " " + caso.ruta());
         }
         assertEquals(200, mvc.perform(request(POST, "/auth/login")).andReturn().getResponse().getStatus());
+        assertEquals(200, mvc.perform(request(GET, "/auth/enlace")).andReturn().getResponse().getStatus());
+        assertEquals(200, mvc.perform(request(POST, "/auth/enlace")).andReturn().getResponse().getStatus());
+        assertEquals(401, mvc.perform(request(PUT, "/auth/enlace")).andReturn().getResponse().getStatus(),
+                "solo GET y POST son públicos");
     }
 
 }

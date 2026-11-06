@@ -30,16 +30,19 @@ public class UsuarioService {
     private final ClienteJpaRepository clienteRepository;
     private final EvaluadoJpaRepository evaluadoRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EnlaceContrasenaService enlaceService;
 
     public UsuarioService(UsuarioJpaRepository repository, UsuarioClienteJpaRepository usuarioClienteRepository,
                           EvaluadorJpaRepository evaluadorRepository, ClienteJpaRepository clienteRepository,
-                          EvaluadoJpaRepository evaluadoRepository, PasswordEncoder passwordEncoder) {
+                          EvaluadoJpaRepository evaluadoRepository, PasswordEncoder passwordEncoder,
+                          EnlaceContrasenaService enlaceService) {
         this.repository = repository;
         this.usuarioClienteRepository = usuarioClienteRepository;
         this.evaluadorRepository = evaluadorRepository;
         this.clienteRepository = clienteRepository;
         this.evaluadoRepository = evaluadoRepository;
         this.passwordEncoder = passwordEncoder;
+        this.enlaceService = enlaceService;
     }
 
     /** Formato de correo (el mismo CHECK de la V20): algo@dominio.ext, sin espacios. */
@@ -59,6 +62,24 @@ public class UsuarioService {
         return normalizado;
     }
 
+    /**
+     * Crea el usuario sin contraseña y, si queda activo, le envía la invitación por correo para que la
+     * defina (mismas reglas del enlace: 48 h, un solo uso). Si se crea inactivo, el enlace se genera
+     * cuando se active.
+     */
+    @Transactional
+    public UsuarioEntity crearConInvitacion(UsuarioEntity entidad) {
+        UsuarioEntity creado = crear(entidad, null);
+        if (Boolean.TRUE.equals(creado.getActivo())) {
+            enlaceService.generar(creado);
+        }
+        return creado;
+    }
+
+    /**
+     * @param contrasena null = sin contraseña hasta que la defina por el enlace; solo el primer
+     *                   administrador se crea con una (desde la configuración)
+     */
     @Transactional
     public UsuarioEntity crear(UsuarioEntity entidad, String contrasena) {
         entidad.setCorreo(validarCorreo(entidad.getCorreo()));
@@ -66,7 +87,7 @@ public class UsuarioService {
             throw new BusinessException("Ya existe un usuario con el correo " + entidad.getCorreo());
         }
         validarVinculo(entidad, null);
-        entidad.setContrasenaHash(passwordEncoder.encode(contrasena));
+        entidad.setContrasenaHash(contrasena == null ? null : passwordEncoder.encode(contrasena));
         if (entidad.getActivo() == null) {
             entidad.setActivo(true);
         }

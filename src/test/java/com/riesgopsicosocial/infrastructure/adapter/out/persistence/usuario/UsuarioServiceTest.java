@@ -32,8 +32,9 @@ class UsuarioServiceTest {
     private final ClienteJpaRepository clienteRepository = mock(ClienteJpaRepository.class);
     private final EvaluadoJpaRepository evaluadoRepository = mock(EvaluadoJpaRepository.class);
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
+    private final EnlaceContrasenaService enlaceService = mock(EnlaceContrasenaService.class);
     private final UsuarioService service = new UsuarioService(repository, usuarioClienteRepository,
-            evaluadorRepository, clienteRepository, evaluadoRepository, passwordEncoder);
+            evaluadorRepository, clienteRepository, evaluadoRepository, passwordEncoder, enlaceService);
 
     @BeforeEach
     void guardarDevuelveLoMismo() {
@@ -62,6 +63,24 @@ class UsuarioServiceTest {
         assertNotEquals("secreta123", creado.getContrasenaHash());
         assertTrue(passwordEncoder.matches("secreta123", creado.getContrasenaHash()));
         assertTrue(creado.getActivo());
+    }
+
+    @Test
+    void crearConInvitacion_sinContrasenaYConEnlace() {
+        UsuarioEntity creado = service.crearConInvitacion(usuario("ana@prueba.co", Rol.ADMIN));
+
+        assertNull(creado.getContrasenaHash(), "la define el usuario con el enlace");
+        assertTrue(creado.getActivo());
+        verify(enlaceService).generar(creado);
+    }
+
+    @Test
+    void crearConInvitacion_inactivo_sinEnlaceHastaQueSeActive() {
+        UsuarioEntity inactivo = usuario("ana@prueba.co", Rol.ADMIN);
+        inactivo.setActivo(false);
+
+        assertNull(service.crearConInvitacion(inactivo).getContrasenaHash());
+        verifyNoInteractions(enlaceService);
     }
 
     @Test

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.auth.AuthController;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.registroingreso.ResultadoIngreso;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.EnlaceContrasenaService;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.EstadoEnlace;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.Rol;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioEntity;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.aplicacion.AplicacionJpaRepository;
@@ -75,6 +77,8 @@ class SeguridadTest {
     private RespuestaJpaRepository respuestaRepository;
     @MockitoBean
     private RegistroIngresos registroIngresos;
+    @MockitoBean
+    private EnlaceContrasenaService enlaceService;
 
     private UsuarioEntity psicologa;
 
@@ -239,6 +243,27 @@ class SeguridadTest {
             assertEquals("UNAUTHORIZED", respuesta.at("/errorCode").asText(), intento);
             assertEquals(AutenticacionService.CREDENCIALES_INVALIDAS, respuesta.at("/message").asText(), intento);
         }
+    }
+
+    @Test
+    void enlace_sinSesion_consultarYDefinir() throws Exception {
+        when(enlaceService.consultar("vencido")).thenReturn(
+                new EnlaceContrasenaService.ConsultaEnlace(EstadoEnlace.VENCIDO, null, null, null, null));
+        mvc.perform(get("/auth/enlace").param("codigo", "vencido"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.vigente").value(false))
+                .andExpect(jsonPath("$.data.estado").value("VENCIDO"))
+                .andExpect(jsonPath("$.data.nombre").doesNotExist());
+
+        when(enlaceService.definirContrasena("abc", "nueva-clave")).thenReturn(psicologa);
+        mvc.perform(post("/auth/enlace").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codigo\":\"abc\",\"contrasena\":\"nueva-clave\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("psicologa@prueba.co"));
+
+        mvc.perform(post("/auth/enlace").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codigo\":\"abc\",\"contrasena\":\"corta\"}"))
+                .andExpect(status().isBadRequest());
     }
 
 }

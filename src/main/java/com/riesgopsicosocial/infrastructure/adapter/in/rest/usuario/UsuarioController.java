@@ -50,10 +50,12 @@ public class UsuarioController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<UsuarioResponse>> crear(@Valid @RequestBody UsuarioCrearRequest request) {
-        UsuarioEntity creado = service.crear(toEntity(request.correo(), request.nombre(), request.rol(),
-                request.idEvaluador(), request.idCliente(), request.idEvaluado(), request.activo()), request.contrasena());
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ResponseBuilder.success("Usuario creado exitosamente", toResponse(creado)));
+        UsuarioEntity creado = service.crearConInvitacion(toEntity(request.correo(), request.nombre(), request.rol(),
+                request.idEvaluador(), request.idCliente(), request.idEvaluado(), request.activo()));
+        String mensaje = Boolean.TRUE.equals(creado.getActivo())
+                ? "Usuario creado. Se envió la invitación para definir la contraseña a " + creado.getCorreo() + modoLog()
+                : "Usuario creado inactivo: genere el enlace de contraseña cuando lo active";
+        return ResponseEntity.status(HttpStatus.CREATED).body(ResponseBuilder.success(mensaje, toResponse(creado)));
     }
 
     @PutMapping("/{id}")
@@ -78,9 +80,13 @@ public class UsuarioController {
     @PostMapping("/{id}/enlace-contrasena")
     public ResponseEntity<ApiResponse<UsuarioResponse>> generarEnlaceContrasena(@PathVariable Long id) {
         UsuarioEntity usuario = enlaceService.generar(id);
-        String mensaje = "Se envió el enlace para definir la contraseña a " + usuario.getCorreo()
-                + (correoService.enviaDeVerdad() ? "" : " (modo log: el enlace quedó en el log del servidor)");
+        String mensaje = "Se envió el enlace para definir la contraseña a " + usuario.getCorreo() + modoLog();
         return ResponseEntity.ok(ResponseBuilder.success(mensaje, toResponse(usuario)));
+    }
+
+    /** En desarrollo, sin clave de Brevo, el correo no sale: el enlace queda en el log del servidor. */
+    private String modoLog() {
+        return correoService.enviaDeVerdad() ? "" : " (modo log: el enlace quedó en el log del servidor)";
     }
 
     @GetMapping

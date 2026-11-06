@@ -8,11 +8,11 @@ import jakarta.validation.constraints.Size;
 
 /**
  * Según el rol va un solo vínculo: idEvaluador (PSICOLOGO), idCliente (CLIENTE) o idEvaluado
- * (EVALUADO); ADMIN sin vínculo. BCrypt solo usa los primeros 72 bytes: de ahí el máximo.
+ * (EVALUADO); ADMIN sin vínculo. Sin contraseña: el usuario la define con el enlace que le llega por
+ * correo.
  */
 public record UsuarioCrearRequest(
         @NotBlank @Email @Size(max = 100) String correo,
-        @NotBlank @Size(min = 8, max = 72) String contrasena,
         @NotBlank @Size(max = 200) String nombre,
         @NotNull Rol rol,
         Long idEvaluador,

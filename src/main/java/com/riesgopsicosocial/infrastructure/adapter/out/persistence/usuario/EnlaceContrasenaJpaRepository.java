@@ -1,6 +1,8 @@
 package com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +13,11 @@ import java.util.Optional;
 public interface EnlaceContrasenaJpaRepository extends JpaRepository<EnlaceContrasenaEntity, Long> {
 
     Optional<EnlaceContrasenaEntity> findByCodigoHash(String codigoHash);
+
+    /** Con bloqueo de escritura: para usarlo, que dos envíos a la vez no pasen los dos. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from EnlaceContrasenaEntity e where e.codigoHash = :codigoHash")
+    Optional<EnlaceContrasenaEntity> buscarParaUsar(@Param("codigoHash") String codigoHash);
 
     /** Anula los enlaces del usuario que aún no se han usado; devuelve cuántos. */
     @Modifying

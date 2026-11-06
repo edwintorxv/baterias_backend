@@ -1,9 +1,14 @@
 package com.riesgopsicosocial.infrastructure.adapter.in.rest.auth;
 
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.auth.dto.CambioContrasenaRequest;
+import com.riesgopsicosocial.infrastructure.adapter.in.rest.auth.dto.DefinirContrasenaRequest;
+import com.riesgopsicosocial.infrastructure.adapter.in.rest.auth.dto.EnlaceContrasenaResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.auth.dto.LoginRequest;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.auth.dto.LoginResponse;
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.auth.dto.UsuarioSesionResponse;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.EnlaceContrasenaService;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.EstadoEnlace;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioEntity;
 import com.riesgopsicosocial.infrastructure.security.AutenticacionService;
 import com.riesgopsicosocial.infrastructure.security.UsuarioAutenticado;
 import com.riesgopsicosocial.shared.response.ApiResponse;
@@ -15,15 +20,19 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-/** Inicio de sesión (abierto) y datos/contraseña de quien tiene la sesión. */
+/**
+ * Inicio de sesión y enlace de contraseña (abiertos), y datos/contraseña de quien tiene la sesión.
+ */
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
 
     private final AutenticacionService service;
+    private final EnlaceContrasenaService enlaceService;
 
-    public AuthController(AutenticacionService service) {
+    public AuthController(AutenticacionService service, EnlaceContrasenaService enlaceService) {
         this.service = service;
+        this.enlaceService = enlaceService;
     }
 
     private static UsuarioSesionResponse toResponse(UsuarioAutenticado usuario) {
@@ -51,6 +60,26 @@ public class AuthController {
                                                                @Valid @RequestBody CambioContrasenaRequest request) {
         service.cambiarContrasena(usuario, request.actual(), request.nueva());
         return ResponseEntity.ok(ResponseBuilder.success("Contraseña actualizada exitosamente", null));
+    }
+
+    /** Público: si el enlace sirve y para quién (siempre 200; el estado dice si se puede usar). */
+    @GetMapping("/enlace")
+    public ResponseEntity<ApiResponse<EnlaceContrasenaResponse>> consultarEnlace(@RequestParam String codigo) {
+        EnlaceContrasenaService.ConsultaEnlace consulta = enlaceService.consultar(codigo);
+        boolean vigente = consulta.estado() == EstadoEnlace.VIGENTE;
+        return ResponseEntity.ok(ResponseBuilder.success(vigente ? "Enlace vigente" : consulta.estado().mensaje(),
+                new EnlaceContrasenaResponse(vigente, consulta.estado(), consulta.estado().mensaje(),
+                        consulta.proposito(), consulta.nombre(), consulta.correo(), consulta.vence())));
+    }
+
+    /**
+     * Público: define la contraseña con el enlace (un solo uso) y cierra las sesiones abiertas. Devuelve
+     * el correo para llevarlo al inicio de sesión; no inicia sesión. 409 si el enlace no está vigente.
+     */
+    @PostMapping("/enlace")
+    public ResponseEntity<ApiResponse<String>> definirContrasena(@Valid @RequestBody DefinirContrasenaRequest request) {
+        UsuarioEntity usuario = enlaceService.definirContrasena(request.codigo(), request.contrasena());
+        return ResponseEntity.ok(ResponseBuilder.success("Contraseña definida: ya puede iniciar sesión", usuario.getCorreo()));
     }
 
 }
