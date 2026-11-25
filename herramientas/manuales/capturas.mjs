@@ -129,6 +129,12 @@ const CONCLUSIONES_EJEMPLO = {
     accionesLargoPlazo: 'Revisión de cargas de trabajo y nueva aplicación de la batería según la periodicidad.',
 };
 
+/** Observaciones y recomendaciones de ejemplo del informe individual. */
+const OBSERVACIONES_EJEMPLO = {
+    observaciones: 'Refiere alta carga de trabajo en los cierres de mes y poco reconocimiento por su desempeño.',
+    recomendaciones: 'Participar en el programa de pausas activas y en los talleres de manejo del estrés.',
+};
+
 /** Recorre la respuesta: primero por la forma de cada objeto, luego cualquier texto que contenga un valor original. */
 function anonimizar(dato) {
     const recorrer = o => {
@@ -144,6 +150,9 @@ function anonimizar(dato) {
         if (typeof o.evaluador === 'string') o.evaluador = nombreEvaluador(o.evaluador);
         if (typeof o.correo === 'string') o.correo = correo(o.correo);
         if (typeof o.nombreContacto === 'string') o.nombreContacto = reemplazo(o.nombreContacto, () => 'Contacto de Ejemplo');
+        // Texto libre de prueba en la aplicación (informe individual): textos de ejemplo.
+        if (typeof o.observaciones === 'string' && o.observaciones.trim()) o.observaciones = OBSERVACIONES_EJEMPLO.observaciones;
+        if (typeof o.recomendaciones === 'string' && o.recomendaciones.trim()) o.recomendaciones = OBSERVACIONES_EJEMPLO.recomendaciones;
         if ('accionesCortoPlazo' in o) {
             for (const [campo, texto] of Object.entries(CONCLUSIONES_EJEMPLO)) if (o[campo]) o[campo] = texto;
         }
