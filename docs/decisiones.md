@@ -178,6 +178,10 @@ El enlace vence a las 48 h y es de un solo uso.
 
 **2026-11-24 · Documentación técnica para desarrolladores**, en Markdown dentro de `docs/`, versionada con el código. El detalle de cada endpoint queda en Swagger.
 
+**2026-11-24 · Versión en Word de los manuales**, generada desde los `.md` con un script del repo (`herramientas/manuales/`). Es un solo documento, y los diagramas se convierten a imagen en el equipo. El `.docx` se guarda fuera del repo.
+- *Motivo*: tener un documento para entregar o imprimir sin duplicar el contenido. Los `.md` siguen siendo la fuente y el Word se regenera.
+- *Descartado*: convertir los diagramas con un servicio en línea, porque enviaría la estructura del sistema afuera, y guardar los `.docx` en git, porque son binarios.
+
 ## Por decidir
 
 | Tema | Estado |
