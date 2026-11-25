@@ -13,11 +13,10 @@ No se envía nada al crear el primer administrador, que se crea con la contrase�
 
 ```mermaid
 flowchart LR
-    S[Servicio<br/>EnlaceContrasenaService<br/>UsuarioService] -- "publica evento<br/>(dentro de la transacción)" --> E((Evento))
-    E -- "@TransactionalEventListener<br/>después del commit" --> L[CorreoEnlaceContrasena<br/>CorreoContrasenaCambiada]
-    L -- "enviar(para, asunto,<br/>plantilla, variables)" --> C[CorreoService<br/>@Async]
-    C -- "Thymeleaf:<br/>plantilla dentro de base.html" --> C
-    C -- "POST /v3/smtp/email" --> B[Brevo]
+    S["Servicio<br/>EnlaceContrasenaService<br/>UsuarioService"] -->|"publica evento<br/>(dentro de la transacción)"| E(("Evento"))
+    E -->|"#64;TransactionalEventListener<br/>después del commit"| L["CorreoEnlaceContrasena<br/>CorreoContrasenaCambiada"]
+    L -->|"enviar(para, asunto,<br/>plantilla, variables)"| C["CorreoService<br/>#64;Async"]
+    C -->|"plantilla Thymeleaf dentro de base.html<br/>POST /v3/smtp/email"| B["Brevo"]
 ```
 
 Todo está en `infrastructure/adapter/out/correo`, salvo los eventos, que están junto a sus servicios en `persistence/usuario`.

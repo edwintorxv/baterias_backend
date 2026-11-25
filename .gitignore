@@ -41,3 +41,6 @@ logs/
 ### Secretos y respaldos ###
 .env
 *.dump
+
+# Herramienta del manual en Word
+herramientas/manuales/node_modules/

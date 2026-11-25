@@ -1,0 +1,14 @@
+{
+  "name": "manuales",
+  "private": true,
+  "description": "Genera el Manual técnico (Word) a partir de README.md y docs/*.md",
+  "type": "module",
+  "scripts": {
+    "generar": "node generar.mjs"
+  },
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "11.4.2",
+    "docx": "9.5.0",
+    "marked": "15.0.12"
+  }
+}
