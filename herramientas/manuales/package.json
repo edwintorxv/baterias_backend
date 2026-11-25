@@ -1,10 +1,11 @@
 {
   "name": "manuales",
   "private": true,
-  "description": "Genera el Manual técnico (Word) a partir de README.md y docs/*.md",
+  "description": "Genera el Manual técnico (Word) del backend o del front a partir de README.md y docs/*.md",
   "type": "module",
   "scripts": {
-    "generar": "node generar.mjs"
+    "generar": "node generar.mjs",
+    "generar:front": "node generar.mjs --proyecto front"
   },
   "dependencies": {
     "@mermaid-js/mermaid-cli": "11.4.2",

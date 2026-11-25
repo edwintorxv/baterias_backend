@@ -1,9 +1,11 @@
-// Genera el Manual técnico (Word) a partir de README.md y docs/*.md.
+// Genera el Manual técnico (Word) a partir de README.md y docs/*.md de un repositorio (backend o front).
 // Los .md son la fuente: el Word nunca se edita a mano, se vuelve a generar.
 //
 //   npm install            (una vez)
-//   npm run generar        → ~/proyectos/Documentacion/baterias/Manual técnico/
+//   npm run generar        → ~/proyectos/Documentacion/baterias/Manual técnico/ (backend)
+//   npm run generar:front  → ídem, manual del front (repo baterias_front al lado del backend)
 //   npm run generar -- --salida /otra/ruta/manual.docx
+//   npm run generar:front -- --raiz /otra/ruta/baterias_front
 //
 // Los diagramas Mermaid se convierten a PNG en el equipo con mermaid-cli (nada sale del equipo).
 
@@ -20,25 +22,58 @@ import {
 } from 'docx';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const RAIZ = path.resolve(AQUI, '..', '..');
+const RAIZ_BACKEND = path.resolve(AQUI, '..', '..');
+const CARPETA_SALIDA = path.join(os.homedir(), 'proyectos', 'Documentacion', 'baterias', 'Manual técnico');
 
-/** Capítulos en orden: archivo y título del capítulo (el H1 del .md se reemplaza por este). */
-const CAPITULOS = [
-    { archivo: 'README.md', titulo: 'Introducción y puesta en marcha' },
-    { archivo: 'docs/arquitectura.md', titulo: 'Arquitectura' },
-    { archivo: 'docs/modelo-de-datos.md', titulo: 'Modelo de datos' },
-    { archivo: 'docs/motor-de-calculo.md', titulo: 'Motor de cálculo' },
-    { archivo: 'docs/informes.md', titulo: 'Informes' },
-    { archivo: 'docs/seguridad.md', titulo: 'Seguridad' },
-    { archivo: 'docs/correo.md', titulo: 'Correo' },
-    { archivo: 'docs/despliegue.md', titulo: 'Despliegue' },
-    { archivo: 'docs/decisiones.md', titulo: 'Registro de decisiones' },
-];
+/**
+ * Un manual por repositorio. `raiz` es la carpeta del repo (el front se busca al lado del backend, con la misma
+ * organización de carpetas; `--raiz` la cambia). Capítulos en orden: archivo y título del capítulo (el H1 del .md
+ * se reemplaza por este).
+ */
+const PROYECTOS = {
+    backend: {
+        raiz: RAIZ_BACKEND,
+        subtitulo: 'Backend',
+        capitulos: [
+            { archivo: 'README.md', titulo: 'Introducción y puesta en marcha' },
+            { archivo: 'docs/arquitectura.md', titulo: 'Arquitectura' },
+            { archivo: 'docs/modelo-de-datos.md', titulo: 'Modelo de datos' },
+            { archivo: 'docs/motor-de-calculo.md', titulo: 'Motor de cálculo' },
+            { archivo: 'docs/informes.md', titulo: 'Informes' },
+            { archivo: 'docs/seguridad.md', titulo: 'Seguridad' },
+            { archivo: 'docs/correo.md', titulo: 'Correo' },
+            { archivo: 'docs/despliegue.md', titulo: 'Despliegue' },
+            { archivo: 'docs/decisiones.md', titulo: 'Registro de decisiones' },
+        ],
+    },
+    front: {
+        raiz: path.resolve(RAIZ_BACKEND, '..', '..', 'frontend', 'baterias_front'),
+        subtitulo: 'Frontend',
+        capitulos: [
+            { archivo: 'README.md', titulo: 'Introducción y puesta en marcha' },
+            { archivo: 'docs/arquitectura.md', titulo: 'Arquitectura' },
+            { archivo: 'docs/pantallas.md', titulo: 'Pantallas' },
+            { archivo: 'docs/seguridad.md', titulo: 'Seguridad' },
+            { archivo: 'docs/patrones.md', titulo: 'Patrones' },
+            { archivo: 'docs/graficos-y-tema.md', titulo: 'Gráficos y tema' },
+            { archivo: 'docs/despliegue.md', titulo: 'Despliegue' },
+            { archivo: 'docs/decisiones.md', titulo: 'Registro de decisiones' },
+        ],
+    },
+};
+
+const NOMBRE_PROYECTO = argumento('--proyecto') ?? 'backend';
+const PROYECTO = PROYECTOS[NOMBRE_PROYECTO];
+if (!PROYECTO) {
+    console.error(`Proyecto desconocido: ${NOMBRE_PROYECTO} (opciones: ${Object.keys(PROYECTOS).join(', ')})`);
+    process.exit(1);
+}
+const RAIZ = path.resolve(argumento('--raiz') ?? PROYECTO.raiz);
+const CAPITULOS = PROYECTO.capitulos;
 
 const TITULO = 'Manual técnico PsicoBatería';
-const SUBTITULO = 'Backend';
-const SALIDA_POR_DEFECTO = path.join(os.homedir(), 'proyectos', 'Documentacion', 'baterias', 'Manual técnico',
-    'Manual técnico PsicoBatería – Backend.docx');
+const SUBTITULO = PROYECTO.subtitulo;
+const SALIDA_POR_DEFECTO = path.join(CARPETA_SALIDA, `${TITULO} – ${SUBTITULO}.docx`);
 
 // Estilo: azul de la marca, carta, márgenes de 1".
 const AZUL = '1E3A8A';
@@ -69,10 +104,13 @@ function marcador(texto) {
     return ('m_' + limpio).slice(0, 40);
 }
 
-/** Capítulo al que apunta una ruta como "docs/seguridad.md", "seguridad.md" o "README.md". */
+/**
+ * Capítulo al que apunta una ruta como "docs/seguridad.md", "seguridad.md", "../README.md" o "README.md". Una ruta
+ * de otro repositorio ("baterias_backend/docs/seguridad.md") no es un capítulo de este manual: queda como código.
+ */
 function capituloDe(ruta) {
-    const base = path.basename(ruta.split('#')[0]);
-    return CAPITULOS.findIndex(c => path.basename(c.archivo) === base);
+    const limpia = ruta.split('#')[0].replace(/^(\.\.?\/)+/, '');
+    return CAPITULOS.findIndex(c => c.archivo === limpia || path.basename(c.archivo) === limpia);
 }
 
 function decodificar(texto) {
@@ -414,7 +452,7 @@ function documento(capitulos) {
     return new Document({
         creator: 'PsicoBatería',
         title: `${TITULO} – ${SUBTITULO}`,
-        description: 'Documentación técnica del backend, generada desde README.md y docs/*.md',
+        description: `Documentación técnica del ${SUBTITULO.toLowerCase()}, generada desde README.md y docs/*.md`,
         styles: {
             default: {
                 document: { run: { font: FUENTE, size: 21, color: '1F2937' }, paragraph: { spacing: { after: 120, line: 276 } } },
