@@ -185,6 +185,11 @@ El enlace vence a las 48 h y es de un solo uso.
 - *Motivo*: tener un documento para entregar o imprimir sin duplicar el contenido. Los `.md` siguen siendo la fuente y el Word se regenera.
 - *Descartado*: convertir los diagramas con un servicio en línea, porque enviaría la estructura del sistema afuera, y guardar los `.docx` en git, porque son binarios.
 
+**2026-11-25 · Manuales de usuario por rol** (Psicólogo, Cliente, Administrador) con capturas de pantalla, en el estilo de los de Control Procesos. El `.md`, las capturas y el Word viven **fuera de los repos** (`Documentacion/baterias/Manuales de usuario/`); en el repo solo está la herramienta (`capturas.mjs`, `generar.mjs`).
+- *Motivo*: son documentos para entregar a los usuarios, no documentación del código.
+- **Las capturas usan datos ficticios**: el script cambia al vuelo, solo en el navegador, los nombres, documentos, empresas, correos, IP y firmas, y no guarda una captura si en la pantalla queda algún valor original. La base local (la demo) no se toca.
+- *Consecuencia*: si cambia una pantalla, se regeneran las capturas de los roles que la ven y sus Word.
+
 ## Por decidir
 
 | Tema | Estado |

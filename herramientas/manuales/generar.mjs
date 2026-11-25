@@ -24,9 +24,14 @@ import {
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ_BACKEND = path.resolve(AQUI, '..', '..');
 const CARPETA_SALIDA = path.join(os.homedir(), 'proyectos', 'Documentacion', 'baterias', 'Manual técnico');
+/** Manuales de usuario: el .md, las capturas (capturas/<rol>/) y el Word, fuera de los repos. */
+const CARPETA_USUARIO = path.join(os.homedir(), 'proyectos', 'Documentacion', 'baterias', 'Manuales de usuario');
 
 /**
- * Un manual por repositorio. `raiz` es la carpeta del repo (el front se busca al lado del backend, con la misma
+ * Manuales técnicos: uno por repositorio. Manuales de usuario (`tipo: 'usuario'`): uno por rol, en un solo .md
+ * donde cada título `#` es un capítulo; sus secciones se numeran (1.1, 1.2…) y las imágenes llevan "Figura N".
+ *
+ * Técnicos: un manual por repositorio. `raiz` es la carpeta del repo (el front se busca al lado del backend, con la misma
  * organización de carpetas; `--raiz` la cambia). Capítulos en orden: archivo y título del capítulo (el H1 del .md
  * se reemplaza por este).
  */
@@ -60,6 +65,18 @@ const PROYECTOS = {
             { archivo: 'docs/decisiones.md', titulo: 'Registro de decisiones' },
         ],
     },
+    psicologo: {
+        tipo: 'usuario', raiz: CARPETA_USUARIO, archivo: 'manual-psicologo.md',
+        subtitulo: 'Manual del Psicólogo', descripcion: 'Profesional que aplica y califica la batería',
+    },
+    administrador: {
+        tipo: 'usuario', raiz: CARPETA_USUARIO, archivo: 'manual-administrador.md',
+        subtitulo: 'Manual del Administrador', descripcion: 'Usuarios, empresas, evaluadores y configuración',
+    },
+    cliente: {
+        tipo: 'usuario', raiz: CARPETA_USUARIO, archivo: 'manual-cliente.md',
+        subtitulo: 'Manual del Cliente', descripcion: 'Usuario de la empresa evaluada',
+    },
 };
 
 const NOMBRE_PROYECTO = argumento('--proyecto') ?? 'backend';
@@ -69,11 +86,24 @@ if (!PROYECTO) {
     process.exit(1);
 }
 const RAIZ = path.resolve(argumento('--raiz') ?? PROYECTO.raiz);
-const CAPITULOS = PROYECTO.capitulos;
+const DE_USUARIO = PROYECTO.tipo === 'usuario';
+const CAPITULOS = DE_USUARIO ? capitulosDeUnArchivo(path.join(RAIZ, PROYECTO.archivo)) : PROYECTO.capitulos;
 
-const TITULO = 'Manual técnico PsicoBatería';
+const TITULO = DE_USUARIO ? 'PsicoBatería' : 'Manual técnico PsicoBatería';
 const SUBTITULO = PROYECTO.subtitulo;
-const SALIDA_POR_DEFECTO = path.join(CARPETA_SALIDA, `${TITULO} – ${SUBTITULO}.docx`);
+const SALIDA_POR_DEFECTO = DE_USUARIO
+    ? path.join(CARPETA_USUARIO, `${SUBTITULO} – PsicoBatería.docx`)
+    : path.join(CARPETA_SALIDA, `${TITULO} – ${SUBTITULO}.docx`);
+
+/** Un .md con un capítulo por cada título `#` (lo de antes del primero se ignora). */
+function capitulosDeUnArchivo(ruta) {
+    const capitulos = [];
+    for (const t of marked.lexer(fs.readFileSync(ruta, 'utf8'))) {
+        if (t.type === 'heading' && t.depth === 1) capitulos.push({ archivo: path.basename(ruta), titulo: decodificar(t.text), tokens: [] });
+        else if (capitulos.length) capitulos.at(-1).tokens.push(t);
+    }
+    return capitulos;
+}
 
 // Estilo: azul de la marca, carta, márgenes de 1".
 const AZUL = '1E3A8A';
@@ -118,6 +148,18 @@ function decodificar(texto) {
         .replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 }
 
+/** Ancho y alto de un JPEG (marcador SOF). */
+function tamanoJpeg(buffer) {
+    let i = 2;
+    while (i < buffer.length) {
+        const marca = buffer[i + 1];
+        const largo = buffer.readUInt16BE(i + 2);
+        if (marca >= 0xC0 && marca <= 0xC3) return { ancho: buffer.readUInt16BE(i + 7), alto: buffer.readUInt16BE(i + 5) };
+        i += 2 + largo;
+    }
+    throw new Error('JPEG sin dimensiones');
+}
+
 /** Ancho y alto de un PNG (cabecera IHDR). */
 function tamanoPng(buffer) {
     return { ancho: buffer.readUInt32BE(16), alto: buffer.readUInt32BE(20) };
@@ -140,6 +182,28 @@ let numeroDiagrama = 0;
 const listasNumeradas = []; // una referencia por lista numerada, para que cada una empiece en 1
 
 let diagramas = 0;
+let figuras = 0;
+
+/** Captura de pantalla con su pie "Figura N. texto" (manuales de usuario: `![texto](capturas/rol/archivo.jpg)`). */
+function figura(imagen) {
+    figuras++;
+    const datos = fs.readFileSync(path.join(RAIZ, decodeURIComponent(imagen.href)));
+    const esPng = imagen.href.toLowerCase().endsWith('.png');
+    const { ancho, alto } = esPng ? tamanoPng(datos) : tamanoJpeg(datos);
+    const w = 560; // ~5,8": deja margen a los lados y cabe más texto en la página
+    const h = Math.round(alto * w / ancho);
+    return [
+        new Paragraph({
+            alignment: AlignmentType.CENTER, keepNext: true, spacing: { before: 160, after: 60 },
+            children: [new ImageRun({ type: esPng ? 'png' : 'jpg', data: datos, transformation: { width: w, height: h },
+                altText: { name: `Figura ${figuras}`, title: `Figura ${figuras}`, description: decodificar(imagen.text) } })],
+        }),
+        new Paragraph({
+            alignment: AlignmentType.CENTER, spacing: { after: 240 },
+            children: [new TextRun({ text: `Figura ${figuras}. ${decodificar(imagen.text)}`, italics: true, size: 18, color: '6B7280' })],
+        }),
+    ];
+}
 
 function diagrama(codigo) {
     diagramas++;
@@ -254,7 +318,11 @@ class Convertidor {
     bloque(t, contexto) {
         switch (t.type) {
             case 'heading': return [this.titulo(t)];
-            case 'paragraph': return [this.parrafo(inline(t.tokens), contexto, t.text.trim().endsWith(':') ? { keepNext: true } : {})];
+            case 'paragraph': {
+                const imagenes = t.tokens.filter(x => x.type === 'image');
+                if (imagenes.length === 1 && t.tokens.every(x => x.type === 'image' || !x.raw.trim())) return figura(imagenes[0]);
+                return [this.parrafo(inline(t.tokens), contexto, t.text.trim().endsWith(':') ? { keepNext: true } : {})];
+            }
             case 'text': return [this.parrafo(inline(t.tokens ?? [{ type: 'text', text: t.text }]), contexto)];
             case 'list': return this.lista(t, contexto, 0);
             case 'table': return [this.tabla(t), new Paragraph({ spacing: { after: 80 }, children: [] })];
@@ -270,11 +338,17 @@ class Convertidor {
     }
 
     titulo(t) {
-        const texto = decodificar(t.text).replace(/`/g, '');
+        let texto = decodificar(t.text).replace(/`/g, '');
         const nivel = { 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 }[t.depth] ?? HeadingLevel.HEADING_4;
         const id = marcador(`cap ${this.cap} ${texto}`);
+        let contenido = inline(t.tokens);
+        // Manuales de usuario: las secciones se numeran con el capítulo (2.1, 2.2…), como en el índice.
+        if (DE_USUARIO && t.depth === 2) {
+            texto = `${this.cap}.${this.secciones.length + 1} ${texto}`;
+            contenido = [new TextRun(`${this.cap}.${this.secciones.length + 1} `), ...contenido];
+        }
         if (t.depth === 2) this.secciones.push({ texto, id });
-        return new Paragraph({ heading: nivel, children: [new Bookmark({ id, children: inline(t.tokens) })] });
+        return new Paragraph({ heading: nivel, children: [new Bookmark({ id, children: contenido })] });
     }
 
     parrafo(runs, contexto, extra = {}) {
@@ -380,10 +454,12 @@ class Convertidor {
 
 function capitulo(indice) {
     const { archivo, titulo } = CAPITULOS[indice];
-    const md = fs.readFileSync(path.join(RAIZ, archivo), 'utf8');
-    const tokens = marked.lexer(md);
-    const primerH1 = tokens.findIndex(t => t.type === 'heading' && t.depth === 1);
-    if (primerH1 >= 0) tokens.splice(primerH1, 1);
+    let tokens = CAPITULOS[indice].tokens;
+    if (!tokens) {
+        tokens = marked.lexer(fs.readFileSync(path.join(RAIZ, archivo), 'utf8'));
+        const primerH1 = tokens.findIndex(t => t.type === 'heading' && t.depth === 1);
+        if (primerH1 >= 0) tokens.splice(primerH1, 1);
+    }
     // En el README, la sección que enlaza los documentos sobra: el índice del manual ya los lista.
     if (archivo === 'README.md') {
         const i = tokens.findIndex(t => t.type === 'heading' && t.text === 'Documentación técnica');
@@ -394,13 +470,30 @@ function capitulo(indice) {
     const cuerpo = conv.bloques(tokens);
     const encabezado = new Paragraph({
         heading: HeadingLevel.HEADING_1,
-        pageBreakBefore: true,
+        // Manuales de usuario: los capítulos van seguidos (solo el primero empieza después del índice).
+        pageBreakBefore: !DE_USUARIO || numero === 1,
         children: [new Bookmark({ id: marcador(`cap ${numero} ${titulo}`), children: [new TextRun(`${numero}. ${titulo}`)] })],
     });
     return { titulo, numero, secciones: conv.secciones, parrafos: [encabezado, ...cuerpo] };
 }
 
+/** Portada de un manual de usuario, como los de Control Procesos: nombre, manual, para quién, versión y aviso. */
+function portadaUsuario() {
+    const hoy = new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
+    const version = argumento('--version') ?? '1.0';
+    const linea = (texto, opciones = {}) => new Paragraph({ alignment: AlignmentType.CENTER, ...opciones.p, children: [new TextRun({ text: texto, font: FUENTE, ...opciones.r })] });
+    return [
+        new Paragraph({ spacing: { before: 3400 }, children: [] }),
+        linea('PsicoBatería', { r: { size: 64, color: AZUL, bold: true }, p: { spacing: { after: 60 } } }),
+        linea(SUBTITULO, { r: { size: 36, color: '111827' }, p: { spacing: { after: 480 } } }),
+        linea(PROYECTO.descripcion, { r: { size: 24, color: '4B5563' }, p: { spacing: { after: 2600 } } }),
+        linea(`Versión ${version} · ${hoy}`, { r: { size: 22, color: '111827' } }),
+        linea('Documento interno. No publicar.', { r: { size: 20, italics: true, color: 'B91C1C' } }),
+    ];
+}
+
 function portada() {
+    if (DE_USUARIO) return portadaUsuario();
     const hoy = new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
     let version = '';
     try {
@@ -452,11 +545,11 @@ function documento(capitulos) {
     return new Document({
         creator: 'PsicoBatería',
         title: `${TITULO} – ${SUBTITULO}`,
-        description: `Documentación técnica del ${SUBTITULO.toLowerCase()}, generada desde README.md y docs/*.md`,
+        description: DE_USUARIO ? `${SUBTITULO} de PsicoBatería` : `Documentación técnica del ${SUBTITULO.toLowerCase()}, generada desde README.md y docs/*.md`,
         styles: {
             default: {
                 document: { run: { font: FUENTE, size: 21, color: '1F2937' }, paragraph: { spacing: { after: 120, line: 276 } } },
-                heading1: encabezadoTitulo(36, AZUL, 0, 240),
+                heading1: encabezadoTitulo(36, AZUL, DE_USUARIO ? 480 : 0, 240), // en los de usuario los capítulos van seguidos
                 heading2: encabezadoTitulo(28, AZUL, 360, 120),
                 heading3: encabezadoTitulo(24, '111827', 240, 80),
                 heading4: encabezadoTitulo(22, '374151', 200, 60),
@@ -475,15 +568,15 @@ function documento(capitulos) {
                 children: portada(),
             },
             {
-                properties: { page: { size: { width: ANCHO_PAGINA, height: ALTO_PAGINA }, margin: { top: MARGEN, bottom: MARGEN, left: MARGEN, right: MARGEN }, pageNumbers: { start: 1 } } },
+                properties: { page: { size: { width: ANCHO_PAGINA, height: ALTO_PAGINA }, margin: { top: MARGEN, bottom: MARGEN, left: MARGEN, right: MARGEN }, ...(DE_USUARIO ? {} : { pageNumbers: { start: 1 } }) } },
                 headers: { default: new Header({ children: [new Paragraph({
                     alignment: AlignmentType.RIGHT,
                     border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: GRIS_BORDE, space: 4 } },
-                    children: [new TextRun({ text: `${TITULO} – ${SUBTITULO}`, size: 16, color: '6B7280' })],
+                    children: [new TextRun({ text: DE_USUARIO ? `${TITULO} · ${SUBTITULO}` : `${TITULO} – ${SUBTITULO}`, size: 16, color: '6B7280' })],
                 })] }) },
                 footers: { default: new Footer({ children: [new Paragraph({
                     alignment: AlignmentType.CENTER,
-                    children: [new TextRun({ children: ['Página ', PageNumber.CURRENT], size: 16, color: '6B7280' })],
+                    children: [new TextRun({ children: DE_USUARIO ? ['Página ', PageNumber.CURRENT, ' de ', PageNumber.TOTAL_PAGES] : ['Página ', PageNumber.CURRENT], size: 16, color: '6B7280' })],
                 })] }) },
                 children: [...indice(capitulos).map((p, i) => (i === 0 ? new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('Contenido')] }) : p)),
                     ...capitulos.flatMap(c => c.parrafos)],
@@ -503,7 +596,7 @@ try {
     // Sin entradas de carpeta en el zip: Word ha rechazado archivos que las traen al abrirlos desde la nube.
     try { execFileSync('zip', ['-dq', salida, '*/'], { stdio: 'ignore' }); } catch { /* no había o no hay zip */ }
     console.log(`Manual generado: ${salida}`);
-    console.log(`  ${capitulos.length} capítulos, ${diagramas} diagramas`);
+    console.log(`  ${capitulos.length} capítulos, ${diagramas} diagramas${DE_USUARIO ? `, ${figuras} figuras` : ''}`);
 } finally {
     fs.rmSync(temporal, { recursive: true, force: true });
 }

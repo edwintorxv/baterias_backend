@@ -5,11 +5,16 @@
   "type": "module",
   "scripts": {
     "generar": "node generar.mjs",
-    "generar:front": "node generar.mjs --proyecto front"
+    "generar:front": "node generar.mjs --proyecto front",
+    "capturas": "node capturas.mjs",
+    "generar:psicologo": "node generar.mjs --proyecto psicologo",
+    "generar:administrador": "node generar.mjs --proyecto administrador",
+    "generar:cliente": "node generar.mjs --proyecto cliente"
   },
   "dependencies": {
     "@mermaid-js/mermaid-cli": "11.4.2",
     "docx": "9.5.0",
-    "marked": "15.0.12"
+    "marked": "15.0.12",
+    "puppeteer": "23.11.1"
   }
 }
