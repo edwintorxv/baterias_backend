@@ -73,6 +73,9 @@ Para agregar una decisión: va en su tema, con la fecha (`AAAA-MM-DD`) y el moti
 **El NIT del cliente no se modifica** después de creado.
 - *Motivo*: identifica a la empresa en los informes y en los nombres de archivo.
 
+**2026-11-25 · El NIT del cliente es único también en la BD** (V24, `UNIQUE (nit)`), además de la validación del servicio; al crear se le quitan los espacios a los lados. No se normalizan puntos ni guiones (`900.123.456-7` y `9001234567` serían NIT distintos).
+- *Motivo*: dos altas simultáneas podían pasar la validación del servicio; la restricción las frena con un 409.
+
 ## Informes
 
 **2026-10-20 · El informe individual lo ve cualquier psicólogo asignado al cliente**, no solo el firmante. El ADMIN y el CLIENTE no lo ven.
@@ -190,5 +193,4 @@ El enlace vence a las 48 h y es de un solo uso.
 | Consentimiento informado, custodia/retención de la historia clínica, registro de quién consulta o descarga informes individuales | Propuesto el 2026-10-21; por validar con el área psicológica/legal |
 | Plan de Render (Starter o mantenerlo despierto) y pausa de Supabase | Se deja como está (2026-11-24); se retoma si el uso lo exige |
 | `MINIMO_PERSONAS_GRUPO` definitivo | Valor provisional 2 |
-| `UNIQUE (nit)` en `cliente` (hoy la unicidad la valida solo el servicio) | Hallazgo del 2026-11-24 |
 | Borrar las columnas viejas de `evaluado` que pasaron a la relación (V17) | Pendiente de una migración |

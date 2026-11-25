@@ -99,7 +99,7 @@ erDiagram
     sector_economico ||--o{ industria : ""
 
     cliente {
-        varchar nit
+        varchar nit "UNIQUE"
         varchar nombre
     }
     evaluado {
@@ -134,7 +134,7 @@ erDiagram
 
 | Tabla | Qué guarda |
 |---|---|
-| `cliente` | La empresa evaluada: NIT, nombre, industria, ciudad y datos de contacto. El NIT no cambia después de creado (lo valida el servicio) |
+| `cliente` | La empresa evaluada: NIT, nombre, industria, ciudad y datos de contacto. El NIT es único (V24, `uk_cliente_nit`; se guarda sin espacios a los lados) y no cambia después de creado (lo valida el servicio) |
 | `evaluado` | **La persona**: solo lo que no cambia (documento único, nombre, apellido, sexo, año de nacimiento) |
 | `evaluado_cliente` | **La relación persona–empresa** y la foto de los datos que sí cambian (ver abajo) |
 | `aplicacion` | Una aplicación de la batería a una persona en una empresa. Guarda la forma elegida (`fk_grupo_ocupacional`), las preguntas filtro (`atiende_clientes`, `es_jefe`; `NULL` = sin registrar), el evaluador que firma y las observaciones y recomendaciones del informe individual |
@@ -290,6 +290,7 @@ Corresponden a las opciones de la **ficha de datos generales** de la batería y 
 | V21 | Ajustes menores (se borra `aplicacion.estado`; "Más de un año") |
 | V22 | Registro de ingresos |
 | V23 | Enlaces de contraseña, contraseña opcional y `sesiones_desde` |
+| V24 | NIT del cliente único (`uk_cliente_nit`) |
 
 Reglas:
 - **Nunca se edita una migración ya aplicada.** Flyway compara checksums y la app dejaría de arrancar.

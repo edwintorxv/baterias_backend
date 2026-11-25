@@ -55,4 +55,15 @@ class ClienteServiceTest {
         assertEquals("Ya existe un cliente con NIT: 900123456", ex.getMessage());
     }
 
+    @Test
+    void crear_quitaLosEspaciosDelNitAntesDeValidarYGuardar() {
+        when(repository.existsByNit("900123456")).thenReturn(true);
+
+        assertThrows(BusinessException.class, () -> service.crear(cliente(" 900123456 ", "Otra")));
+        verify(repository, never()).save(any());
+
+        ClienteEntity creado = service.crear(cliente(" 800999888 ", "Nueva"));
+        assertEquals("800999888", creado.getNit());
+    }
+
 }

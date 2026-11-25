@@ -17,7 +17,9 @@ public class ClienteService {
         this.repository = repository;
     }
 
+    /** El NIT se guarda sin espacios a los lados; la BD lo exige único (V24, uk_cliente_nit). */
     public ClienteEntity crear(ClienteEntity entidad) {
+        entidad.setNit(entidad.getNit().trim());
         if (repository.existsByNit(entidad.getNit())) {
             throw new BusinessException("Ya existe un cliente con NIT: " + entidad.getNit());
         }
