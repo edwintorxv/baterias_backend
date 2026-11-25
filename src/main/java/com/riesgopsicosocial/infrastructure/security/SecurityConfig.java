@@ -57,6 +57,8 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").authenticated()
 
                         .requestMatchers("/usuarios/**").hasRole(ADMIN)
+                        // La IP de cada intento es un dato personal: solo el administrador.
+                        .requestMatchers(HttpMethod.GET, "/registro-ingresos").hasRole(ADMIN)
 
                         .requestMatchers(HttpMethod.GET, CONFIGURACION).hasAnyRole(ADMIN, PSICOLOGO)
                         .requestMatchers(CONFIGURACION).hasRole(ADMIN)

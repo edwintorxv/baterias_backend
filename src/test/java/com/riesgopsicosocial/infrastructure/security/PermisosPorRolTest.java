@@ -87,6 +87,8 @@ class PermisosPorRolTest {
             caso(POST, "/usuarios", ADMIN),
             caso(PUT, "/usuarios/1/clientes", ADMIN),
             caso(POST, "/usuarios/1/enlace-contrasena", ADMIN),
+            caso(GET, "/registro-ingresos", ADMIN),
+            caso(POST, "/registro-ingresos"),
 
             caso(GET, "/preguntas", ADMIN, PSICOLOGO),
             caso(GET, "/cuestionarios", ADMIN, PSICOLOGO),

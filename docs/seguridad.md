@@ -71,7 +71,7 @@ Un `CHECK` en la BD amarra cada rol con su vínculo (ver `docs/modelo-de-datos.m
 - **Nunca se guarda la contraseña.**
 - Si falla la escritura, el error queda en el log y el login sigue.
 - **Retención de 12 meses** (`app.seguridad.ingresos.retencion`), porque la IP es un dato personal. Lo viejo se borra un minuto después de arrancar y luego una vez al día.
-- Todavía no hay pantalla: se consulta en la BD.
+- **Consulta** (2026-11-25): `GET /registro-ingresos?desde=&hasta=` (`RegistroIngresoController` → `RegistroIngresoService`), **solo ADMIN** porque la IP es un dato personal. Fechas `yyyy-MM-dd`, los dos días incluidos; sin ellas, los últimos 30 días hasta hoy; `desde` posterior a `hasta` → 400. Devuelve los totales de exitosos, fallidos y bloqueados de todo el rango y las filas de la más reciente a la más antigua, con el nombre del usuario si el correo existe, con un tope de **2.000** (`truncado: true` y el mensaje lo avisan). Solo lectura y sin exportar. El front la muestra en Administración → Ingresos.
 
 ## Contraseñas por enlace
 
@@ -144,6 +144,7 @@ Las reglas se evalúan en orden y **gana la primera que coincide**. Al final, **
 | `POST /auth/login`, `GET`/`POST /auth/enlace`, Swagger | público | público | público |
 | `/auth/**` (yo, cambiar contraseña) | ✓ | ✓ | ✓ |
 | `/usuarios/**` | ✓ | | |
+| `GET /registro-ingresos` | ✓ | | |
 | Configuración de la batería (cuestionarios, preguntas, dominios, dimensiones, baremos, escalas…) | lectura y escritura | lectura | |
 | Catálogos (departamentos, ciudades, sexos, tipos de cargo…) | lectura | lectura | |
 | `GET /clientes`, `GET /clientes/{id}` | ✓ | ✓ (sus clientes) | |
