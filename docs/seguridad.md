@@ -118,6 +118,13 @@ Solo puede hacerlo un ADMIN. Responde 409 si el usuario está inactivo o si el a
 
 **Crear un usuario** (`UsuarioService.crearConInvitacion`): se crea sin contraseña y con la invitación en la misma transacción. Si se crea inactivo, no se envía nada; el enlace se genera cuando se active.
 
+**Estado de la contraseña en el listado** (2026-11-25): `GET /usuarios` y los demás endpoints de `/usuarios` devuelven `estadoContrasena` en cada usuario, para que el administrador sepa a quién reenviarle el enlace sin preguntarle:
+- `DEFINIDA`: ya tiene contraseña.
+- `PENDIENTE`: no tiene contraseña y tiene un enlace sin usar, sin anular y sin vencer; `venceEnlace` dice hasta cuándo sirve.
+- `SIN_ENLACE`: no tiene contraseña y su enlace venció, se anuló o nunca se generó (por ejemplo, porque se creó inactivo).
+
+`EnlaceContrasenaService.estadosContrasena` lo calcula para todo el listado con una sola consulta (`vencimientosVigentes`), y solo para los usuarios sin contraseña. Nunca expone la contraseña, su hash ni el código del enlace.
+
 **Primer administrador** (`PrimerAdministrador`): si la tabla `usuario` está vacía al arrancar, se crea con `APP_SEGURIDAD_ADMIN_CORREO` y `APP_SEGURIDAD_ADMIN_CONTRASENA`. Después esas variables se ignoran y conviene vaciarlas.
 
 ### Cambiar la propia contraseña

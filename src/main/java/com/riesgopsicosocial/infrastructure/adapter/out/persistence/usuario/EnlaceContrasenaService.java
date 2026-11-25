@@ -18,7 +18,11 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -54,6 +58,33 @@ public class EnlaceContrasenaService {
         this.eventos = eventos;
         this.passwordEncoder = passwordEncoder;
         this.reloj = reloj;
+    }
+
+    /**
+     * Estado de la contraseña de cada usuario (por id), con una sola consulta para todo el listado: definida,
+     * pendiente (con el vencimiento de su enlace) o sin enlace vigente. Para que el administrador sepa a quién
+     * reenviarle el enlace sin tener que preguntarle.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, ContrasenaUsuario> estadosContrasena(Collection<UsuarioEntity> usuarios) {
+        Map<Long, ContrasenaUsuario> estados = new HashMap<>();
+        List<Long> sinContrasena = usuarios.stream()
+                .filter(u -> u.getContrasenaHash() == null).map(UsuarioEntity::getId).toList();
+        usuarios.stream().filter(u -> u.getContrasenaHash() != null)
+                .forEach(u -> estados.put(u.getId(), ContrasenaUsuario.DEFINIDA));
+        sinContrasena.forEach(id -> estados.put(id, ContrasenaUsuario.SIN_ENLACE));
+        if (!sinContrasena.isEmpty()) {
+            for (Object[] fila : enlaceRepository.vencimientosVigentes(sinContrasena, LocalDateTime.now(reloj))) {
+                estados.put((Long) fila[0], ContrasenaUsuario.pendiente((LocalDateTime) fila[1]));
+            }
+        }
+        return estados;
+    }
+
+    /** Igual que {@link #estadosContrasena(Collection)}, para un solo usuario. */
+    @Transactional(readOnly = true)
+    public ContrasenaUsuario estadoContrasena(UsuarioEntity usuario) {
+        return estadosContrasena(List.of(usuario)).get(usuario.getId());
     }
 
     /**

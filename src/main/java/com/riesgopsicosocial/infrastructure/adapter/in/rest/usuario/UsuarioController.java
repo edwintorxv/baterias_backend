@@ -2,6 +2,7 @@ package com.riesgopsicosocial.infrastructure.adapter.in.rest.usuario;
 
 import com.riesgopsicosocial.infrastructure.adapter.in.rest.usuario.dto.*;
 import com.riesgopsicosocial.infrastructure.adapter.out.correo.CorreoService;
+import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.ContrasenaUsuario;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.EnlaceContrasenaService;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.Rol;
 import com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.UsuarioEntity;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Usuarios de la API y clientes asignados a cada psicólogo. Sin DELETE: se desactivan. El administrador
@@ -34,8 +36,13 @@ public class UsuarioController {
     }
 
     private UsuarioResponse toResponse(UsuarioEntity usuario) {
+        return toResponse(usuario, enlaceService.estadoContrasena(usuario));
+    }
+
+    private static UsuarioResponse toResponse(UsuarioEntity usuario, ContrasenaUsuario contrasena) {
         return new UsuarioResponse(usuario.getId(), usuario.getCorreo(), usuario.getNombre(), usuario.getRol(),
-                usuario.getFkEvaluador(), usuario.getFkCliente(), usuario.getFkEvaluado(), usuario.getActivo());
+                usuario.getFkEvaluador(), usuario.getFkCliente(), usuario.getFkEvaluado(), usuario.getActivo(),
+                contrasena.estado(), contrasena.venceEnlace());
     }
 
     private static UsuarioEntity toEntity(String correo, String nombre, Rol rol, Long idEvaluador, Long idCliente,
@@ -94,7 +101,9 @@ public class UsuarioController {
             return ResponseEntity.ok(ResponseBuilder.success("Usuario encontrado",
                     List.of(toResponse(service.obtenerPorCorreo(correo)))));
         }
-        List<UsuarioResponse> data = service.listar(rol, activo).stream().map(this::toResponse).toList();
+        List<UsuarioEntity> usuarios = service.listar(rol, activo);
+        Map<Long, ContrasenaUsuario> contrasenas = enlaceService.estadosContrasena(usuarios);
+        List<UsuarioResponse> data = usuarios.stream().map(u -> toResponse(u, contrasenas.get(u.getId()))).toList();
         return ResponseEntity.ok(ResponseBuilder.success("Listado de usuarios", data));
     }
 

@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface EnlaceContrasenaJpaRepository extends JpaRepository<EnlaceContrasenaEntity, Long> {
@@ -35,5 +37,17 @@ public interface EnlaceContrasenaJpaRepository extends JpaRepository<EnlaceContr
                and (e.proposito = com.riesgopsicosocial.infrastructure.adapter.out.persistence.usuario.PropositoEnlace.RESTABLECER
                     or e.fechaUso is not null)""")
     boolean yaTuvoContrasena(@Param("idUsuario") Long idUsuario);
+
+    /**
+     * Por usuario, el vencimiento de su enlace vigente (sin usar, sin anular y sin vencer). Cada fila es
+     * {idUsuario, vence}; quien no tiene enlace vigente no aparece. Normalmente hay uno solo por usuario,
+     * porque generar uno nuevo anula los anteriores.
+     */
+    @Query("""
+            select e.fkUsuario, max(e.vence) from EnlaceContrasenaEntity e
+             where e.fkUsuario in :idsUsuario and e.fechaUso is null and e.anulado = false and e.vence > :ahora
+             group by e.fkUsuario""")
+    List<Object[]> vencimientosVigentes(@Param("idsUsuario") Collection<Long> idsUsuario,
+                                        @Param("ahora") LocalDateTime ahora);
 
 }

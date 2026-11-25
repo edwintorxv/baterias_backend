@@ -247,4 +247,43 @@ class EnlaceContrasenaServiceTest {
         assertTrue(passwordEncoder.matches("nueva-clave", usuario.getContrasenaHash()));
     }
 
+    private static UsuarioEntity usuarioCon(long id, String contrasenaHash) {
+        UsuarioEntity u = new UsuarioEntity();
+        u.setId(id);
+        u.setContrasenaHash(contrasenaHash);
+        return u;
+    }
+
+    @Test
+    void estadosContrasena_definida_pendienteConVencimiento_ySinEnlace_enUnaSolaConsulta() {
+        UsuarioEntity conContrasena = usuarioCon(1L, "$2a$hash");
+        UsuarioEntity conEnlace = usuarioCon(2L, null);
+        UsuarioEntity sinEnlace = usuarioCon(3L, null);
+        LocalDateTime vence = AHORA.plusHours(30);
+        when(enlaceRepository.vencimientosVigentes(List.of(2L, 3L), AHORA))
+                .thenReturn(List.<Object[]>of(new Object[]{2L, vence}));
+
+        var estados = service.estadosContrasena(List.of(conContrasena, conEnlace, sinEnlace));
+
+        assertEquals(new ContrasenaUsuario(EstadoContrasena.DEFINIDA, null), estados.get(1L));
+        assertEquals(new ContrasenaUsuario(EstadoContrasena.PENDIENTE, vence), estados.get(2L));
+        assertEquals(new ContrasenaUsuario(EstadoContrasena.SIN_ENLACE, null), estados.get(3L));
+        verify(enlaceRepository, times(1)).vencimientosVigentes(any(), any());
+    }
+
+    @Test
+    void estadosContrasena_todosConContrasena_noConsultaLosEnlaces() {
+        var estados = service.estadosContrasena(List.of(usuarioCon(1L, "$2a$hash")));
+
+        assertEquals(EstadoContrasena.DEFINIDA, estados.get(1L).estado());
+        verify(enlaceRepository, never()).vencimientosVigentes(any(), any());
+    }
+
+    @Test
+    void estadoContrasena_unUsuarioSinContrasenaYSinEnlaceVigente_SIN_ENLACE() {
+        when(enlaceRepository.vencimientosVigentes(List.of(9L), AHORA)).thenReturn(List.of());
+
+        assertEquals(EstadoContrasena.SIN_ENLACE, service.estadoContrasena(usuarioCon(9L, null)).estado());
+    }
+
 }
