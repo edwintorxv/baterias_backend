@@ -199,7 +199,7 @@ Hay tres puntos de control:
 - **Datos personales**:
   - La plantilla de carga de personas siempre se descarga vacía: nunca se exportan personas ya cargadas.
   - Los informes protegen los grupos pequeños (ver `docs/informes.md`).
-  - El correo de los enlaces nunca se registra en el log con su código (ver `docs/correo.md`).
+  - Con Brevo activo, el código de los enlaces no se escribe en el log. **En modo log sí se escribe**, porque ese modo existe para desarrollo; en producción hay que verificar que las variables de Brevo estén puestas (ver `docs/correo.md`).
 
 ## Dónde está el código
 
